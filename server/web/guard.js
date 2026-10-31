@@ -41,11 +41,17 @@ PARENT.passphrase = 'family';
 
 renderTabs = function (on) {
   const tabs = [['home', 'house', '홈'], ['sim', 'gamepad-2', '체험'], ['detect', 'shield-check', '검사'], ['report', 'messages-square', '커뮤니티'], ['family', 'users', '가족']];
-  $('#tabbar').innerHTML = `<button class="side-logo" onclick="go('home')" aria-label="홈으로"><img src="assets/brand/logo-horizontal.png" alt="Cody Safe"></button>` + tabs.map(([k, i, t]) => k === 'detect'
+  $('#tabbar').innerHTML = `<button class="side-logo" onclick="logoHome()" aria-label="소개 페이지로"><img src="assets/brand/logo-horizontal.png" alt="Cody Safe"></button>` + tabs.map(([k, i, t]) => k === 'detect'
     ? `<button class="tab tab-center ${on === k ? 'on' : ''}" onclick="go('${k}')"><span class="fab">${ic(i)}</span><span>${t}</span></button>`
     : `<button class="tab ${on === k ? 'on' : ''}" onclick="go('${k}')">${ic(i)}<span>${t}</span></button>`).join('') + `<button class="tab admin-tab ${on === 'admin' ? 'on' : ''}" onclick="go('admin')">${ic('chart-column')}<span>관리자</span></button>`;
   icons();
 };
+
+// 앱 안에는 소개 페이지가 필요 없어 홈으로 보내고, 웹은 랜딩으로 나갑니다. 미리보기에서 눌러도 창 전체가 이동합니다.
+function logoHome() {
+  if (native) go('home');
+  else window.top.location.href = '/';
+}
 
 /* ---------------- PC 화면: 오른쪽 모바일 미리보기 ---------------- */
 const embedded = document.body.classList.contains('embedded');
@@ -117,7 +123,7 @@ async function loadDemoFamily() {
 
 function demoPicker() {
   return `<div class="page">
-    <div class="brand-hero small"><button class="logo-home" onclick="go('home')" aria-label="홈으로"><img src="assets/brand/logo-horizontal.png" alt="Cody Safe"></button></div>
+    <div class="brand-hero small"><button class="logo-home" onclick="logoHome()" aria-label="소개 페이지로"><img src="assets/brand/logo-horizontal.png" alt="Cody Safe"></button></div>
     <div class="lead-text">누구로<br><em>시연</em>할까요?</div>
     <div class="demo-list">${demoMembers.map((m) => `<button class="demo-person" onclick="demoEnter('${esc(m.id)}')"><span><b>${esc(m.name)}</b><small>${DEMO_LABEL[m.role]}</small></span>${ic('chevron-right')}</button>`).join('')}</div>
     <div class="card mt soft-warn">시연용 가족입니다. 접속한 사람 모두 같은 기록을 볼 수 있으니 실제 통화는 올리지 마세요.</div>
@@ -197,7 +203,7 @@ document.querySelectorAll('.sb-icons').forEach((el) => { el.innerHTML = `<svg wi
 function onboardingPage() {
   if (!accepted()) {
     return `<div class="page">
-      <div class="brand-hero"><button class="logo-home" onclick="go('home')" aria-label="홈으로"><img src="assets/brand/logo-vertical.png" alt="Cody Safe"></button></div>
+      <div class="brand-hero"><button class="logo-home" onclick="logoHome()" aria-label="소개 페이지로"><img src="assets/brand/logo-vertical.png" alt="Cody Safe"></button></div>
       <div class="lead-text">AI 사기는 <em>미리 경험</em>하고,<br>가족과 <em>함께</em> 막아요</div>
       <div class="card"><ul class="notice">
         ${['앱이 통화를 직접 녹음하지 않고, 이미 저장된 파일만 읽습니다.', '폴더를 연결한 뒤에 생긴 파일만 서버로 보냅니다.', (keepAudio ? '음성은 분석 후에도 사용자별로 저장되며, 기록을 삭제하면 함께 지워집니다. 일상 통화는 글자 기록을 남기지 않습니다.' : '음성은 분석 후 삭제하고, 일상 통화는 글자 기록도 남기지 않습니다.'), '사기로 의심되는 통화의 글자 기록은 검토를 위해 보관합니다.', '분석 내용은 본인만 봅니다. 가족에게는 보이스피싱 의심 여부만 알립니다.']
@@ -209,7 +215,7 @@ function onboardingPage() {
   }
   if (demoMembers.length) return demoPicker();
   return `<div class="page">
-    <div class="brand-hero small"><button class="logo-home" onclick="go('home')" aria-label="홈으로"><img src="assets/brand/logo-horizontal.png" alt="Cody Safe"></button></div>
+    <div class="brand-hero small"><button class="logo-home" onclick="logoHome()" aria-label="소개 페이지로"><img src="assets/brand/logo-horizontal.png" alt="Cody Safe"></button></div>
     <div class="lead-text">가족 안에서<br><em>누구</em>신가요?</div>
     <div class="card">${rolePicker()}
     <div class="field"><label for="regName">가족에게 보일 이름</label><input id="regName" maxlength="30" placeholder="예: 민수"></div>
@@ -352,7 +358,7 @@ function deleteSheet(id) {
 
 /* ---------------- 홈 ---------------- */
 SCREENS.home = gated(() => `<div class="page">
-  <div class="brand-bar"><button class="logo-home" onclick="go('home')" aria-label="홈으로"><img src="assets/brand/logo-horizontal.png" alt="Cody Safe"></button>
+  <div class="brand-bar"><button class="logo-home" onclick="logoHome()" aria-label="소개 페이지로"><img src="assets/brand/logo-horizontal.png" alt="Cody Safe"></button>
     <span class="brand-actions"><button class="brand-bell" onclick="go('family')" aria-label="가족 경고">${ic('bell')}</button><button class="brand-bell" onclick="go('me')" aria-label="MY">${ic('user-round')}</button></span></div>
   <div class="home-greeting">안녕하세요${store.get('name') ? `, ${esc(store.get('name'))}님` : ''}</div>
   <div class="home-sub">오늘도 함께 살펴볼게요.</div>
@@ -466,42 +472,19 @@ function userDashboard({ dash }) {
 }
 
 /* ---------------- 관리자 대시보드: 개인을 알 수 없는 집계만 ---------------- */
-const adminToken = {
-  get: () => { try { return sessionStorage.getItem('guard.admin') || ''; } catch (e) { return ''; } },
-  set: (v) => { try { sessionStorage.setItem('guard.admin', v); } catch (e) { } },
-  del: () => { try { sessionStorage.removeItem('guard.admin'); } catch (e) { } },
-};
 let adminIncludeDemo = true;
+let opsTimer = null;
 const LABEL_NAME = { voice_phishing: '보이스피싱 의심', other_scam: '다른 사기 의심', normal: '사기 징후 못 찾음', uncertain: '판단 어려움' };
 const EVENT_NAME = { family_alert: '가족 경고 발송', alert_ack: '가족 경고 확인', lock_auto: '자동 잠금', lock_manual: '직접 잠금', unlock_family: '가족 해제', unlock_self: '본인 해제 요청' };
 
-SCREENS.admin = () => `<div class="page">
+SCREENS.admin = () => `<div class="page admin-page">
   <div class="lead" style="margin-top:6px">관리자 대시보드</div>
-  <div class="lead-sub" style="margin-top:6px">이름과 통화 내용 없이 집계만 보여 줍니다.</div>
+  <div class="lead-sub" style="margin-top:6px">이름과 통화 내용 없이 집계로 사기 흐름을 봅니다.</div>
   <div id="adminBody"></div>
 </div>`;
 
-function adminLogin() {
-  return `<div class="card mt"><div class="field" style="margin-top:0"><label for="adminKey">관리자 비밀번호</label><input id="adminKey" type="password" autocomplete="off"></div>
-    <button class="btn pri block mt" onclick="adminEnter()">들어가기</button></div>`;
-}
-
-function adminEnter() {
-  adminToken.set($('#adminKey').value.trim());
-  loadAdmin();
-}
-
-function adminLogout() {
-  adminToken.del();
-  go('home');
-}
-
 async function adminFetch(path) {
-  const res = await fetch(path, { headers: { 'X-Admin-Token': adminToken.get() } });
-  if (res.status === 403) {
-    adminToken.del();
-    throw new Error('403');
-  }
+  const res = await fetch(path);
   if (!res.ok) throw new Error(res.status);
   return res;
 }
@@ -522,38 +505,165 @@ async function downloadDataset() {
 async function loadAdmin() {
   const body = $('#adminBody');
   if (!body) return;
-  if (!adminToken.get()) { body.innerHTML = adminLogin(); return; }
   try {
-    const d = await (await adminFetch(`/v1/admin/dashboard?include_demo=${adminIncludeDemo}`)).json();
+    const [summary, o] = await Promise.all([
+      adminFetch(`/v1/admin/dashboard?include_demo=${adminIncludeDemo}`).then((r) => r.json()),
+      adminFetch(`/v1/admin/ops?hours=${opsHours}&include_demo=${adminIncludeDemo}`).then((r) => r.json()),
+    ]);
     if (!$('#adminBody')) return;
-    $('#adminBody').innerHTML = adminView(d);
+    const scrollY = view.scrollTop;
+    $('#adminBody').innerHTML = adminView({ f: summary.feedback, o, include_demo: summary.include_demo });
+    view.scrollTop = scrollY;
+    bindOpsTips();
     icons();
+    clearTimeout(opsTimer);
+    opsTimer = setTimeout(() => { if (route().r === 'admin' && !document.querySelector('.ops-table[open]')) loadAdmin(); }, 30000);
   } catch (e) {
-    body.innerHTML = adminLogin();
-    if (e.message === '403') toast('비밀번호가 맞지 않습니다', 'circle-alert');
+    body.innerHTML = '<div class="card mt"><div class="empty">대시보드를 불러오지 못했습니다.</div></div>';
   }
 }
 
+/* 관제 화면. 차트 색은 어두운 면에서 검증한 범주 색을 고정 순서로 씁니다. */
+const OPS_RANGES = [[24, '24시간'], [168, '7일'], [720, '30일']];
+const OPS_COLORS = ['#3987e5', '#d95926', '#199e70', '#c98500', '#d55181'];
+const OPS_OTHER = '#8a8a84';
+const WEEKDAYS = ['월', '화', '수', '목', '금', '토', '일'];
+let opsHours = 168;
+const typeName = (t) => (t === 'other' ? '기타' : BY_TYPE_NAME[t] || t);
+const pad2 = (n) => String(n).padStart(2, '0');
+function kstParts(epoch) {
+  const d = new Date((epoch + 9 * 3600) * 1000);
+  return { mo: d.getUTCMonth() + 1, da: d.getUTCDate(), h: d.getUTCHours() };
+}
+const opsTime = (epoch, hours) => {
+  const p = kstParts(epoch);
+  return hours <= 24 ? `${pad2(p.h)}시` : hours <= 168 ? `${p.mo}/${p.da} ${pad2(p.h)}시` : `${p.mo}/${p.da}`;
+};
+const change = (now, before) => (before ? `${now >= before ? '+' : ''}${Math.round((now - before) / before * 100)}%` : '이전 없음');
+const opsTip = (t) => `data-tip="${esc(t)}" tabindex="0"`;
+
+function stackedChart(d) {
+  const keys = Object.keys(d.series);
+  const color = (k, i) => (k === 'other' ? OPS_OTHER : OPS_COLORS[i]);
+  const totals = d.buckets.map((_, i) => keys.reduce((n, k) => n + d.series[k][i], 0));
+  const max = Math.max(1, ...totals);
+  const W = 760, H = 220, L = 30, B = 22, T = 8;
+  const plotH = H - B - T;
+  const bw = (W - L) / d.buckets.length;
+  const bars = d.buckets.map((b, i) => {
+    let y = H - B;
+    const rects = keys.map((k, n) => {
+      const v = d.series[k][i];
+      if (!v) return '';
+      const h = v / max * plotH;
+      y -= h;
+      return `<rect x="${L + i * bw + 1}" y="${y + 1}" width="${Math.max(bw - 2, 1)}" height="${Math.max(h - 2, 1)}" rx="1.5" fill="${color(k, n)}"/>`;
+    }).join('');
+    const tip = `${opsTime(b, d.hours)} · 총 ${totals[i]}건\n` + keys.filter((k) => d.series[k][i]).map((k) => `${typeName(k)} ${d.series[k][i]}건`).join('\n');
+    return `<g class="ops-col" ${opsTip(tip)}><rect x="${L + i * bw}" y="${T}" width="${bw}" height="${plotH}" fill="transparent"/>${rects}</g>`;
+  }).join('');
+  const grid = [0, .5, 1].map((r) => `<line x1="${L}" x2="${W}" y1="${H - B - r * plotH}" y2="${H - B - r * plotH}" class="ops-grid"/><text x="${L - 6}" y="${H - B - r * plotH + 4}" text-anchor="end" class="ops-axis">${Math.round(max * r)}</text>`).join('');
+  const every = Math.max(1, Math.ceil(d.buckets.length / 7));
+  const ticks = d.buckets.map((b, i) => (i % every ? '' : `<text x="${L + i * bw + bw / 2}" y="${H - 6}" text-anchor="middle" class="ops-axis">${opsTime(b, d.hours)}</text>`)).join('');
+  const legend = keys.map((k, n) => `<span><i style="background:${color(k, n)}"></i>${esc(typeName(k))}</span>`).join('');
+  const table = `<details class="ops-table"><summary>표로 보기</summary><table><thead><tr><th>구간</th>${keys.map((k) => `<th>${esc(typeName(k))}</th>`).join('')}</tr></thead><tbody>${d.buckets.map((b, i) => (totals[i] ? `<tr><td>${opsTime(b, d.hours)}</td>${keys.map((k) => `<td>${d.series[k][i]}</td>`).join('')}</tr>` : '')).join('')}</tbody></table></details>`;
+  if (!keys.length) return opsEmpty();
+  return `<div class="ops-legend">${legend}</div><svg viewBox="0 0 ${W} ${H}" role="img" aria-label="시간대별 사기 유형 건수">${grid}${bars}${ticks}</svg>${table}`;
+}
+
+const opsEmpty = () => '<div class="ops-empty">이 기간에 데이터가 없습니다.</div>';
+
+function falseAlarmChart(d) {
+  const pts = d.false_alarm;
+  if (!pts.length) return opsEmpty();
+  const W = 360, H = 170, L = 34, B = 22, T = 10;
+  const t0 = pts[0].at, t1 = Math.max(pts[pts.length - 1].at, t0 + 1);
+  const x = (t) => (pts.length === 1 ? (L + W) / 2 : L + (t - t0) / (t1 - t0) * (W - L - 8));
+  const rate = (p) => p.wrong / p.total * 100;
+  const max = Math.max(20, ...pts.map(rate));
+  const y = (v) => H - B - v / max * (H - B - T);
+  const line = pts.map((p, i) => `${i ? 'L' : 'M'}${x(p.at).toFixed(1)} ${y(rate(p)).toFixed(1)}`).join(' ');
+  const grid = [0, .5, 1].map((r) => `<line x1="${L}" x2="${W}" y1="${y(max * r)}" y2="${y(max * r)}" class="ops-grid"/><text x="${L - 6}" y="${y(max * r) + 4}" text-anchor="end" class="ops-axis">${Math.round(max * r)}%</text>`).join('');
+  const dots = pts.map((p) => `<g ${opsTip(`${opsTime(p.at, d.hours)}\n오탐 ${p.wrong} / 확인 ${p.total}건 (${Math.round(rate(p))}%)`)}><circle cx="${x(p.at)}" cy="${y(rate(p))}" r="11" fill="transparent"/><circle cx="${x(p.at)}" cy="${y(rate(p))}" r="4" fill="#3987e5" stroke="#1a1a19" stroke-width="2"/></g>`).join('');
+  return `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="오탐률 추이">${grid}<path d="${line}" fill="none" stroke="#3987e5" stroke-width="2"/>${dots}<text x="${L}" y="${H - 6}" class="ops-axis">${opsTime(t0, d.hours)}</text><text x="${W}" y="${H - 6}" text-anchor="end" class="ops-axis">${opsTime(t1, d.hours)}</text></svg>`;
+}
+
+function heatmap(d) {
+  const max = Math.max(1, ...d.heatmap.flat());
+  const cell = (v) => `rgba(57, 135, 229, ${v ? (0.18 + 0.82 * v / max).toFixed(2) : 0.04})`;
+  const hours = Array.from({ length: 24 }, (_, h) => `<span>${h % 6 ? '' : h}</span>`).join('');
+  return `<div class="ops-heat"><span></span>${hours}${d.heatmap.map((row, w) => `<b>${WEEKDAYS[w]}</b>${row.map((v, h) => `<i style="background:${cell(v)}" ${opsTip(`${WEEKDAYS[w]}요일 ${pad2(h)}시 · ${v}건`)}></i>`).join('')}`).join('')}</div>`;
+}
+
+function funnel(d) {
+  const max = Math.max(1, ...d.funnel.map((f) => f[1]));
+  return d.funnel.map(([name, n]) => `<div class="ops-bar"><span>${esc(name)}</span><div><i style="width:${n / max * 100}%"></i></div><b>${n}</b></div>`).join('');
+}
+
 function adminView(d) {
-  const f = d.feedback;
-  const pct = (v, n) => (v == null ? '-' : `${v}%`) + `<small>${n ? `${n[0]} / ${n[1]}건` : ''}</small>`;
-  const rows = (items) => (items.length ? `<div class="card admin-rows">${items.map(([k, v]) => `<div class="kv"><span>${esc(k)}</span><span>${esc(v)}</span></div>`).join('')}</div>` : emptyCard('아직 없습니다.'));
-  return `<div class="row between mt">
-      <button class="chip ${d.include_demo ? 'pri' : ''}" onclick="adminIncludeDemo=!adminIncludeDemo;loadAdmin()">시연 데이터 ${d.include_demo ? '포함' : '제외'}</button>
-      <div class="row" style="gap:6px"><button class="btn line sm" onclick="downloadDataset()">${ic('download')}데이터셋</button><button class="btn line sm" onclick="adminLogout()">나가기</button></div>
+  const { f, o } = d;
+  const T = o.totals;
+  const stat = (label, value, note) => `<div class="ops-stat"><span>${label}</span><b>${value}</b><small>${note}</small></div>`;
+  const pct = (v) => (v == null ? '-' : `${v}%`);
+  const surge = o.surges.length
+    ? o.surges.map((s) => `<div class="ops-surge"><span class="ops-flag">${ic('trending-up')}급증</span><b>${esc(typeName(s.type))}</b><span>최근 ${s.recent}건 · 평소 ${s.baseline}건</span><em>${s.ratio ? `${s.ratio}배` : '신규'}</em></div>`).join('')
+    : '<div class="ops-empty">기준을 넘은 급증이 없습니다.</div>';
+  const callers = o.callers.length
+    ? `<table class="ops-list"><thead><tr><th>번호</th><th>통화</th><th>신고 기기</th><th>주요 유형</th><th>최근</th></tr></thead><tbody>${o.callers.map((c) => `<tr><td class="mono">${esc(c.number)}</td><td>${c.calls}</td><td>${c.devices}</td><td>${esc(typeName(c.type))}</td><td>${opsTime(c.last, 168)}</td></tr>`).join('')}</tbody></table><div class="ops-foot">보이스피싱으로 남은 통화만 집계하고, 번호 가운데를 가립니다. 번호를 알 수 없는 통화 ${o.callers_no_number}건 제외. 판정 기반이라 범죄 번호로 확정된 것은 아닙니다.</div>`
+    : opsEmpty();
+  return `<div class="ops">
+    <div class="ops-bar-top">
+      <div class="ops-range">${OPS_RANGES.map(([h, t]) => `<button class="${opsHours === h ? 'on' : ''}" onclick="opsHours=${h};loadAdmin()">${t}</button>`).join('')}</div>
+      <button class="ops-btn ${d.include_demo ? 'on' : ''}" onclick="adminIncludeDemo=!adminIncludeDemo;loadAdmin()">시연 데이터 ${d.include_demo ? '포함' : '제외'}</button>
+      <span class="ops-live"><i></i>30초마다 갱신</span>
+      <span class="ops-spacer"></span>
+      <button class="ops-btn" onclick="downloadDataset()">${ic('download')}라벨 데이터셋</button>
     </div>
-    ${f.small_sample ? `<div class="card mt soft-warn">사람이 확인한 건이 ${f.confirmed}건으로 적어 참고용입니다. 성능 수치로 인용하지 마세요.</div>` : ''}
-    <div class="stat-grid mt">
-      <div class="stat"><b>${d.calls.total}건</b><span>AI 판정</span></div>
-      <div class="stat"><b>${f.confirmed}건</b><span>사람 확인</span></div>
-      <div class="stat"><b>${pct(f.false_alarm_rate, f.false_alarm_n)}</b><span>오탐률 (사람 확인 기준)</span></div>
-      <div class="stat"><b>${pct(f.miss_rate, f.miss_n)}</b><span>놓친 비율 (신고된 건 기준)</span></div>
+    ${d.include_demo ? '<div class="ops-note">시연 데이터가 포함되어 있습니다. 가상의 기록이며 실제 피해 통계가 아닙니다.</div>' : ''}
+    <div class="ops-stats">
+      ${stat('AI 판정', T.calls.toLocaleString(), `이전 기간 대비 ${change(T.calls, T.calls_before)}`)}
+      ${stat('보이스피싱 의심', T.phishing.toLocaleString(), `이전 기간 대비 ${change(T.phishing, T.phishing_before)}`)}
+      ${stat('사기 의심 비중', pct(T.scam_share), '전체 판정 중')}
+      ${stat('오탐률', pct(f.false_alarm_rate), `사람 확인 ${f.false_alarm_n[1]}건 중 ${f.false_alarm_n[0]}건${f.small_sample ? ' · 표본 적음' : ''}`)}
+      ${stat('놓친 비율', pct(f.miss_rate), `신고 ${f.miss_n[1]}건 중 ${f.miss_n[0]}건`)}
     </div>
-    <div class="sec-title">판정 분포</div>${rows(Object.entries(d.calls.by_label).map(([k, n]) => [LABEL_NAME[k] || k, n + '건']))}
-    <div class="sec-title">사람이 확인한 수법</div>${rows(d.scam_types.map((t) => [BY_TYPE_NAME[t.type] || t.type, t.n + '건']))}
-    <div class="sec-title">수법별 체험 평균</div>${rows(d.training.map((t) => [t.tag, `${t.average}점 · ${t.n}회`]))}
-    <div class="sec-title">대응 기록</div>${rows(Object.entries(d.events).map(([k, n]) => [EVENT_NAME[k] || k, n + '건']))}
-    <div class="muted small" style="margin-top:14px">재학습과 검색 색인 반영은 추후 과제입니다.</div>`;
+    <div class="ops-grid-layout">
+      <section class="ops-panel wide"><h3>시간대별 사기 유형</h3>${stackedChart(o)}</section>
+      <section class="ops-panel"><h3>급증 경보</h3>${surge}<div class="ops-foot">최근 구간이 평소의 2배 이상이고 3건 이상일 때</div></section>
+      <section class="ops-panel wide"><h3>반복 발신 번호 TOP 10</h3>${callers}</section>
+      <section class="ops-panel"><h3>오탐률 추이</h3>${falseAlarmChart(o)}<div class="ops-foot">사람이 확인한 보이스피싱 판정 기준</div></section>
+      <section class="ops-panel wide"><h3>요일·시간대 분포</h3>${heatmap(o)}<div class="ops-foot">사기 의심 통화를 올린 시각 기준 (한국 시간)</div></section>
+      <section class="ops-panel"><h3>대응 흐름</h3>${funnel(o)}</section>
+    </div>
+    <div class="ops-foot">재학습과 검색 색인 반영은 추후 과제입니다.</div>
+    <div class="ops-tip" id="opsTip" hidden></div>
+  </div>`;
+}
+
+function bindOpsTips() {
+  const root = document.querySelector('.ops');
+  const tip = $('#opsTip');
+  if (!root || !tip) return;
+  const show = (el, x, y) => {
+    tip.textContent = el.dataset.tip;
+    tip.hidden = false;
+    const box = root.getBoundingClientRect();
+    tip.style.left = `${Math.min(x - box.left + 12, box.width - tip.offsetWidth - 8)}px`;
+    tip.style.top = `${y - box.top + 12}px`;
+  };
+  root.addEventListener('mousemove', (e) => {
+    const el = e.target.closest('[data-tip]');
+    if (el) show(el, e.clientX, e.clientY);
+    else tip.hidden = true;
+  });
+  root.addEventListener('mouseleave', () => { tip.hidden = true; });
+  root.addEventListener('focusin', (e) => {
+    const el = e.target.closest('[data-tip]');
+    if (!el) return;
+    const r = el.getBoundingClientRect();
+    show(el, r.left, r.bottom);
+  });
+  root.addEventListener('focusout', () => { tip.hidden = true; });
 }
 
 const BY_TYPE_NAME = { prosecutor_impersonation: '검찰·경찰·금감원 사칭', loan_refinance: '저금리 대환대출 사기', family_impersonation: '가족·지인 사칭', bank_security: '은행·카드사 보안 사칭', government_benefit: '정부 지원금·환급 사칭', investment_rebate: '투자 리딩방·코인 사기', romance_scam: '로맨스 스캠', secondhand_fraud: '중고거래·티켓 사기', job_mule: '고수익 알바·통장 대여', extortion_sextortion: '몸캠·협박형 사기', unknown: '기타', none: '기타' };

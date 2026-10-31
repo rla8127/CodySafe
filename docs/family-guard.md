@@ -89,7 +89,7 @@ GUARD_STT=openai
 
 ## 관리자 대시보드
 
-`server/.env`의 `GUARD_ADMIN_TOKEN`을 비밀번호로 씁니다. 값이 없으면 열리지 않습니다. PC는 왼쪽 메뉴, 모바일은 MY 아래 링크나 `/app/#/admin`으로 들어가며, 입력한 값은 브라우저 탭을 닫으면 사라집니다. 글자 기록이 든 `review-dataset.jsonl`은 `GUARD_DATASET_TOKEN`으로 따로 보호합니다.
+시연용으로 비밀번호 없이 열립니다. 공개 주소에서는 누구나 집계를 볼 수 있으므로 실제 운영 전에 인증을 넣어야 합니다. PC는 왼쪽 메뉴, 모바일은 MY 아래 링크나 `/app/#/admin`으로 들어갑니다. 글자 기록이 든 `review-dataset.jsonl`은 `GUARD_DATASET_TOKEN`으로 계속 보호합니다.
 
 ## 웹 시연 가족
 

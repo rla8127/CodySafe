@@ -29,6 +29,7 @@ async def lifespan(_: FastAPI):
     db.init()
     if config.DEMO_FAMILY:
         db.seed_demo_family()
+        db.seed_demo_analytics()
     config.LOCAL_AUDIO_DIR.mkdir(parents=True, exist_ok=True)
     yield
 
@@ -56,6 +57,11 @@ async def no_stale_ui(request: Request, call_next):
     if request.url.path.startswith("/app"):
         response.headers["Cache-Control"] = "no-cache"
     return response
+
+
+@app.get("/", include_in_schema=False)
+def landing():
+    return FileResponse(WEB_DIR / "landing.html", headers={"Cache-Control": "no-cache"})
 
 
 @app.get("/app", include_in_schema=False)
@@ -332,6 +338,29 @@ def remove_guardian(guardian_id: str, device: str = Depends(current_device)):
 
 # ---------- 시연용 예시 통화: 기록, 가족 알림, 잠금에 영향을 주지 않습니다 ----------
 _sample_results: dict[str, dict] = {}
+_sample_lock = threading.Lock()
+
+
+def _analyze_sample(sample_id: str) -> dict:
+    sample = samples.BY_ID.get(sample_id)
+    if not sample:
+        raise HTTPException(404)
+    # 눌러 볼 때마다 LLM 비용이 나가지 않도록 서버가 켜져 있는 동안 결과를 재사용합니다.
+    # 로그인 없는 랜딩에서도 부르므로 동시에 눌러도 샘플당 한 번만 분석합니다.
+    with _sample_lock:
+        if sample_id not in _sample_results:
+            text = samples.transcript(sample)
+            result = llm.analyze(text)
+            _sample_results[sample_id] = {
+                "status": "done",
+                "label": result["label"],
+                "confidence": result["confidence"],
+                "review_label": None,
+                "evidence": result["evidence"],
+                "matches": pipeline.public_matches(pipeline.find_matches(result, text)),
+                "expected": sample["expected"],
+            }
+        return _sample_results[sample_id]
 
 
 @app.get("/v1/samples")
@@ -341,23 +370,17 @@ def list_samples(_: str = Depends(current_device)):
 
 @app.post("/v1/samples/{sample_id}/analyze")
 def analyze_sample(sample_id: str, _: str = Depends(current_device)):
-    sample = samples.BY_ID.get(sample_id)
-    if not sample:
-        raise HTTPException(404)
-    # 눌러 볼 때마다 LLM 비용이 나가지 않도록 서버가 켜져 있는 동안 결과를 재사용합니다.
-    if sample_id not in _sample_results:
-        text = samples.transcript(sample)
-        result = llm.analyze(text)
-        _sample_results[sample_id] = {
-            "status": "done",
-            "label": result["label"],
-            "confidence": result["confidence"],
-            "review_label": None,
-            "evidence": result["evidence"],
-            "matches": pipeline.public_matches(pipeline.find_matches(result, text)),
-            "expected": sample["expected"],
-        }
-    return _sample_results[sample_id]
+    return _analyze_sample(sample_id)
+
+
+@app.get("/v1/demo/samples")
+def list_demo_samples():
+    return {"items": samples.SAMPLES}
+
+
+@app.post("/v1/demo/samples/{sample_id}/analyze")
+def analyze_demo_sample(sample_id: str):
+    return _analyze_sample(sample_id)
 
 
 # ---------- 가족 암구호 ----------
@@ -617,11 +640,6 @@ def review(rec_id: str, body: ReviewIn, device: str = Depends(current_device)):
     return {"ok": True, "in_dataset": in_dataset}
 
 
-def require_admin(x_admin_token: str = Header(default="")) -> None:
-    if not config.ADMIN_TOKEN or not hmac.compare_digest(config.ADMIN_TOKEN, x_admin_token):
-        raise HTTPException(403)
-
-
 # ---------- 대시보드: 사용자는 자기 기록만, 관리자는 개인을 알 수 없는 집계만 봅니다 ----------
 @app.post("/v1/training")
 def save_training(body: TrainingIn, device: str = Depends(current_device)):
@@ -639,13 +657,21 @@ def my_dashboard(device: str = Depends(current_device)):
         return dashboard.user(conn, device)
 
 
-@app.get("/v1/admin/dashboard", dependencies=[Depends(require_admin)])
+@app.get("/v1/admin/dashboard")
 def admin_dashboard(include_demo: bool = True):
     with db.connect() as conn:
         return dashboard.admin(conn, include_demo)
 
 
-@app.get("/v1/admin/feedback-dataset.jsonl", response_class=PlainTextResponse, dependencies=[Depends(require_admin)])
+@app.get("/v1/admin/ops")
+def admin_ops(hours: int = 168, include_demo: bool = True):
+    if hours not in dashboard.RANGES:
+        raise HTTPException(400, "unknown range")
+    with db.connect() as conn:
+        return dashboard.ops(conn, hours, include_demo, db.now())
+
+
+@app.get("/v1/admin/feedback-dataset.jsonl", response_class=PlainTextResponse)
 def export_feedback():
     with db.connect() as conn:
         rows = conn.execute(

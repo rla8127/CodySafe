@@ -455,9 +455,8 @@ def test_feedback_and_dashboards_separate_user_and_admin(client):
     assert me["training"]["count"] == 3 and [w["scenario"] for w in me["training"]["weak"]] == ["loan"]
     assert me["calls"]["confirmed"] == 2
     assert client.get("/v1/dashboard/me", headers=b).json()["training"]["count"] == 0
-    # 일반 사용자는 관리자 집계를 볼 수 없습니다.
-    assert client.get("/v1/admin/dashboard", headers=a).status_code == 403
-    assert client.get("/v1/admin/dashboard", headers={"X-Admin-Token": "wrong"}).status_code == 403
+    # 대시보드는 비밀번호 없이 열리지만 이름과 통화 내용은 없습니다.
+    assert client.get("/v1/admin/dashboard").status_code == 200
     admin = {"X-Admin-Token": "admin"}
     data = client.get("/v1/admin/dashboard", headers=admin).json()
     fb = data["feedback"]
@@ -476,3 +475,42 @@ def test_transcript_dataset_can_use_stronger_token_than_dashboard(client, monkey
     assert client.get("/v1/admin/dashboard", headers=weak).status_code == 200
     assert client.get("/v1/admin/review-dataset.jsonl", headers=weak).status_code == 403
     assert client.get("/v1/admin/review-dataset.jsonl", headers=strong).status_code == 200
+
+
+def test_landing_demo_runs_only_fixed_samples_without_login(client):
+    assert "방금 그 전화" in client.get("/").text
+    assert len(client.get("/v1/demo/samples").json()["items"]) == 6
+    assert client.post("/v1/demo/samples/prosecutor/analyze").json()["label"] == "voice_phishing"
+    assert client.post("/v1/demo/samples/none/analyze").status_code == 404
+
+
+def test_ops_finds_surge_masks_numbers_and_excludes_normal_calls(client):
+    import sqlite3
+
+    from guard import dashboard
+
+    with db.connect() as conn:
+        for table in ("recordings", "recording_feedback", "response_events"):
+            conn.execute(f"DELETE FROM {table}")
+    db.seed_demo_analytics()
+    with db.connect() as conn:
+        now = db.now()
+        for i in range(3):
+            db.add_demo_recording(conn, f"n{i}", "demo-seed-1", "통화 01099998888_260101_120000.m4a", "normal", "none", now - 60)
+    admin = {"X-Admin-Token": "admin"}
+    assert client.get("/v1/admin/ops").status_code == 200
+    assert client.get("/v1/admin/ops?hours=5", headers=admin).status_code == 400
+    data = client.get("/v1/admin/ops?hours=168", headers=admin).json()
+    assert any(s["type"] == "family_impersonation" for s in data["surges"])
+    top = data["callers"][0]
+    assert top["number"] == "010-****-1001" and top["calls"] >= 16
+    text = str(data)
+    assert "9998888" not in text and "8888" not in text and "01000001001" not in text
+    assert len(data["heatmap"]) == 7 and len(data["heatmap"][0]) == 24
+    assert data["funnel"][0][0] == "보이스피싱 의심" and data["totals"]["phishing"] > 0
+    empty = client.get("/v1/admin/ops?hours=24&include_demo=false", headers=admin).json()
+    assert empty["totals"]["calls"] == 0 and empty["callers"] == []
+    # 시연 집계용 기기는 가족 목록과 실제 사용자 기록에 섞이지 않습니다.
+    assert sqlite3.connect(config.DB_PATH).execute("SELECT COUNT(*) FROM family_links WHERE protected_id LIKE 'demo-seed-%'").fetchone()[0] == 0
+    assert dashboard._number("통화 김철수_260101_120000.m4a") is None
+    assert dashboard._number("통화 010-1234-5678_260101_120000.m4a") == "01012345678"
