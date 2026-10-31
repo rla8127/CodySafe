@@ -41,7 +41,7 @@ PARENT.passphrase = 'family';
 
 renderTabs = function (on) {
   const tabs = [['home', 'house', '홈'], ['sim', 'gamepad-2', '체험'], ['detect', 'shield-check', '검사'], ['report', 'messages-square', '커뮤니티'], ['family', 'users', '가족']];
-  $('#tabbar').innerHTML = tabs.map(([k, i, t]) => k === 'detect'
+  $('#tabbar').innerHTML = `<button class="side-logo" onclick="go('home')" aria-label="홈으로"><img src="assets/brand/logo-horizontal.png" alt="Cody Safe"></button>` + tabs.map(([k, i, t]) => k === 'detect'
     ? `<button class="tab tab-center ${on === k ? 'on' : ''}" onclick="go('${k}')"><span class="fab">${ic(i)}</span><span>${t}</span></button>`
     : `<button class="tab ${on === k ? 'on' : ''}" onclick="go('${k}')">${ic(i)}<span>${t}</span></button>`).join('');
   icons();
@@ -117,7 +117,7 @@ async function loadDemoFamily() {
 
 function demoPicker() {
   return `<div class="page">
-    <div class="brand-hero small"><img src="assets/brand/logo-horizontal.png" alt="Cody Safe"></div>
+    <div class="brand-hero small"><button class="logo-home" onclick="go('home')" aria-label="홈으로"><img src="assets/brand/logo-horizontal.png" alt="Cody Safe"></button></div>
     <div class="lead-text">누구로<br><em>시연</em>할까요?</div>
     <div class="demo-list">${demoMembers.map((m) => `<button class="demo-person" onclick="demoEnter('${esc(m.id)}')"><span><b>${esc(m.name)}</b><small>${DEMO_LABEL[m.role]}</small></span>${ic('chevron-right')}</button>`).join('')}</div>
     <div class="card mt soft-warn">시연용 가족입니다. 접속한 사람 모두 같은 기록을 볼 수 있으니 실제 통화는 올리지 마세요.</div>
@@ -197,7 +197,7 @@ document.querySelectorAll('.sb-icons').forEach((el) => { el.innerHTML = `<svg wi
 function onboardingPage() {
   if (!accepted()) {
     return `<div class="page">
-      <div class="brand-hero"><img src="assets/brand/logo-vertical.png" alt="Cody Safe"></div>
+      <div class="brand-hero"><button class="logo-home" onclick="go('home')" aria-label="홈으로"><img src="assets/brand/logo-vertical.png" alt="Cody Safe"></button></div>
       <div class="lead-text">AI 사기는 <em>미리 경험</em>하고,<br>가족과 <em>함께</em> 막아요</div>
       <div class="card"><ul class="notice">
         ${['앱이 통화를 직접 녹음하지 않고, 이미 저장된 파일만 읽습니다.', '폴더를 연결한 뒤에 생긴 파일만 서버로 보냅니다.', (keepAudio ? '음성은 분석 후에도 사용자별로 저장되며, 기록을 삭제하면 함께 지워집니다. 일상 통화는 글자 기록을 남기지 않습니다.' : '음성은 분석 후 삭제하고, 일상 통화는 글자 기록도 남기지 않습니다.'), '사기로 의심되는 통화의 글자 기록은 검토를 위해 보관합니다.', '분석 내용은 본인만 봅니다. 가족에게는 보이스피싱 의심 여부만 알립니다.']
@@ -209,7 +209,7 @@ function onboardingPage() {
   }
   if (demoMembers.length) return demoPicker();
   return `<div class="page">
-    <div class="brand-hero small"><img src="assets/brand/logo-horizontal.png" alt="Cody Safe"></div>
+    <div class="brand-hero small"><button class="logo-home" onclick="go('home')" aria-label="홈으로"><img src="assets/brand/logo-horizontal.png" alt="Cody Safe"></button></div>
     <div class="lead-text">가족 안에서<br><em>누구</em>신가요?</div>
     <div class="card">${rolePicker()}
     <div class="field"><label for="regName">가족에게 보일 이름</label><input id="regName" maxlength="30" placeholder="예: 민수"></div>
@@ -341,10 +341,11 @@ function deleteSheet(id) {
 
 /* ---------------- 홈 ---------------- */
 SCREENS.home = gated(() => `<div class="page">
-  <div class="brand-bar"><img src="assets/brand/logo-horizontal.png" alt="Cody Safe">
+  <div class="brand-bar"><button class="logo-home" onclick="go('home')" aria-label="홈으로"><img src="assets/brand/logo-horizontal.png" alt="Cody Safe"></button>
     <span class="brand-actions"><button class="brand-bell" onclick="go('family')" aria-label="가족 경고">${ic('bell')}</button><button class="brand-bell" onclick="go('me')" aria-label="MY">${ic('user-round')}</button></span></div>
   <div class="home-greeting">안녕하세요${store.get('name') ? `, ${esc(store.get('name'))}님` : ''}</div>
   <div class="home-sub">오늘도 함께 살펴볼게요.</div>
+  ${showFlow() ? `<div class="flow-home">${flowDemo()}</div>` : ''}
   <div id="data"></div>
 </div>`);
 
@@ -375,6 +376,70 @@ function homeData({ recordings, recs, family, alerts, lock, reports }) {
     ${trendsBlock()}
     ${reports.some((r) => r.rank) ? `<div class="sec-title">제보 TOP 3 <button class="more" onclick="go('report')">전체 보기${ic('chevron-right')}</button></div>
       <div class="card trend-list">${reports.filter((r) => r.rank).map((r) => `<button class="trend-row top-row" onclick="go('report')"><time>${r.rank}위</time><span><strong>${esc(r.title)}</strong><small>추천 ${r.votes} · 이용자 제보, 사실 확인 전</small></span>${ic('chevron-right')}</button>`).join('')}</div>` : ''}`;
+}
+
+/* ---------------- 웹 설명용 처리 흐름 영상 ---------------- */
+const FLOW_STEPS = [
+  ['phone-off', '통화 종료', '삼성 전화 앱이 통화를 녹음해 둡니다', '통화 4분 12초 종료'],
+  ['folder-down', '녹음 저장', '녹음 파일이 지정한 폴더에 저장됩니다', 'Recordings/Call/통화_1432.m4a'],
+  ['cloud-upload', 'S3 업로드', '앱이 15초마다 폴더를 확인해 새 파일을 올립니다', 's3://…/recordings/{기기 ID}/…m4a'],
+  ['audio-lines', '음성 변환', 'STT가 음성을 글자로 바꿉니다', '"안전 계좌로 옮기셔야 합니다"'],
+  ['search', 'RAG 조회', '비슷한 사기 수법을 찾아 참고 자료로 넘깁니다', '유사 수법: 기관 사칭'],
+  ['brain-circuit', 'AI 판정', 'LLM이 녹취와 참고 자료를 함께 보고 판정합니다', '판정: 보이스피싱 의심'],
+  ['badge-check', '녹취 대조', '근거 문장이 통화에 실제로 있었는지 확인합니다', '근거 3개 일치'],
+  ['bell-ring', '후속 조치', '가족에게 알리고, 강한 의심이면 금융 앱을 잠급니다', '가족 알림 전송 · 금융 앱 잠금'],
+];
+const FLOW_MS = 2300;
+let flowStep = 0;
+let flowPaused = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+const showFlow = () => !native && !embedded;
+
+function flowDemo() {
+  return `<section class="flow-video" aria-label="통화 후 처리 흐름 설명">
+    <div class="flow-top"><span class="flow-title">통화 후 이렇게 동작합니다</span><span class="flow-note">예시 화면</span>
+      <button class="flow-pause" id="flowPause" onclick="toggleFlow()"></button></div>
+    <div class="flow-stage" id="flowStage"></div>
+    <div class="flow-track" style="--count:${FLOW_STEPS.length}"><i id="flowFill"></i>
+      ${FLOW_STEPS.map((s, i) => `<button class="flow-node" data-i="${i}" onclick="jumpFlow(${i})" aria-label="${s[1]}">${ic(s[0])}<span>${s[1]}</span></button>`).join('')}
+    </div>
+  </section>`;
+}
+
+function drawFlow() {
+  const stage = $('#flowStage');
+  if (!stage) return;
+  const [icon, title, text, sample] = FLOW_STEPS[flowStep];
+  stage.innerHTML = `<div class="flow-icon">${ic(icon)}</div><div class="flow-copy"><small>${flowStep + 1} / ${FLOW_STEPS.length}</small><b>${title}</b><p>${text}</p><code>${esc(sample)}</code></div>`;
+  document.querySelectorAll('.flow-node').forEach((n, i) => {
+    n.classList.toggle('on', i === flowStep);
+    n.classList.toggle('done', i < flowStep);
+  });
+  $('#flowFill').style.setProperty('--progress', flowStep / (FLOW_STEPS.length - 1));
+  $('#flowPause').innerHTML = `${ic(flowPaused ? 'play' : 'pause')}${flowPaused ? '재생' : '일시정지'}`;
+  icons();
+}
+
+let flowRun = 0;
+function runFlow() {
+  const run = ++flowRun;
+  drawFlow();
+  if (flowPaused) return;
+  later(() => {
+    if (run !== flowRun || flowPaused || !$('#flowStage')) return;
+    flowStep = (flowStep + 1) % FLOW_STEPS.length;
+    runFlow();
+  }, flowStep === FLOW_STEPS.length - 1 ? FLOW_MS * 2 : FLOW_MS);
+}
+
+function toggleFlow() {
+  flowPaused = !flowPaused;
+  runFlow();
+}
+
+function jumpFlow(i) {
+  flowStep = i;
+  runFlow();
 }
 
 /* ---------------- 커뮤니티 제보 ---------------- */
@@ -464,7 +529,7 @@ async function voteReport(id, voted) {
 
 async function makeScenario(id) {
   const button = $('#mk' + id);
-  if (button) { button.disabled = true; button.textContent = 'AI가 시나리오를 만드는 중입니다'; }
+  if (button) { button.disabled = true; button.innerHTML = `${ic('loader')}AI가 시나리오를 만드는 중입니다`; icons(); }
   try {
     await api('POST', `/v1/reports/${id}/scenario`);
     await loadReportScenarios();
@@ -684,7 +749,7 @@ async function unlockSheet(id) {
 SCREENS.detect = gated(() => `<div class="page">
   <div class="lead" style="margin-top:6px">통화 검사</div>
   <div class="lead-sub" style="margin-top:6px">${native ? '통화가 끝나면 새 녹음 파일을 자동으로 STT로 분석한 뒤 진단 결과를 알려 드립니다.' : '녹음 파일을 올리면 STT로 분석한 뒤 진단 결과를 알려 드립니다. 통화 후 자동 분석은 안드로이드 앱에서 동작합니다.'} 결과는 본인만 볼 수 있습니다.</div>
-  <div class="detect-flow">${[native ? '통화 종료' : '파일 올리기', 'STT 변환', 'AI 진단', '결과 확인'].map((t, i) => `${i ? ic('chevron-right') : ''}<span>${t}</span>`).join('')}</div>
+  ${showFlow() ? flowDemo() : `<div class="detect-flow">${['통화 종료', 'STT 변환', 'AI 진단', '결과 확인'].map((t, i) => `${i ? ic('chevron-right') : ''}<span>${t}</span>`).join('')}</div>`}
   <div class="card mt">${folderBlock()}<button class="guide-link" onclick="folderGuide()">${ic('circle-help')}녹음 폴더 설정 가이드${ic('chevron-right')}</button></div>
   <button class="btn grad block mt" onclick="$('#filePick').click()">${ic('upload')}파일 직접 올려 검사</button>
   <div class="sec-title">예시로 체험하기</div>
@@ -1108,7 +1173,7 @@ async function pollAlerts() {
   }
 }
 
-['home', 'detect', 'family', 'lock', 'passphrase', 'report'].forEach((k) => { INIT[k] = () => { lastData = ''; refresh(); if (k === 'detect') loadSamples(); }; });
+['home', 'detect', 'family', 'lock', 'passphrase', 'report'].forEach((k) => { INIT[k] = () => { lastData = ''; refresh(); if (k === 'detect') loadSamples(); if ($('#flowStage')) runFlow(); }; });
 setInterval(refresh, 5000);
 setInterval(pollAlerts, 5000);
 setInterval(pollLock, 5000);

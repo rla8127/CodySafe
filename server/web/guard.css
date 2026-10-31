@@ -350,7 +350,8 @@ body.embedded .web-preview, body.embedded .preview-toggle { display: none !impor
 
   /* 왼쪽 메뉴 */
   body:not(.embedded) #tabbar, body:not(.embedded) #tabbar.hidden { display: flex; flex-direction: column; gap: 4px; top: 0; right: auto; bottom: 0; width: var(--side); height: auto; padding: 92px 14px 20px; background: var(--card); border-top: 0; border-right: 1px solid var(--line); }
-  body:not(.embedded) #tabbar::before { content: ""; position: absolute; left: 22px; top: 26px; width: 150px; height: 53px; background: url(../assets/brand/logo-horizontal.png) left center / contain no-repeat; }
+  body:not(.embedded) .side-logo { display: block; position: absolute; left: 22px; top: 26px; }
+  body:not(.embedded) .side-logo img { display: block; width: 150px; height: auto; }
   body:not(.embedded) .tab { flex-direction: row; gap: 12px; height: 46px; padding: 0 14px; border-radius: 12px; font-size: 15px; font-weight: 600; color: var(--sub); transition: background-color .15s ease; }
   body:not(.embedded) .tab:hover { background: var(--bg); }
   body:not(.embedded) .tab.on { background: var(--pri-soft); color: var(--pri); font-weight: 800; }
@@ -364,7 +365,7 @@ body.embedded .web-preview, body.embedded .preview-toggle { display: none !impor
   body:not(.embedded) #view, body:not(.embedded) #view.full { top: 0; left: var(--side); right: var(--preview); bottom: 0; }
   body:not(.embedded) .page { max-width: 760px; margin: 0 auto; padding: 40px 32px 56px; }
   body:not(.embedded) .brand-bar { justify-content: flex-end; margin: 0 0 8px; }
-  body:not(.embedded) .brand-bar img, body:not(.embedded) .brand-hero { display: none; }
+  body:not(.embedded) .brand-bar .logo-home, body:not(.embedded) .brand-hero { display: none; }
   body:not(.embedded) .brand-bar { position: absolute; right: 32px; top: 36px; }
   body:not(.embedded) .page { position: relative; }
   body:not(.embedded) .home-greeting { font-size: 32px; padding-right: 110px; }
@@ -409,3 +410,43 @@ body.embedded .web-preview, body.embedded .preview-toggle { display: none !impor
 }
 @media (prefers-reduced-motion: reduce) { .web-preview, body:not(.embedded) #view { transition: none; } }
 /* 미리보기 안 모바일 화면은 폭이 좁아 위 PC 규칙이 적용되지 않습니다. */
+
+/* 처리 중 표시와 로고 */
+.side-logo { display: none; }
+.logo-home { display: block; line-height: 0; border-radius: 10px; }
+.lucide-loader, .lucide-loader-circle { animation: spin 1s linear infinite; }
+.sample-wait { animation: guard-pulse 1.4s ease-in-out infinite; }
+@keyframes guard-pulse { 50% { opacity: .55; } }
+@media (prefers-reduced-motion: reduce) { .lucide-loader, .lucide-loader-circle { animation-duration: 3s; } .sample-wait { animation: none; } }
+
+/* 처리 흐름 영상 */
+.flow-home { display: none; }
+.flow-home .flow-video { margin-bottom: 14px; }
+.flow-video { margin: 14px 0 4px; padding: 20px; border-radius: 24px; background: var(--navy); color: #fff; }
+.flow-top { display: flex; align-items: center; gap: 8px; }
+.flow-title { white-space: nowrap; font-size: 14.5px; font-weight: 800; letter-spacing: -0.02em; }
+.flow-note { padding: 2px 7px; border-radius: 99px; background: rgba(255, 255, 255, .12); font-size: 11px; font-weight: 600; white-space: nowrap; }
+.flow-pause { display: inline-flex; align-items: center; gap: 4px; margin-left: auto; color: rgba(255, 255, 255, .78); font-size: 12px; font-weight: 700; white-space: nowrap; }
+.flow-pause svg.lucide { width: 14px; height: 14px; }
+.flow-stage { display: flex; align-items: center; gap: 16px; min-height: 112px; margin: 16px 0 18px; animation: flow-in .35s ease; }
+.flow-icon { display: grid; place-items: center; flex: none; width: 66px; height: 66px; border-radius: 50%; background: var(--lime); color: var(--navy); animation: flow-pop .45s ease; }
+.flow-icon svg.lucide { width: 30px; height: 30px; }
+.flow-copy { min-width: 0; animation: flow-in .35s ease; }
+.flow-copy small { font-size: 11.5px; font-weight: 700; color: var(--lime); }
+.flow-copy b { display: block; margin-top: 2px; font-size: 20px; letter-spacing: -0.03em; }
+.flow-copy p { margin-top: 2px; font-size: 13px; line-height: 1.45; opacity: .78; }
+.flow-copy code { display: inline-block; max-width: 100%; margin-top: 7px; padding: 3px 8px; border-radius: 7px; background: rgba(255, 255, 255, .1); font: 600 11.5px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--lime); overflow-wrap: anywhere; }
+.flow-track { position: relative; display: grid; grid-template-columns: repeat(var(--count), 1fr); }
+.flow-track::before, .flow-track > i { content: ""; position: absolute; left: calc(100% / var(--count) / 2); top: 14px; height: 2px; width: calc(100% - 100% / var(--count)); background: rgba(255, 255, 255, .18); }
+.flow-track > i { --progress: 0; background: var(--lime); transform: scaleX(var(--progress)); transform-origin: left; transition: transform .45s ease; }
+.flow-node { position: relative; display: grid; justify-items: center; gap: 5px; font-size: 10px; font-weight: 600; color: rgba(255, 255, 255, .58); }
+.flow-node svg.lucide { box-sizing: content-box; width: 14px; height: 14px; padding: 6px; border-radius: 50%; background: #1B3158; color: rgba(255, 255, 255, .7); transition: background-color .25s ease, color .25s ease; }
+.flow-node.done svg.lucide { background: var(--lime); color: var(--navy); }
+.flow-node.on { color: #fff; font-weight: 800; }
+.flow-node.on svg.lucide { background: var(--lime); color: var(--navy); box-shadow: 0 0 0 4px rgba(201, 242, 75, .25); }
+.flow-node span { white-space: nowrap; letter-spacing: -0.04em; }
+@keyframes flow-in { from { opacity: 0; transform: translateY(6px); } }
+@keyframes flow-pop { from { transform: scale(.8); } }
+@media (max-width: 500px) { .flow-node span { display: none; } .flow-node.on span { display: block; position: absolute; top: 32px; } .flow-track { padding-bottom: 20px; } }
+@media (min-width: 1001px) { body:not(.embedded) .flow-home { display: block; } body:not(.embedded) .flow-node { font-size: 12px; } body:not(.embedded) .flow-stage { min-height: 120px; } }
+@media (prefers-reduced-motion: reduce) { .flow-stage, .flow-icon, .flow-copy { animation: none; } .flow-track > i, .flow-node svg.lucide { transition: none; } }
