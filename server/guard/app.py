@@ -654,8 +654,10 @@ def export_feedback():
     return "\n".join(json.dumps(dict(r), ensure_ascii=False) for r in rows)
 
 
-@app.get("/v1/admin/review-dataset.jsonl", response_class=PlainTextResponse, dependencies=[Depends(require_admin)])
-def export_dataset():
+@app.get("/v1/admin/review-dataset.jsonl", response_class=PlainTextResponse)
+def export_dataset(x_admin_token: str = Header(default="")):
+    if not config.DATASET_TOKEN or not hmac.compare_digest(config.DATASET_TOKEN, x_admin_token):
+        raise HTTPException(403)
     with db.connect() as conn:
         rows = conn.execute("SELECT * FROM review_dataset ORDER BY created_at").fetchall()
     return "\n".join(json.dumps(dict(r), ensure_ascii=False) for r in rows)

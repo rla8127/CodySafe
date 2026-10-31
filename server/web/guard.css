@@ -469,3 +469,9 @@ body.embedded .web-preview, body.embedded .preview-toggle { display: none !impor
 
 /* 글꼴 */
 body, input, textarea, select, button { font-family: "SUIT Variable", SUIT, -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Noto Sans KR", sans-serif; }
+
+/* 관리자 메뉴는 PC 왼쪽 메뉴에만 둡니다. 모바일은 MY 안의 링크로 들어갑니다. */
+.admin-tab { display: none; }
+@media (min-width: 1001px) {
+  body:not(.embedded) .admin-tab { display: flex; margin-top: auto; }
+}

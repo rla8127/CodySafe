@@ -468,3 +468,11 @@ def test_feedback_and_dashboards_separate_user_and_admin(client):
     # 사용자가 기록을 지우면 라벨도 함께 지워집니다.
     client.delete(f"/v1/recordings/{normal['id']}", headers=a)
     assert client.get("/v1/admin/dashboard", headers=admin).json()["feedback"]["confirmed"] == 2
+
+
+def test_transcript_dataset_can_use_stronger_token_than_dashboard(client, monkeypatch):
+    monkeypatch.setattr(config, "DATASET_TOKEN", "strong")
+    weak, strong = {"X-Admin-Token": "admin"}, {"X-Admin-Token": "strong"}
+    assert client.get("/v1/admin/dashboard", headers=weak).status_code == 200
+    assert client.get("/v1/admin/review-dataset.jsonl", headers=weak).status_code == 403
+    assert client.get("/v1/admin/review-dataset.jsonl", headers=strong).status_code == 200

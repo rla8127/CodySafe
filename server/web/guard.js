@@ -33,7 +33,7 @@ if (store.get('token')) native?.setToken(store.get('token'));
 
 /* ---------------- 시안 화면 제거 ---------------- */
 ['image', 'voice', 'call', 'url', 'verify', 'report', 'generate', 'weakness', 'training', 'copilot', 'checkup'].forEach((k) => delete SCREENS[k]);
-Object.assign(TAB_OF, { home: 'home', sim: 'sim', play: 'sim', detect: 'detect', family: 'family', me: '', admin: '', lock: 'home', passphrase: 'family', report: 'report' });
+Object.assign(TAB_OF, { home: 'home', sim: 'sim', play: 'sim', detect: 'detect', family: 'family', me: '', admin: 'admin', lock: 'home', passphrase: 'family', report: 'report' });
 delete PARENT.family;
 // 체험 대화 중에도 아래 메뉴를 그대로 보여 줍니다.
 FULL.splice(FULL.indexOf('play'), 1);
@@ -43,7 +43,7 @@ renderTabs = function (on) {
   const tabs = [['home', 'house', '홈'], ['sim', 'gamepad-2', '체험'], ['detect', 'shield-check', '검사'], ['report', 'messages-square', '커뮤니티'], ['family', 'users', '가족']];
   $('#tabbar').innerHTML = `<button class="side-logo" onclick="go('home')" aria-label="홈으로"><img src="assets/brand/logo-horizontal.png" alt="Cody Safe"></button>` + tabs.map(([k, i, t]) => k === 'detect'
     ? `<button class="tab tab-center ${on === k ? 'on' : ''}" onclick="go('${k}')"><span class="fab">${ic(i)}</span><span>${t}</span></button>`
-    : `<button class="tab ${on === k ? 'on' : ''}" onclick="go('${k}')">${ic(i)}<span>${t}</span></button>`).join('');
+    : `<button class="tab ${on === k ? 'on' : ''}" onclick="go('${k}')">${ic(i)}<span>${t}</span></button>`).join('') + `<button class="tab admin-tab ${on === 'admin' ? 'on' : ''}" onclick="go('admin')">${ic('chart-column')}<span>관리자</span></button>`;
   icons();
 };
 
@@ -482,7 +482,7 @@ SCREENS.admin = () => `<div class="page">
 </div>`;
 
 function adminLogin() {
-  return `<div class="card mt"><div class="field" style="margin-top:0"><label for="adminKey">관리자 토큰</label><input id="adminKey" type="password" autocomplete="off"></div>
+  return `<div class="card mt"><div class="field" style="margin-top:0"><label for="adminKey">관리자 비밀번호</label><input id="adminKey" type="password" autocomplete="off"></div>
     <button class="btn pri block mt" onclick="adminEnter()">들어가기</button></div>`;
 }
 
@@ -530,7 +530,7 @@ async function loadAdmin() {
     icons();
   } catch (e) {
     body.innerHTML = adminLogin();
-    if (e.message === '403') toast('토큰이 맞지 않습니다', 'circle-alert');
+    if (e.message === '403') toast('비밀번호가 맞지 않습니다', 'circle-alert');
   }
 }
 
@@ -1180,7 +1180,7 @@ SCREENS.me = gated(() => `<div class="page">
     ${[keepAudio ? '음성은 사용자별로 저장되며, 기록을 삭제하면 함께 지워집니다.' : '음성은 분석 후 삭제합니다. 실패한 음성은 재시도나 삭제 전까지 남습니다.', '일상 통화는 글자 기록을 남기지 않습니다.', '분석 내용은 본인만 볼 수 있습니다.', '가족에게는 보이스피싱 의심 여부만 전달됩니다.'].map((t) => `<li>${ic('lock')}<span>${t}</span></li>`).join('')}
   </ul></div>
   ${browserNotifyBlock()}
-  ${native ? '' : `<button class="admin-link" onclick="go('admin')">관리자 대시보드</button>`}
+  <button class="admin-link" onclick="go('admin')">관리자 대시보드</button>
   <button class="btn line block mt" onclick="signOut()">${demoMembers.length ? '다른 가족으로 보기' : '이 기기 등록 해제'}</button>
 </div>`);
 
