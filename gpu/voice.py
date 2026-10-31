@@ -44,23 +44,27 @@ hf_cache = modal.Volume.from_name("codysafe-hf-cache", create_if_missing=True)
 VOLUMES = {"/root/.cache/huggingface": hf_cache}
 app = modal.App(APP_NAME)
 
+# Pace is not reliable through the instruct alone (08:4x test), so _synth trims silence and time-stretches
+# (pitch kept, ffmpeg atempo) to a target syllables-per-second per tone.
+RATE = {"": 6.2, "calm": 5.6, "official": 5.8, "urgent": 7.2, "threat": 6.4, "tremble": 6.6, "sob": 5.2,
+        "friendly": 6.4}
 VOICES = {
     "caller_male": "A Korean man in his early 40s with a low, steady, businesslike voice, "
-                   "speaking standard Seoul Korean on a phone call.",
+                   "speaking standard Seoul Korean on a phone call. ",
     "caller_female": "A Korean woman in her early 30s with a clear, polite, composed call-center voice, "
-                     "speaking standard Seoul Korean on a phone call.",
+                     "speaking standard Seoul Korean on a phone call. ",
     "family": "A Korean man in his late 20s, the listener's son, with a natural, familiar, warm voice, "
-              "speaking casual Seoul Korean on a phone call.",
+              "speaking casual Seoul Korean on a phone call. ",
 }
 SEEDS = {"caller_male": 1101, "caller_female": 2202, "family": 3303}  # fixed seed per voice -> steadier timbre
-TONES = {  # O-1 TONE_GUIDE keys -> English style words for the instruct
-    "calm": "calm, slow and clearly articulated",
-    "official": "stiff, formal and bureaucratic, slightly low pitch",
-    "urgent": "urgent and fast, pressing the listener to hurry",
-    "threat": "intimidating, stern and low, scolding",
-    "tremble": "anxious and trembling, short of breath",
+TONES = {  # O-1 TONE_GUIDE keys -> English style words for the instruct (pace stays natural unless noted)
+    "calm": "calm and clear, but at a normal conversational pace",
+    "official": "stiff, formal and bureaucratic, slightly low pitch, brisk",
+    "urgent": "urgent and fast, pressing the listener to hurry, quicker than normal",
+    "threat": "intimidating, stern and low, scolding, clipped",
+    "tremble": "anxious and trembling, short of breath, hurried",
     "sob": "tearful, sobbing, the ends of sentences shaking",
-    "friendly": "friendly, warm and bright",
+    "friendly": "friendly, warm and bright, lively pace",
 }
 MAX_TEXT = 400
 MAX_AUDIO = 15 * 1024 * 1024
@@ -107,9 +111,12 @@ class Voice:
         # warm the kernels once so the first real request is not the slow one
         self._synth("안녕하세요.", "caller_male", "")
 
-    def _synth(self, text: str, voice: str, style: str):
+    def _synth(self, text: str, voice: str, style: str, emotion: str = ""):
         import io
+        import re
+        import subprocess
 
+        import numpy as np
         import soundfile as sf
         import torch
 
@@ -117,9 +124,27 @@ class Voice:
         with self.lock:
             torch.manual_seed(SEEDS[voice])
             wavs, sr = self.tts.generate_voice_design(text=text, instruct=instruct, language=self.lang)
+        wav = np.asarray(wavs[0], dtype=np.float32)
+        loud = np.flatnonzero(np.abs(wav) > 0.01)
+        if loud.size:  # trim leading/trailing silence, keep 0.08 s
+            pad = int(0.08 * sr)
+            wav = wav[max(0, loud[0] - pad):loud[-1] + pad]
+        syllables = len(re.findall(r"[가-힣0-9]", text)) + len(re.findall(r"[A-Za-z]", text)) / 2
+        dur = len(wav) / sr
+        speed = 1.0
+        if syllables and dur:
+            speed = min(1.6, max(1.0, RATE.get(emotion, RATE[""]) * dur / syllables))
+        if speed > 1.02:  # raw float in/out so the WAV header written below has the right length
+            out = subprocess.run(["ffmpeg", "-nostdin", "-loglevel", "error", "-f", "f32le", "-ar", str(sr),
+                                  "-ac", "1", "-i", "-", "-filter:a", f"atempo={speed:.3f}", "-f", "f32le", "-"],
+                                 input=wav.tobytes(), capture_output=True)
+            if out.returncode == 0 and out.stdout:
+                wav = np.frombuffer(out.stdout, dtype=np.float32)
+            else:
+                speed = 1.0
         buf = io.BytesIO()
-        sf.write(buf, wavs[0], sr, format="WAV", subtype="PCM_16")
-        return buf.getvalue()
+        sf.write(buf, wav, sr, format="WAV", subtype="PCM_16")
+        return buf.getvalue(), speed
 
     @modal.asgi_app()
     def web(self):
@@ -193,9 +218,10 @@ class Voice:
             import anyio
 
             t0 = time.perf_counter()
-            audio = await anyio.to_thread.run_sync(self._synth, text, voice, style)
+            audio, speed = await anyio.to_thread.run_sync(self._synth, text, voice, style, emotion)
             return Response(content=audio, media_type="audio/wav",
-                            headers={"X-Elapsed-S": f"{time.perf_counter() - t0:.3f}", "X-Voice": voice})
+                            headers={"X-Elapsed-S": f"{time.perf_counter() - t0:.3f}", "X-Voice": voice,
+                                     "X-Speed": f"{speed:.2f}"})
 
         @api.get("/gpu", dependencies=[Depends(auth)])
         def gpu():
