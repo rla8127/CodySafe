@@ -36,6 +36,11 @@ PARENT.passphrase = 'family';
 
 renderTabs = function (on) {
   const tabs = [['home', 'house', '홈'], ['sim', 'gamepad-2', '체험'], ['detect', 'shield-check', '검사'], ['family', 'users', '가족'], ['me', 'user-round', 'MY']];
+  // 시작 전에는 아직 쓸 수 없는 탭을 보여 주지 않습니다.
+  if (!signedIn()) {
+    $('#tabbar').classList.add('hidden');
+    view.classList.add('full');
+  }
   $('#tabbar').innerHTML = tabs.map(([k, i, t]) => k === 'detect'
     ? `<button class="tab tab-center ${on === k ? 'on' : ''}" onclick="go('${k}')"><span class="fab">${ic(i)}</span><span>${t}</span></button>`
     : `<button class="tab ${on === k ? 'on' : ''}" onclick="go('${k}')">${ic(i)}<span>${t}</span></button>`).join('');
@@ -57,7 +62,7 @@ function onboardingPage() {
     </div>`;
   }
   return `<div class="page">
-    <div class="brand-bar"><img src="assets/brand/logo-horizontal.png" alt="Cody Safe"></div>
+    <div class="brand-hero small"><img src="assets/brand/logo-horizontal.png" alt="Cody Safe"></div>
     <div class="lead-text">가족에게 보일<br><em>이름</em>을 정해 주세요</div>
     <div class="card"><div class="field" style="margin-top:0"><label for="regName">이름</label><input id="regName" maxlength="30" placeholder="예: 민수"></div>
     <div class="muted small" style="margin-top:10px">계정이나 비밀번호는 필요 없습니다.</div></div>
@@ -184,8 +189,10 @@ function deleteSheet(id) {
 
 /* ---------------- 홈 ---------------- */
 SCREENS.home = gated(() => `<div class="page">
-  <div class="brand-bar"><img src="assets/brand/logo-horizontal.png" alt="Cody Safe"></div>
-  <div class="hello" style="margin:0 2px 14px">안녕하세요${store.get('name') ? `, <b>${esc(store.get('name'))}님</b>` : ''} 오늘도 안전한 하루 보내세요</div>
+  <div class="brand-bar"><img src="assets/brand/logo-horizontal.png" alt="Cody Safe">
+    <button class="brand-bell" onclick="go('family')" aria-label="가족 경고">${ic('bell')}</button></div>
+  <div class="home-greeting">안녕하세요${store.get('name') ? `, ${esc(store.get('name'))}님` : ''}</div>
+  <div class="home-sub">오늘도 함께 살펴볼게요.</div>
   <div id="data"></div>
 </div>`);
 
@@ -199,16 +206,20 @@ function homeData({ recordings, recs, family, alerts, lock }) {
       <div class="hero-label">분석한 통화</div>
       <div class="hero-score">${recs.analyzed}<small>건</small></div>
       <div class="hero-meta">사기 의심 <b>${flagged}건</b> · 연결된 가족 <b>${family.guardians.length}명</b></div>
-      <div class="hero-actions"><button class="w" onclick="go('detect')">${ic('shield-check')}통화 검사</button><button onclick="go('sim')">${ic('gamepad-2')}사기 체험</button></div>
+    </div>
+    <div class="quick-grid">
+      ${[['detect', 'shield-check', '통화 검사'], ['passphrase', 'key-round', '가족 암구호'], ['lock', 'lock', '금융 앱 잠금'], ['sim', 'gamepad-2', '사기 체험']]
+        .map(([k, i, t]) => `<button onclick="go('${k}')"><span>${ic(i)}</span>${t}</button>`).join('')}
     </div>
     ${unread.map(alertCard).join('')}
     ${reviews ? `<button class="card mt soft-warn" style="width:100%;text-align:left" onclick="go('detect')"><b>검토가 필요한 통화 ${reviews}건</b><br>판정을 확인해 주시면 탐지 개선에 쓰입니다.</button>` : ''}
-    <div class="sec-title">자주 의심된 사기 유형</div>
-    ${recs.items.length ? recs.items.map((r) => `<div class="card mt"><span class="chip pri">${r.count}회 의심</span>
+    ${recs.items.length ? `<div class="sec-title">자주 의심된 사기 유형</div>
+      ${recs.items.map((r) => `<div class="card mt"><span class="chip pri">${r.count}회 의심</span>
       <div class="call-title">${esc(r.name)}</div><div class="call-text">${esc(r.advice)}</div>
-      <div class="call-text" style="color:var(--pri);font-weight:700;font-size:13px">추천 훈련 · ${esc(r.training)}</div></div>`).join('') : emptyCard('아직 사기로 판정된 통화가 없습니다.')}
-    <div class="sec-title">최근 분석 <button class="more" onclick="go('detect')">전체 보기${ic('chevron-right')}</button></div>
-    ${items.length ? items.slice(0, 3).map(recordingCard).join('') : emptyCard('아직 분석한 통화가 없습니다.')}`;
+      <div class="call-text" style="color:var(--pri);font-weight:700;font-size:13px">추천 훈련 · ${esc(r.training)}</div></div>`).join('')}` : ''}
+    ${items.length ? `<div class="sec-title">최근 분석 <button class="more" onclick="go('detect')">전체 보기${ic('chevron-right')}</button></div>
+      ${items.slice(0, 3).map(recordingCard).join('')}`
+    : `<button class="home-empty" onclick="go('detect')"><span>${ic('sparkles')}</span><span><b>아직 분석한 통화가 없어요</b><small>예시 통화로 어떻게 동작하는지 먼저 볼 수 있어요.</small></span>${ic('chevron-right')}</button>`}`;
 }
 
 /* ---------------- 가족 암구호 ---------------- */
