@@ -40,6 +40,13 @@ RAG_URL = os.getenv("GUARD_RAG_URL", "").rstrip("/")
 RAG_API_KEY = os.getenv("GUARD_RAG_API_KEY", "")
 RAG_TOP = int(os.getenv("GUARD_RAG_TOP", "3"))
 RAG_TIMEOUT = float(os.getenv("GUARD_RAG_TIMEOUT", "8"))
+# 켜면 rag_first.py가 판정: 사례 검색 결과를 판정 앞에 넣고 AI 의심 점수 4구간으로 알림·잠금을 정합니다.
+# 끄면(기본) 아래 ALERT_THRESHOLD·LOCK_THRESHOLD로 옛 동작 그대로입니다.
+RAG_FIRST = os.getenv("GUARD_RAG_FIRST", "0") == "1"
+# AI 의심 점수(0–100, 보정 전·확률 아님) 구간 경계: 미만 기록 / 주의 / 위험(가족 알림) / 매우 위험(잠금)
+BAND_CAUTION = int(os.getenv("GUARD_BAND_CAUTION", "40"))
+BAND_ALERT = int(os.getenv("GUARD_BAND_ALERT", "70"))
+BAND_LOCK = int(os.getenv("GUARD_BAND_LOCK", "90"))
 
 ANTHROPIC_MODEL = os.getenv("GUARD_ANTHROPIC_MODEL", "claude-opus-5-5")
 OPENAI_MODEL = os.getenv("GUARD_OPENAI_MODEL", "")  # GUARD_LLM=openai일 때 필수
