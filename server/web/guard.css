@@ -468,7 +468,12 @@ body.embedded .web-preview, body.embedded .preview-toggle { display: none !impor
 @media (min-width: 1001px) { body:not(.embedded) .stat-grid { grid-template-columns: repeat(4, 1fr); } }
 
 /* 글꼴 */
-body, input, textarea, select, button { font-family: "SUIT Variable", SUIT, -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Noto Sans KR", sans-serif; }
+/* 네이버 나눔스퀘어 라운드. 굵기별 파일을 한 이름으로 묶어 font-weight가 그대로 동작하게 합니다. */
+@font-face { font-family: "NanumRound"; src: url("https://hangeul.pstatic.net/hangeul_static/webfont/NanumSquareRound/NanumSquareRoundL.woff2") format("woff2"); font-weight: 300; font-display: swap; }
+@font-face { font-family: "NanumRound"; src: url("https://hangeul.pstatic.net/hangeul_static/webfont/NanumSquareRound/NanumSquareRoundR.woff2") format("woff2"); font-weight: 400 600; font-display: swap; }
+@font-face { font-family: "NanumRound"; src: url("https://hangeul.pstatic.net/hangeul_static/webfont/NanumSquareRound/NanumSquareRoundB.woff2") format("woff2"); font-weight: 700; font-display: swap; }
+@font-face { font-family: "NanumRound"; src: url("https://hangeul.pstatic.net/hangeul_static/webfont/NanumSquareRound/NanumSquareRoundEB.woff2") format("woff2"); font-weight: 800 900; font-display: swap; }
+body, input, textarea, select, button { font-family: "NanumRound", "SUIT Variable", SUIT, -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Noto Sans KR", sans-serif; }
 
 /* 관리자 메뉴는 PC 왼쪽 메뉴에만 둡니다. 모바일은 MY 안의 링크로 들어갑니다. */
 .admin-tab { display: none; }

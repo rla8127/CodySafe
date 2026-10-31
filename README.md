@@ -113,7 +113,7 @@ docs/project-plan.md             초기 QR 판독 기획 (이번 제출 범위 �
 | Amazon S3 | 음성 저장 |
 | FastAPI, SQLite | 서버 |
 | AndroidX WorkManager, DocumentFile | 앱 |
-| SUIT 2.0.5, Lucide 0.460.0 | 폰트, 아이콘 |
+| 네이버 나눔스퀘어 라운드, SUIT 2.0.5, Lucide 0.460.0 | 폰트, 아이콘 |
 
 **사전 보유 코드:** 웹 화면 코드(`index.html`, `css/`, `js/`, `assets/`)는 주제 공개(2026-10-30 11:00) 전인 2026-10-30 01시경 처음 작성됐습니다. 대회 규정에 따라 발표자료의 외부 자원 활용 내역에도 같은 내용을 적습니다.
 
