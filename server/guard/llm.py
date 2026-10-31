@@ -138,9 +138,13 @@ def _in_transcript(quote: str, transcript: str) -> bool:
 
 
 def _keep_grounded(result: dict, transcript: str) -> dict:
+    # 근거 대조는 가족 알림과 잠금으로 이어지는 보이스피싱 판정에만 합니다.
+    if result["label"] != VOICE_PHISHING:
+        result["evidence"] = []
+        return result
     result["evidence"] = [q for q in result["evidence"] if _in_transcript(q, transcript)]
     # 녹취에서 확인되는 발화 없이는 가족 알림과 잠금을 일으키지 않고 사람 검토로 보냅니다.
-    if result["label"] in (VOICE_PHISHING, OTHER_SCAM) and not result["evidence"]:
+    if not result["evidence"]:
         result["label"] = "uncertain"
     return result
 

@@ -128,9 +128,9 @@ a.btn { text-decoration: none; }
 .lock-alert-text { margin-top: 10px; font-size: 14.5px; line-height: 1.55; color: var(--ink2); }
 .fact-box { position: relative; overflow: hidden; margin-top: 12px; padding: 16px; border-radius: 16px; background: var(--pri-soft); }
 .fact-box small { display: block; font-size: 12px; font-weight: 600; color: var(--sub); }
-.fact-box > b { display: block; padding-right: 76px; font-size: 16.5px; font-weight: 800; letter-spacing: -0.02em; color: var(--ink); }
-.fact-stamp { position: absolute; top: 14px; right: 12px; padding: 3px 8px; border: 2.5px solid #D92D20; border-radius: 7px; outline: 1px solid #D92D20; outline-offset: 2px; font-family: Georgia, "Times New Roman", serif; font-size: 15px; font-weight: 800; letter-spacing: .12em; color: #D92D20; opacity: .82; transform: rotate(-10deg); }
-.fact-head { margin-top: 14px; font-size: 12.5px; font-weight: 700; color: var(--sub); }
+.fact-box > b { display: block; font-size: 16.5px; font-weight: 800; letter-spacing: -0.02em; color: var(--ink); }
+.fact-head { display: flex; align-items: center; gap: 5px; margin-top: 14px; font-size: 12.5px; font-weight: 700; color: var(--pri); }
+.fact-head svg.lucide { width: 15px; height: 15px; }
 .fact-list { display: grid; gap: 8px; margin-top: 8px; list-style: none; }
 .fact-list li { display: flex; gap: 8px; font-size: 14px; font-weight: 600; line-height: 1.45; color: var(--ink2); overflow-wrap: anywhere; }
 .fact-list svg.lucide { width: 16px; height: 16px; margin-top: 2px; stroke-width: 3; color: var(--pri); }

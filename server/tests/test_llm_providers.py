@@ -71,8 +71,14 @@ def test_only_quotes_found_in_transcript_are_kept(monkeypatch):
 
 def test_scam_verdict_without_real_quote_becomes_uncertain(monkeypatch):
     assert analyzed(monkeypatch, "voice_phishing", ["최근 비슷한 사건이 있었다"])["label"] == "uncertain"
-    assert analyzed(monkeypatch, "other_scam", ["***"])["label"] == "uncertain"
+    assert analyzed(monkeypatch, "voice_phishing", ["***"])["label"] == "uncertain"
     assert analyzed(monkeypatch, "normal", [])["label"] == "normal"
+
+
+def test_non_phishing_skips_evidence_check(monkeypatch):
+    other = analyzed(monkeypatch, "other_scam", ["녹취에 없는 말"])
+    assert other["label"] == "other_scam" and other["evidence"] == []
+    assert analyzed(monkeypatch, "normal", ["녹취에 없는 말"])["evidence"] == []
 
 
 def test_prompt_forbids_identity_and_outside_facts():

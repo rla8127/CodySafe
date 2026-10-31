@@ -248,23 +248,24 @@ function callTitle(r) {
 
 // 모델이 스스로 매긴 값이라 통계적 확률로 표현하지 않습니다. 사람이 판정을 고치면 숨깁니다.
 function confidenceBar(r) {
-  if (r.status !== 'done' || r.review_label || !['voice_phishing', 'other_scam'].includes(r.label) || r.confidence == null) return '';
+  if (r.status !== 'done' || r.review_label || r.label !== 'voice_phishing' || r.confidence == null) return '';
   const percent = Math.round(r.confidence * 100);
   return `<div class="confidence"><div class="confidence-top"><span>AI 판단 확신도</span><b>${percent}%</b></div>
     <div class="confidence-track"><span style="width:${percent}%"></span></div>
     <div class="confidence-note">실제 사기일 확률이 아니라 AI가 판단에 얼마나 확신하는지를 나타냅니다.</div></div>`;
 }
 
-// AI가 풀어 쓴 요약은 보여 주지 않고, 녹취에서 대조한 발화만 사실로 표시합니다.
+// AI가 풀어 쓴 요약은 보여 주지 않습니다. 근거 대조는 보이스피싱 의심일 때만 보여 주고 나머지는 한 줄로 넘깁니다.
 function factBox(r, top) {
-  if (!r.evidence.length) {
-    if (r.status !== 'done') return '';
-    return `<div class="call-text">${(r.review_label || r.label) === 'normal' ? '사기로 볼 만한 말을 찾지 못했습니다.' : '근거가 될 말을 찾지 못해 판단하지 못했습니다.'}</div>`;
+  if (r.status !== 'done') return '';
+  const label = r.review_label || r.label;
+  if (label !== 'voice_phishing' || !r.evidence.length) {
+    const line = { normal: '사기로 볼 만한 말을 찾지 못했습니다.', other_scam: '보이스피싱은 아니지만 다른 사기가 의심됩니다. 판정을 확인해 주세요.', voice_phishing: '직접 보이스피싱으로 표시한 통화입니다.' }[label] || '판단하기 어려운 통화입니다. 판정을 확인해 주세요.';
+    return `<div class="call-text">${line}</div>`;
   }
   return `<div class="fact-box">
-    <span class="fact-stamp" aria-hidden="true">FACT</span>
     ${top ? `<small>비슷한 수법</small><b>${esc(top.name)}</b>` : '<b>확인된 말</b>'}
-    <div class="fact-head">통화에서 실제로 나온 말</div>
+    <div class="fact-head">${ic('badge-check')}녹취에서 확인한 말</div>
     <ul class="fact-list">${r.evidence.map((e) => `<li>${ic('check')}<span>“${esc(e)}”</span></li>`).join('')}</ul>
     <div class="fact-note">녹취에서 그대로 옮겼습니다. 말한 내용이 사실이라는 뜻은 아니며, 음성 변환 오류가 있을 수 있습니다.</div>
     ${top ? `<div class="fact-advice"><b>이렇게 확인하세요</b><p>${esc(top.advice)}</p></div>` : ''}
