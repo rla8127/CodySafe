@@ -55,7 +55,21 @@ def _titan_embed(text: str) -> list[float]:
     return json.loads(response["body"].read())["embedding"]
 
 
+_openai = None
+
+
+def _openai_embed(text: str) -> list[float]:
+    global _openai
+    if _openai is None:
+        from openai import OpenAI
+
+        _openai = OpenAI()
+    return _openai.embeddings.create(model=config.OPENAI_EMBED_MODEL, input=text[:8000]).data[0].embedding
+
+
 def _embed(text: str) -> list[float]:
+    if config.EMBED == "openai":
+        return _openai_embed(text)
     return _titan_embed(text) if config.EMBED == "titan" else _hash_embed(text)
 
 

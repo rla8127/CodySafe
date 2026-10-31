@@ -14,16 +14,15 @@ def _set(rec_id: str, **fields) -> None:
         conn.execute(f"UPDATE recordings SET {cols} WHERE id = ?", (*fields.values(), rec_id))
 
 
-def _notify_family(rec_id: str, protected_id: str, result: dict, matches: list[dict]) -> None:
-    kind = matches[0]["name"] if matches else "보이스피싱"
+def _notify_family(rec_id: str, protected_id: str) -> None:
     with db.connect() as conn:
         name = conn.execute("SELECT name FROM devices WHERE id = ?", (protected_id,)).fetchone()["name"]
         guardians = conn.execute("SELECT guardian_id FROM family_links WHERE protected_id = ?", (protected_id,)).fetchall()
         for g in guardians:
-            # 녹취 원문은 보호자에게 보내지 않고 요약만 보냅니다.
+            # 가족에게는 의심 여부만 전달합니다. 요약, 유형, 녹취, 파일명은 보내지 않습니다.
             conn.execute(
                 "INSERT INTO alerts (guardian_id, protected_id, recording_id, title, body, created_at) VALUES (?, ?, ?, ?, ?, ?)",
-                (g["guardian_id"], protected_id, rec_id, f"{name}님 통화에서 {kind} 의심", result["summary"], db.now()),
+                (g["guardian_id"], protected_id, rec_id, f"{name}님 보이스피싱 의심 통화", db.FAMILY_ALERT_BODY, db.now()),
             )
 
 
@@ -67,12 +66,15 @@ def process(rec_id: str) -> None:
             transcript=transcript if is_scam or needs_review else None,
         )
         if alert:
-            _notify_family(rec_id, row["device_id"], result, matches)
+            _notify_family(rec_id, row["device_id"])
+        if label == VOICE_PHISHING and confidence >= config.LOCK_THRESHOLD:
+            with db.connect() as conn:
+                db.extend_lock(conn, row["device_id"], config.LOCK_SECONDS)
         # 분석이 끝난 뒤에 지워야 LLM 실패 시 다시 시도할 수 있습니다.
         providers.delete_audio(row["s3_key"])
     except Exception as exc:
         log.exception("recording %s failed", rec_id)
-        _set(rec_id, status="failed", error=type(exc).__name__)
+        _set(rec_id, status="failed", error=f"{type(exc).__name__}: {exc}"[:500])
 
 
 def recommendations(device_id: str) -> dict:

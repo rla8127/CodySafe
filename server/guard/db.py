@@ -37,6 +37,9 @@ CREATE TABLE IF NOT EXISTS review_dataset (
 """
 
 
+FAMILY_ALERT_BODY = "통화 내용은 공유되지 않습니다. 본인에게 직접 연락해 확인해 주세요."
+
+
 @contextmanager
 def connect():
     Path(config.DB_PATH).parent.mkdir(parents=True, exist_ok=True)
@@ -53,10 +56,22 @@ def connect():
 def init() -> None:
     with connect() as conn:
         conn.executescript(SCHEMA)
+        if "lock_until" not in {r["name"] for r in conn.execute("PRAGMA table_info(devices)")}:
+            conn.execute("ALTER TABLE devices ADD COLUMN lock_until REAL NOT NULL DEFAULT 0")
+        # 이전 버전 알림에 저장된 요약과 사기 유형을 지웁니다.
+        conn.execute(
+            "UPDATE alerts SET body = ?, title = (SELECT name FROM devices WHERE id = alerts.protected_id) || '님 보이스피싱 의심 통화'"
+            " WHERE body != ?",
+            (FAMILY_ALERT_BODY, FAMILY_ALERT_BODY),
+        )
 
 
 def now() -> float:
     return time.time()
+
+
+def extend_lock(conn: sqlite3.Connection, device_id: str, seconds: float) -> None:
+    conn.execute("UPDATE devices SET lock_until = MAX(lock_until, ?) WHERE id = ?", (now() + seconds, device_id))
 
 
 def public_recording(row: sqlite3.Row) -> dict:

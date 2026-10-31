@@ -2,5 +2,6 @@ fastapi
 uvicorn
 boto3
 anthropic[bedrock]
+openai
 pytest
 httpx

@@ -83,12 +83,46 @@ def _transcribe(rec_id: str, key: str) -> str:
         client.delete_transcription_job(TranscriptionJobName=job)
 
 
+def _read(key: str) -> bytes:
+    if config.STORAGE == "s3":
+        return s3().get_object(Bucket=config.S3_BUCKET, Key=key)["Body"].read()
+    return local_path(key).read_bytes()
+
+
+_openai = None
+
+
+def _as_m4a(data: bytes) -> bytes:
+    """삼성 통화 녹음은 AAC인데 컨테이너 표기가 3gp4입니다. 음성은 그대로 두고 표기만 바꿉니다."""
+    if data[4:8] != b"ftyp" or data[8:11] != b"3gp" or b"mp4a" not in data:
+        return data
+    out = bytearray(data)
+    out[8:12] = b"M4A "
+    for i in range(16, int.from_bytes(data[:4], "big"), 4):
+        if out[i : i + 3] == b"3gp":
+            out[i : i + 4] = b"M4A "
+    return bytes(out)
+
+
+def _openai_transcribe(key: str) -> str:
+    global _openai
+    data = _as_m4a(_read(key))
+    if len(data) > config.OPENAI_STT_MAX_BYTES:
+        raise ValueError("OpenAI 전사 크기 제한 초과")
+    if _openai is None:
+        from openai import OpenAI
+
+        _openai = OpenAI()
+    result = _openai.audio.transcriptions.create(
+        model=config.OPENAI_STT_MODEL, file=(key.rsplit("/", 1)[-1], data), language="ko"
+    )
+    return result.text.strip()
+
+
 def transcribe(rec_id: str, key: str) -> str:
     if config.STT == "transcribe":
         return _transcribe(rec_id, key)
-    # text 모드: 업로드한 .txt를 녹취로 간주합니다.
-    if config.STORAGE == "s3":
-        data = s3().get_object(Bucket=config.S3_BUCKET, Key=key)["Body"].read()
-    else:
-        data = local_path(key).read_bytes()
-    return data.decode("utf-8", errors="ignore").strip()
+    if config.STT == "openai":
+        return _openai_transcribe(key)
+    # text 모드: 업로드한 .txt를 녹취로 간주합니다. 글자가 아니면 LLM에 넘기지 않고 실패 처리합니다.
+    return _read(key).decode("utf-8").strip()

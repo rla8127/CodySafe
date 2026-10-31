@@ -47,18 +47,43 @@ RERANK_SCHEMA = {
 _client = None
 
 
-def _claude():
+def _llm_client():
     global _client
     if _client is None:
-        from anthropic import AnthropicBedrock
+        if config.LLM == "openai":
+            from openai import OpenAI
 
-        _client = AnthropicBedrock(aws_region=config.CLAUDE_REGION)
+            _client = OpenAI()
+        elif config.LLM == "anthropic":
+            from anthropic import Anthropic
+
+            _client = Anthropic()
+        else:
+            from anthropic import AnthropicBedrock
+
+            _client = AnthropicBedrock(aws_region=config.CLAUDE_REGION)
     return _client
 
 
+def _ask_openai(system: str, user: str, schema: dict) -> dict:
+    if not config.OPENAI_MODEL:
+        raise RuntimeError("GUARD_OPENAI_MODEL을 설정하세요")
+    response = _llm_client().chat.completions.create(
+        model=config.OPENAI_MODEL,
+        messages=[{"role": "system", "content": system}, {"role": "user", "content": user}],
+        response_format={"type": "json_schema", "json_schema": {"name": "result", "strict": True, "schema": schema}},
+    )
+    choice = response.choices[0]
+    if choice.finish_reason != "stop" or not choice.message.content:
+        raise RuntimeError(f"OpenAI 응답 중단: {choice.finish_reason}")
+    return json.loads(choice.message.content)
+
+
 def _ask_json(system: str, user: str, schema: dict) -> dict:
-    response = _claude().messages.create(
-        model=config.CLAUDE_MODEL,
+    if config.LLM == "openai":
+        return _ask_openai(system, user, schema)
+    response = _llm_client().messages.create(
+        model=config.ANTHROPIC_MODEL if config.LLM == "anthropic" else config.CLAUDE_MODEL,
         max_tokens=4000,
         system=system,
         messages=[{"role": "user", "content": user}],
@@ -96,7 +121,7 @@ def _rule_analyze(transcript: str) -> dict:
 
 
 def analyze(transcript: str) -> dict:
-    if config.LLM == "bedrock":
+    if config.LLM != "rule":
         result = _ask_json(ANALYSIS_SYSTEM, f"<transcript>\n{transcript}\n</transcript>", ANALYSIS_SCHEMA)
     else:
         result = _rule_analyze(transcript)
@@ -106,7 +131,7 @@ def analyze(transcript: str) -> dict:
 
 def rerank(query: str, candidates: list[dict]) -> list[dict]:
     """하이브리드 검색 후보를 쿼리 관련도 순으로 다시 정렬합니다."""
-    if config.LLM != "bedrock" or len(candidates) < 2:
+    if config.LLM == "rule" or len(candidates) < 2:
         return candidates
     docs = "\n".join(f"- {d['id']}: {d['name']} — {d['text']}" for d in candidates)
     result = _ask_json(

@@ -1,0 +1,31 @@
+/* 웹 MVP의 style.css 위에 가족보호 화면에 필요한 것만 더합니다. */
+.intro[hidden] { display: none; }
+.lead-text { font-size: 28px; font-weight: 800; line-height: 1.3; letter-spacing: -0.03em; margin: 8px 2px 16px; }
+.lead-text em { font-style: normal; background: var(--grad); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.notice { list-style: none; display: grid; gap: 10px; font-size: 14px; line-height: 1.5; color: var(--ink2); }
+.notice li { display: flex; gap: 8px; }
+.notice svg.lucide { width: 17px; height: 17px; color: var(--pri); margin-top: 2px; }
+.soft-warn { background: var(--warn-soft); color: #A85A00; box-shadow: none; font-size: 13.5px; line-height: 1.5; }
+.soft-danger { background: var(--danger-soft); box-shadow: none; }
+.call-title { font-weight: 700; font-size: 15.5px; margin-top: 8px; }
+.call-text { font-size: 14px; line-height: 1.55; color: var(--ink2); margin-top: 4px; overflow-wrap: anywhere; }
+.quote { font-size: 13px; line-height: 1.5; color: var(--sub); margin-top: 6px; overflow-wrap: anywhere; }
+.type-box { background: var(--pri-soft); border-radius: 14px; padding: 12px; margin-top: 10px; }
+.type-box b { color: var(--pri); font-size: 14px; }
+.type-box p { font-size: 13.5px; line-height: 1.5; color: var(--ink2); margin-top: 3px; }
+.link-row { display: flex; gap: 18px; margin-top: 10px; }
+.link-row button { font-size: 13.5px; font-weight: 700; color: var(--pri); padding: 4px 0; }
+.link-row button.quiet { color: var(--sub); }
+.empty { font-size: 14px; color: var(--sub); text-align: center; padding: 8px 0; }
+.btn-col { display: grid; gap: 8px; margin-top: 14px; }
+.kv { display: flex; justify-content: space-between; gap: 16px; padding: 12px 0; border-top: 1px solid var(--line); font-size: 14px; }
+.kv:first-child { border-top: 0; padding-top: 0; }
+.kv:last-child { padding-bottom: 0; }
+.kv span:first-child { color: var(--sub); flex: none; }
+.kv span:last-child { font-weight: 600; text-align: right; overflow-wrap: anywhere; }
+.code-big { font-size: 28px; font-weight: 800; letter-spacing: .12em; text-align: center; color: var(--pri); margin: 8px 0 12px; }
+a.btn { text-decoration: none; }
+.lock-banner { display: flex; align-items: center; gap: 10px; width: 100%; text-align: left; margin-bottom: 12px; font-size: 14px; line-height: 1.45; color: var(--ink2); }
+.lock-banner svg.lucide { width: 22px; height: 22px; color: var(--danger); flex: none; }
+/* 모바일에서 대화 첫 줄이 진행 막대에 가리지 않게 합니다. */
+@media (max-width: 500px) { #playWrap .chat { padding-top: 84px; } }

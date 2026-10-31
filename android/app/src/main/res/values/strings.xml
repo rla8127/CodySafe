@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="guard_service_label">CodySafe 금융 앱 잠금</string>
+    <string name="guard_service_desc">보이스피싱이 의심될 때 은행, 간편결제, 증권, 원격제어 앱을 잠시 막습니다. 열린 앱의 이름만 확인하며 화면 내용과 입력한 글자는 읽지 않습니다.</string>
+</resources>

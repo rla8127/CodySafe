@@ -12,16 +12,26 @@ AWS_REGION = os.getenv("GUARD_AWS_REGION", "ap-northeast-2")
 
 STORAGE = os.getenv("GUARD_STORAGE", "local")  # local | s3
 S3_BUCKET = os.getenv("GUARD_S3_BUCKET", "")
-STT = os.getenv("GUARD_STT", "text")  # text | transcribe
-LLM = os.getenv("GUARD_LLM", "rule")  # rule | bedrock
-EMBED = os.getenv("GUARD_EMBED", "hash")  # hash | titan
+STT = os.getenv("GUARD_STT", "text")  # text | openai | transcribe
+OPENAI_STT_MODEL = os.getenv("GUARD_OPENAI_STT_MODEL", "whisper-1")
+LLM = os.getenv("GUARD_LLM", "rule")  # rule | anthropic | openai | bedrock
+EMBED = os.getenv("GUARD_EMBED", "hash")  # hash | openai | titan
 
+ANTHROPIC_MODEL = os.getenv("GUARD_ANTHROPIC_MODEL", "claude-opus-5-5")
+OPENAI_MODEL = os.getenv("GUARD_OPENAI_MODEL", "")  # GUARD_LLM=openai일 때 필수
+OPENAI_EMBED_MODEL = os.getenv("GUARD_OPENAI_EMBED_MODEL", "text-embedding-3-small")
 CLAUDE_MODEL = os.getenv("GUARD_CLAUDE_MODEL", "global.anthropic.claude-opus-5-5")
 CLAUDE_REGION = os.getenv("GUARD_CLAUDE_REGION", AWS_REGION)
 TITAN_MODEL = os.getenv("GUARD_TITAN_MODEL", "amazon.titan-embed-text-v2:0")
 
 # 오탐 알림은 가족에게 실제 불안을 주므로, 이 값 미만이면 알림 대신 사람 검토로 보냅니다.
 ALERT_THRESHOLD = float(os.getenv("GUARD_ALERT_THRESHOLD", "0.7"))
+# 잠금은 알림보다 오탐 피해가 크므로 기준을 더 높게 둡니다.
+LOCK_THRESHOLD = float(os.getenv("GUARD_LOCK_THRESHOLD", "0.9"))
+LOCK_SECONDS = int(os.getenv("GUARD_LOCK_SECONDS", "3600"))
+LOCK_RELEASE_WAIT = int(os.getenv("GUARD_LOCK_RELEASE_WAIT", "600"))
 MAX_UPLOAD_BYTES = int(os.getenv("GUARD_MAX_UPLOAD_BYTES", str(200 * 1024 * 1024)))
 AUDIO_EXTENSIONS = {"m4a", "mp3", "mp4", "wav", "flac", "ogg", "amr", "webm"}
+OPENAI_STT_EXTENSIONS = {"m4a", "mp3", "mp4", "wav", "flac", "ogg", "webm"}
+OPENAI_STT_MAX_BYTES = 25 * 1024 * 1024  # OpenAI 전사 API의 파일 크기 제한
 TEXT_EXTENSIONS = {"txt"}  # GUARD_STT=text 테스트 전용

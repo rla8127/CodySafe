@@ -17,7 +17,7 @@ os.environ.update(
 import pytest
 from fastapi.testclient import TestClient
 
-from guard import config, rag
+from guard import config, db, rag
 from guard.app import app
 
 PHISHING = "서울중앙지검 수사관입니다. 명의가 도용되어 구속 수사 대상입니다. 안전 계좌로 옮기세요."
@@ -63,9 +63,13 @@ def test_phishing_alerts_guardian_without_transcript(client):
     assert rec["label"] == "voice_phishing" and not rec["needs_review"]
     assert rec["matches"][0]["id"] == "prosecutor_impersonation"
     items = client.get("/v1/alerts", headers=g).json()["items"]
-    assert len(items) == 1 and "엄마" in items[0]["title"]
-    assert "안전 계좌로 옮기세요" not in items[0]["body"]
+    assert len(items) == 1 and items[0]["title"] == "엄마님 보이스피싱 의심 통화"
+    assert items[0]["body"] == db.FAMILY_ALERT_BODY
+    assert set(items[0]) == {"id", "title", "body", "acked", "created_at"}
     assert "transcript" not in rec
+    # 가족은 분석 결과를 조회할 수 없습니다.
+    assert client.get("/v1/recordings", headers=g).json()["items"] == []
+    assert client.post(f"/v1/recordings/{rec['id']}/review", headers=g, json={"label": "normal"}).status_code == 404
 
 
 def test_low_confidence_goes_to_review_not_alert(client):
@@ -142,3 +146,105 @@ def test_invite_is_single_use_and_guardian_can_be_removed(client):
 def test_hybrid_retrieval_finds_type():
     assert rag.retrieve("저금리 대환대출로 갈아타려면 선납 이자를 입금하라고 함")[0]["id"] == "loan_refinance"
     assert rag.retrieve("아들이 폰이 고장나서 다른 번호로 합의금을 보내달라고 함")[0]["id"] == "family_impersonation"
+
+
+def test_text_mode_rejects_audio_and_binary(client):
+    h = device(client, "음성")
+    assert client.post("/v1/recordings", headers=h, json={"filename": "call.m4a", "client_key": "m"}).status_code == 415
+    r = client.post("/v1/recordings", headers=h, json={"filename": "fake.txt", "client_key": "f"}).json()
+    u = urlsplit(r["upload_url"])
+    client.put(f"{u.path}?{u.query}", content=b"\x00\x00\x00\x18ftyp3gp4\xff\xfe\xfa")
+    client.post(f"/v1/recordings/{r['id']}/complete", headers=h)
+    rec = client.get("/v1/recordings", headers=h).json()["items"][0]
+    assert rec["status"] == "failed" and rec["label"] is None
+
+
+def test_openai_stt_sends_audio_and_enforces_limit(client, monkeypatch):
+    from types import SimpleNamespace as NS
+
+    from guard import providers
+
+    seen = {}
+
+    def create(**kw):
+        seen.update(kw)
+        return NS(text=" " + PHISHING + " ")
+
+    monkeypatch.setattr(config, "STT", "openai")
+    monkeypatch.setattr(providers, "_openai", NS(audio=NS(transcriptions=NS(create=create))))
+    h = device(client, "전사")
+    assert client.post("/v1/recordings", headers=h, json={"filename": "a.amr", "client_key": "amr"}).status_code == 415
+    r = client.post("/v1/recordings", headers=h, json={"filename": "a.m4a", "client_key": "a"}).json()
+    u = urlsplit(r["upload_url"])
+    client.put(f"{u.path}?{u.query}", content=b"\x00audio")
+    client.post(f"/v1/recordings/{r['id']}/complete", headers=h)
+    rec = client.get("/v1/recordings", headers=h).json()["items"][0]
+    assert rec["label"] == "voice_phishing" and seen["language"] == "ko" and seen["file"][1] == b"\x00audio"
+
+    monkeypatch.setattr(config, "OPENAI_STT_MAX_BYTES", 2)
+    r = client.post("/v1/recordings", headers=h, json={"filename": "b.m4a", "client_key": "b"}).json()
+    u = urlsplit(r["upload_url"])
+    client.put(f"{u.path}?{u.query}", content=b"\x00audio")
+    client.post(f"/v1/recordings/{r['id']}/complete", headers=h)
+    assert client.get("/v1/recordings", headers=h).json()["items"][0]["status"] == "failed"
+
+
+def test_samsung_3gp_header_becomes_m4a_without_touching_audio():
+    from guard.providers import _as_m4a
+
+    head = (24).to_bytes(4, "big") + b"ftyp3gp4\x00\x00\x00\x01isom3gp4"
+    body = b"mdat-3gp4-audio-mp4a"
+    out = _as_m4a(head + body)
+    assert out[8:12] == b"M4A " and out[20:24] == b"M4A " and out[16:20] == b"isom"
+    assert out[24:] == body and len(out) == len(head + body)
+    amr = head + b"samr"
+    assert _as_m4a(amr) == amr
+
+
+def test_web_ui_is_served_without_exposing_repo(client):
+    assert client.get("/app/").status_code == 200 and "guard.js" in client.get("/app/").text
+    assert client.get("/app/js/app.js").status_code == 200
+    assert client.get("/app/css/style.css").headers["cache-control"] == "no-cache"
+    for path in ("/app/.git/config", "/app/server/guard/config.py", "/app/js/../../server/.env", "/app/web/../guard/config.py"):
+        assert client.get(path).status_code == 404, path
+
+
+def test_high_confidence_phishing_locks_only_that_device(client):
+    p, g = linked(client)
+    assert client.get("/v1/lock", headers=p).json()["locked"] is False
+    send(client, p, WEAK, "weak-lock")
+    assert client.get("/v1/lock", headers=p).json()["locked"] is False
+    rec = send(client, p, PHISHING, "lock")
+    state = client.get("/v1/lock", headers=p).json()
+    assert state["locked"] and 0 < state["remaining"] <= config.LOCK_SECONDS and "viva.republica.toss" in state["apps"]
+    assert client.get("/v1/lock", headers=g).json()["locked"] is False
+    # 잠금 상태만 가족에게 보이고, 사기범이 시킨 판정 변경이나 삭제로는 풀리지 않습니다.
+    assert client.get("/v1/family", headers=g).json()["protected"][0]["locked"] is True
+    client.post(f"/v1/recordings/{rec['id']}/review", headers=p, json={"label": "normal"})
+    client.delete(f"/v1/recordings/{rec['id']}", headers=p)
+    assert client.get("/v1/lock", headers=p).json()["locked"] is True
+
+
+def test_self_release_waits_and_cannot_extend_or_unlock_immediately(client):
+    p = device(client, "해제")
+    assert client.post("/v1/lock", headers=p, json={"minutes": 0}).status_code == 422
+    assert client.post("/v1/lock", headers=p, json={"minutes": 61}).status_code == 422
+    assert client.post("/v1/lock/release", headers=p).json()["locked"] is False
+    client.post("/v1/lock", headers=p, json={"minutes": 60})
+    first = client.post("/v1/lock/release", headers=p).json()
+    assert first["locked"] and first["remaining"] <= config.LOCK_RELEASE_WAIT
+    assert client.post("/v1/lock/release", headers=p).json()["remaining"] <= first["remaining"]
+    # 짧은 수동 잠금이 남은 시간을 줄이지 않습니다.
+    client.post("/v1/lock", headers=p, json={"minutes": 60})
+    assert client.post("/v1/lock", headers=p, json={"minutes": 1}).json()["remaining"] > 3000
+
+
+def test_only_linked_guardian_can_unlock(client):
+    p, g = linked(client)
+    pid = client.get("/v1/family", headers=g).json()["protected"][0]["id"]
+    client.post("/v1/lock", headers=p, json={"minutes": 60})
+    assert client.post(f"/v1/family/protected/{pid}/unlock", headers=device(client, "남")).status_code == 404
+    assert client.get("/v1/lock", headers=p).json()["locked"] is True
+    assert client.post(f"/v1/family/protected/{pid}/unlock", headers=g).status_code == 200
+    assert client.get("/v1/lock", headers=p).json()["locked"] is False
+    assert client.get("/v1/family", headers=g).json()["protected"][0]["locked"] is False
