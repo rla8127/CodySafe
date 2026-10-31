@@ -514,3 +514,27 @@ def test_ops_finds_surge_masks_numbers_and_excludes_normal_calls(client):
     assert sqlite3.connect(config.DB_PATH).execute("SELECT COUNT(*) FROM family_links WHERE protected_id LIKE 'demo-seed-%'").fetchone()[0] == 0
     assert dashboard._number("통화 김철수_260101_120000.m4a") is None
     assert dashboard._number("통화 010-1234-5678_260101_120000.m4a") == "01012345678"
+
+
+def test_each_change_request_is_one_trace_without_ids_or_polling(client, monkeypatch):
+    from contextlib import contextmanager
+    from types import SimpleNamespace as NS
+
+    from guard import tracing
+
+    names = []
+
+    @contextmanager
+    def trace(name, **_):
+        names.append(name)
+        yield NS(update=lambda **f: None)
+
+    monkeypatch.setattr(tracing, "trace", trace)
+    h = device(client, "요청")
+    client.get("/v1/lock", headers=h)
+    r = client.post("/v1/recordings", headers=h, json={"filename": "t.txt", "client_key": "trace"}).json()
+    u = urlsplit(r["upload_url"])
+    client.put(f"{u.path}?{u.query}", content=NORMAL.encode())
+    client.post(f"/v1/recordings/{r['id']}/complete", headers=h)
+    assert names == ["POST /v1/devices", "POST /v1/recordings", "PUT /v1/local-upload/{id}", "POST /v1/recordings/{id}/complete"]
+    assert not any(r["id"] in n or "token" in n for n in names)

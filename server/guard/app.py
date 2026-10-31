@@ -1,6 +1,7 @@
 import hmac
 import json
 import logging
+import re
 import secrets
 import threading
 import uuid
@@ -50,6 +51,25 @@ WEB_DIR = config.ROOT / "web"
 for path, folder in (("css", "css"), ("js", "js"), ("assets", "assets")):
     app.mount(f"/app/{path}", StaticFiles(directory=config.ROOT.parent / folder), name=f"app-{path}")
 app.mount("/app/web", StaticFiles(directory=WEB_DIR), name="app-web")
+
+
+_ROUTE_ID = re.compile(r"/(?:[0-9a-f]{32}|demo-[\w-]+|\d+)(?=/|$)")
+
+
+@app.middleware("http")
+async def trace_requests(request: Request, call_next):
+    """사용자 요청 하나를 트레이스 하나로 기록합니다. 5초마다 도는 조회(GET)는 제외합니다."""
+    if request.method == "GET" or not request.url.path.startswith("/v1/"):
+        return await call_next(request)
+    # 주소의 토큰과 ID가 남지 않도록 쿼리를 빼고 ID를 가립니다.
+    name = f"{request.method} {_ROUTE_ID.sub('/{id}', request.url.path)}"
+    with tracing.trace(name, metadata={"method": request.method}) as root:
+        response = await call_next(request)
+        fields = {"metadata": {"status": response.status_code}}
+        if response.status_code >= 500:
+            fields.update(level="ERROR", status_message=str(response.status_code))
+        tracing.update(root, **fields)
+        return response
 
 
 @app.middleware("http")
@@ -246,7 +266,7 @@ def create_scenario(report_id: int, device: str = Depends(current_device)):
         if not item["rank"]:
             raise HTTPException(403, "top reports only")
         try:
-            with tracing.trace("시나리오 생성", metadata={"report": report_id}):
+            with tracing.observe("시나리오 생성", metadata={"report": report_id}):
                 scenario = reports.generate(item["title"], item["body"])
         except Exception as exc:
             logging.getLogger("guard.reports").exception("scenario failed")
@@ -351,7 +371,7 @@ def _analyze_sample(sample_id: str) -> dict:
     # 로그인 없는 랜딩에서도 부르므로 동시에 눌러도 샘플당 한 번만 분석합니다.
     with _sample_lock:
         if sample_id not in _sample_results:
-            with tracing.trace("예시 통화 분석", metadata={"sample": sample_id}):
+            with tracing.observe("예시 통화 분석", metadata={"sample": sample_id}):
                 text = samples.transcript(sample)
                 result = llm.analyze(text)
                 _sample_results[sample_id] = {

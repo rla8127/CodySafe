@@ -44,7 +44,7 @@ def public_matches(matches: list[dict]) -> list[dict]:
 
 
 def process(rec_id: str) -> None:
-    with tracing.trace("통화 분석", metadata={"recording": rec_id}) as trace:
+    with tracing.observe("통화 분석", metadata={"recording": rec_id}) as trace:
         _process(rec_id, trace)
 
 

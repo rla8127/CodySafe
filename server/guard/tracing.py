@@ -6,10 +6,16 @@
 import logging
 import os
 from contextlib import contextmanager
+from contextvars import ContextVar
+
+from opentelemetry import context as otel_context
 
 log = logging.getLogger("guard.tracing")
 _langfuse = None
 _ready = False
+# FastAPI가 자체로 만드는 스팬은 내보내지 않으므로, 그 스팬을 부모로 삼으면 트리가 끊어집니다.
+# 그래서 부모 관계를 직접 들고 다닙니다. 스레드풀과 백그라운드 작업에도 함께 복사됩니다.
+_current: ContextVar[tuple[str, str] | None] = ContextVar("guard_trace_parent", default=None)
 
 
 class _NoOp:
@@ -50,14 +56,25 @@ def update(observation, **fields) -> None:
 def observe(name: str, as_type: str = "span", **fields):
     client = _client()
     context = None
+    token = None
+    detached = None
     if client:
         try:
+            parent = _current.get()
+            if parent:
+                fields["trace_context"] = {"trace_id": parent[0], "parent_span_id": parent[1]}
+            else:
+                # 새 트레이스의 맨 위가 되도록 FastAPI 스팬에서 떼어 냅니다.
+                detached = otel_context.attach(otel_context.Context())
             context = client.start_as_current_observation(name=name, as_type=as_type, **fields)
             observation = context.__enter__()
+            token = _current.set((observation.trace_id, observation.id))
         except Exception as exc:
             log.warning("Langfuse 기록 실패: %s", type(exc).__name__)
             context = None
     if context is None:
+        if detached is not None:
+            otel_context.detach(detached)
         yield _NoOp()
         return
     try:
@@ -67,10 +84,14 @@ def observe(name: str, as_type: str = "span", **fields):
         update(observation, level="ERROR", status_message=type(exc).__name__)
         raise
     finally:
+        if token is not None:
+            _current.reset(token)
         try:
             context.__exit__(None, None, None)
         except Exception as exc:
             log.warning("Langfuse 기록 실패: %s", type(exc).__name__)
+        if detached is not None:
+            otel_context.detach(detached)
 
 
 @contextmanager

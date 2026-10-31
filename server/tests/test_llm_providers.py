@@ -144,12 +144,15 @@ def test_tracing_records_usage_without_call_content_and_survives_failures(monkey
     seen = []
 
     class Client:
+        def create_trace_id(self):
+            return "t" * 32
+
         def start_as_current_observation(self, **fields):
             seen.append(fields)
 
             @contextmanager
             def context():
-                yield NS(update=lambda **f: seen.append(f))
+                yield NS(update=lambda **f: seen.append(f), trace_id="t" * 32, id=f"s{len(seen)}")
 
             return context()
 
@@ -160,12 +163,20 @@ def test_tracing_records_usage_without_call_content_and_survives_failures(monkey
     monkeypatch.setattr(llm, "_client", NS(messages=NS(create=lambda **k: response)))
     monkeypatch.setattr(tracing, "_ready", True)
     monkeypatch.setattr(tracing, "_langfuse", Client())
-    assert llm.analyze(secret)["label"] == "voice_phishing"
+    with tracing.observe("요청"):
+        assert llm.analyze(secret)["label"] == "voice_phishing"
     assert any(f.get("name") == "판정" and f.get("as_type") == "generation" for f in seen)
     assert {"input": 11, "output": 7} in [f.get("usage_details") for f in seen]
     assert secret not in str(seen) and not any("input" in f or "output" in f for f in seen)
+    # 바깥 스팬이 트레이스를 시작하고, 안쪽은 그 스팬을 부모로 삼습니다.
+    roots = [f for f in seen if f.get("name") == "요청" and "trace_context" not in f]
+    children = [f for f in seen if "trace_context" in f and "parent_span_id" in f["trace_context"]]
+    assert roots and children and all(f["trace_context"]["trace_id"] == "t" * 32 for f in children)
 
     class Broken:
+        def create_trace_id(self):
+            return "t" * 32
+
         def start_as_current_observation(self, **_):
             raise OSError("down")
 
