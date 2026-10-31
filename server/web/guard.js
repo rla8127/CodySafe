@@ -47,6 +47,23 @@ renderTabs = function (on) {
   icons();
 };
 
+/* ---------------- PC 소개 접기 ---------------- */
+function drawIntroToggle() {
+  const closed = document.body.classList.contains('intro-closed');
+  const button = $('#introToggle');
+  button.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg>${closed ? '소개 펼치기' : '소개 접기'}`;
+  button.setAttribute('aria-expanded', String(!closed));
+}
+
+function toggleIntro() {
+  const closed = document.body.classList.toggle('intro-closed');
+  if (closed) store.set('introClosed', '1');
+  else store.del('introClosed');
+  drawIntroToggle();
+}
+
+drawIntroToggle();
+
 /* ---------------- 첫 실행 ---------------- */
 function onboardingPage() {
   if (!accepted()) {
