@@ -72,6 +72,17 @@ GUARD_STORAGE=s3 GUARD_S3_BUCKET=<버킷> GUARD_STT=transcribe GUARD_ADMIN_TOKEN
 
 기획과 기술 판단은 [family-guard-plan.md](family-guard-plan.md)에 있습니다.
 
+## 키와 설정
+
+서버는 시작할 때 `server/.env`를 읽습니다. 이 파일은 커밋되지 않으며, 실행 명령에 직접 넘긴 값이 우선합니다.
+
+```
+OPENAI_API_KEY=
+GUARD_LLM=openai
+GUARD_OPENAI_MODEL=
+GUARD_STT=openai
+```
+
 ## 웹 시연 가족
 
 서버를 켜면 기본으로 웹에서 동현, 상우, 선형, 호연, 병국 중 한 명을 골라 들어갑니다. `GUARD_DEMO_FAMILY=0`이면 꺼집니다. 안드로이드 앱은 직접 등록합니다. 접속한 누구나 이 계정을 쓸 수 있으므로 실제 통화를 올리지 않습니다.

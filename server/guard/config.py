@@ -4,6 +4,20 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 
+
+def _load_env_file() -> None:
+    """server/.env의 키와 설정을 읽습니다. 실행 명령에 직접 넘긴 값이 있으면 그 값을 씁니다."""
+    path = os.getenv("GUARD_ENV_FILE", str(ROOT / ".env"))
+    if not path or not Path(path).is_file():
+        return
+    for line in Path(path).read_text(encoding="utf-8").splitlines():
+        name, sep, value = line.strip().partition("=")
+        if sep and name and not name.startswith("#"):
+            os.environ.setdefault(name, value.strip().strip("'\""))
+
+
+_load_env_file()
+
 DB_PATH = os.getenv("GUARD_DB", str(ROOT / "data" / "guard.db"))
 LOCAL_AUDIO_DIR = Path(os.getenv("GUARD_LOCAL_AUDIO_DIR", str(ROOT / "data" / "audio")))
 PUBLIC_BASE_URL = os.getenv("GUARD_PUBLIC_BASE_URL", "http://localhost:8091").rstrip("/")
