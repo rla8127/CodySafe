@@ -296,3 +296,19 @@ def test_emergency_answer_is_hashed_normalized_and_rate_limited(client):
     for _ in range(5):
         assert verify(a, "틀림").json()["match"] is False
     assert verify(a, "초코dog").status_code == 429
+
+
+def test_samples_show_result_without_touching_records_alerts_or_lock(client):
+    p, g = linked(client)
+    assert client.get("/v1/samples").status_code == 401
+    items = client.get("/v1/samples", headers=p).json()["items"]
+    kinds = [s["expected"] for s in items]
+    assert kinds.count("voice_phishing") == 3 and kinds.count("normal") == 3
+    results = {s["id"]: client.post(f"/v1/samples/{s['id']}/analyze", headers=p).json() for s in items}
+    assert client.post("/v1/samples/none/analyze", headers=p).status_code == 404
+    # 규칙 판정의 정확도가 아니라 기록과 알림에 영향이 없는지 봅니다.
+    assert results["prosecutor"]["label"] == "voice_phishing" and results["prosecutor"]["matches"]
+    assert results["dinner"]["label"] == "normal" and results["dinner"]["evidence"] == []
+    assert client.get("/v1/recordings", headers=p).json()["items"] == []
+    assert client.get("/v1/alerts", headers=g).json()["items"] == []
+    assert client.get("/v1/lock", headers=p).json()["locked"] is False

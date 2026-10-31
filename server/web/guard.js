@@ -411,6 +411,9 @@ SCREENS.detect = gated(() => `<div class="page">
   <div class="lead-sub" style="margin-top:6px">저장된 통화 녹음을 AI가 분석합니다. 결과는 본인만 볼 수 있습니다.</div>
   <div class="card mt">${folderBlock()}</div>
   <button class="btn grad block mt" onclick="$('#filePick').click()">${ic('upload')}파일 직접 올려 검사</button>
+  <div class="sec-title">예시로 체험하기</div>
+  <div class="muted small sample-intro">가상의 통화 대본으로 분석 결과를 미리 봅니다. 기록에 남지 않고 가족 알림과 잠금도 일어나지 않습니다.</div>
+  <div id="samples"></div>
   <div class="sec-title">분석 결과</div>
   <div id="data"></div>
 </div>`);
@@ -421,6 +424,51 @@ function folderBlock() {
   return `<div class="row between"><div class="b">녹음 폴더</div><span class="chip ${folder ? 'safe' : ''}">${folder ? '연결됨' : '연결 안 됨'}</span></div>
     <div class="muted small" style="margin-top:6px">${folder ? esc(folder) + ' · ' : ''}연결한 뒤에 새로 저장된 파일만 분석합니다.</div>
     <div class="row" style="margin-top:12px"><button class="btn ghost sm grow" onclick="CodySafeNative.pickFolder()">폴더 선택</button><button class="btn line sm grow" onclick="CodySafeNative.syncNow();toast('동기화를 요청했습니다')">지금 동기화</button></div>`;
+}
+
+/* ---------------- 예시 통화 ---------------- */
+let sampleList = [];
+
+async function loadSamples() {
+  if (!signedIn()) return;
+  try {
+    if (!sampleList.length) sampleList = (await api('GET', '/v1/samples')).items;
+    const host = $('#samples');
+    if (!host) return;
+    const button = (s) => `<button class="sample-card" onclick="openSample('${esc(s.id)}')"><span>${esc(s.title)}</span>${ic('chevron-right')}</button>`;
+    const group = (kind, chip, title) => `<div class="sample-group"><span class="chip ${chip}">${title}</span>${sampleList.filter((s) => s.expected === kind).map(button).join('')}</div>`;
+    host.innerHTML = group('voice_phishing', 'danger', '보이스피싱 예시') + group('normal', 'safe', '정상 대화 예시');
+    icons();
+  } catch (e) {
+    if ($('#samples')) $('#samples').innerHTML = emptyCard('예시를 불러오지 못했습니다.');
+  }
+}
+
+function sampleResultHtml(r) {
+  const label = r.label;
+  const matched = label === r.expected;
+  return `<div class="sample-result">${verdictChip(r, label)}
+    ${factBox(r, r.matches[0])}
+    <div class="sample-expected ${matched ? 'ok' : 'miss'}">${ic(matched ? 'circle-check' : 'circle-alert')}대본의 의도와 ${matched ? '같은 결과입니다' : '다른 결과입니다'}</div></div>`;
+}
+
+async function openSample(id) {
+  const s = sampleList.find((x) => x.id === id);
+  if (!s) return;
+  openSheet(`<div class="sample-sheet"><span class="chip">가상 대본</span>
+    <div class="b" style="font-size:18px;margin-top:8px">${esc(s.title)}</div>
+    <div class="sample-chat">${s.turns.map((t, i) => `<div class="sample-line ${i % 2 ? 'me' : ''}">${esc(t)}</div>`).join('')}</div>
+    <div id="sampleResult"><div class="sample-wait">${ic('loader')}AI가 대본을 분석하고 있습니다</div></div>
+    <div class="muted small" style="margin-top:10px">음성 변환 단계는 건너뛰고 분석만 보여 줍니다.</div>
+    <button class="btn line block mt" onclick="closeSheet()">닫기</button></div>`);
+  icons();
+  try {
+    const r = await api('POST', `/v1/samples/${id}/analyze`);
+    if ($('#sampleResult')) $('#sampleResult').innerHTML = sampleResultHtml(r);
+  } catch (e) {
+    if ($('#sampleResult')) $('#sampleResult').innerHTML = '<div class="sample-wait">분석에 실패했습니다. 잠시 뒤 다시 시도해 주세요.</div>';
+  }
+  icons();
 }
 
 const detectData = ({ recordings }) => (recordings.items.length ? recordings.items.map(recordingCard).join('') : emptyCard('아직 올린 파일이 없습니다.'));
@@ -753,7 +801,7 @@ async function pollAlerts() {
   }
 }
 
-['home', 'detect', 'family', 'lock', 'passphrase'].forEach((k) => { INIT[k] = () => { lastData = ''; refresh(); }; });
+['home', 'detect', 'family', 'lock', 'passphrase'].forEach((k) => { INIT[k] = () => { lastData = ''; refresh(); if (k === 'detect') loadSamples(); }; });
 setInterval(refresh, 5000);
 setInterval(pollAlerts, 5000);
 setInterval(pollLock, 5000);

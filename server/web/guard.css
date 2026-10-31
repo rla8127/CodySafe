@@ -63,6 +63,20 @@ a.btn { text-decoration: none; }
 .fact-advice { margin-top: 12px; padding-top: 12px; border-top: 1px solid rgba(47, 91, 255, .16); }
 .fact-advice b { font-size: 13px; color: var(--pri); }
 .fact-advice p { margin-top: 3px; font-size: 13.5px; line-height: 1.5; color: var(--ink2); }
+.sample-intro { margin: -6px 2px 12px; line-height: 1.5; }
+.sample-group { display: grid; gap: 8px; margin-top: 14px; }
+.sample-group .chip { justify-self: start; }
+.sample-card { display: flex; align-items: center; justify-content: space-between; gap: 10px; width: 100%; padding: 15px 16px; border-radius: 16px; background: var(--card); box-shadow: var(--shadow); font-size: 14.5px; font-weight: 600; text-align: left; }
+.sample-card svg.lucide { width: 18px; height: 18px; color: var(--mute); }
+.sample-chat { display: grid; gap: 7px; margin-top: 12px; }
+.sample-line { justify-self: start; max-width: 86%; padding: 9px 12px; border-radius: 14px 14px 14px 4px; background: var(--bg); font-size: 13.5px; line-height: 1.45; }
+.sample-line.me { justify-self: end; border-radius: 14px 14px 4px 14px; background: var(--pri-soft); }
+.sample-result { margin-top: 16px; }
+.sample-wait { display: flex; align-items: center; justify-content: center; gap: 7px; margin-top: 16px; padding: 14px; border-radius: 14px; background: var(--bg); font-size: 13.5px; font-weight: 600; color: var(--sub); }
+.sample-expected { display: flex; align-items: center; gap: 6px; margin-top: 10px; font-size: 13px; font-weight: 700; }
+.sample-expected svg.lucide { width: 16px; height: 16px; }
+.sample-expected.ok { color: #08875A; }
+.sample-expected.miss { color: #C46A00; }
 .lock-banner { display: flex; align-items: center; gap: 10px; width: 100%; text-align: left; margin-bottom: 12px; font-size: 14px; line-height: 1.45; color: var(--ink2); }
 .lock-banner svg.lucide { width: 22px; height: 22px; color: var(--danger); flex: none; }
 /* 모바일에서 대화 첫 줄이 진행 막대에 가리지 않게 합니다. */

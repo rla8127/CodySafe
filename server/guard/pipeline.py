@@ -26,6 +26,16 @@ def _notify_family(rec_id: str, protected_id: str) -> None:
             )
 
 
+def find_matches(result: dict, transcript: str) -> list[dict]:
+    if result["label"] == VOICE_PHISHING:
+        return rag.retrieve(f"{result['summary']}\n{transcript}")
+    return [BY_ID[result["scam_type"]]] if result["scam_type"] in BY_ID else []
+
+
+def public_matches(matches: list[dict]) -> list[dict]:
+    return [{"id": m["id"], "name": m["name"], "advice": m["advice"]} for m in matches]
+
+
 def process(rec_id: str) -> None:
     with db.connect() as conn:
         row = conn.execute("SELECT * FROM recordings WHERE id = ?", (rec_id,)).fetchone()
@@ -42,11 +52,7 @@ def process(rec_id: str) -> None:
         label, confidence = result["label"], result["confidence"]
         is_scam = label in (VOICE_PHISHING, OTHER_SCAM)
 
-        matches: list[dict] = []
-        if label == VOICE_PHISHING:
-            matches = rag.retrieve(f"{result['summary']}\n{transcript}")
-        elif result["scam_type"] in BY_ID:
-            matches = [BY_ID[result["scam_type"]]]
+        matches = find_matches(result, transcript)
 
         alert = label == VOICE_PHISHING and confidence >= config.ALERT_THRESHOLD
         needs_review = label in (OTHER_SCAM, "uncertain") or (label == VOICE_PHISHING and not alert)
@@ -58,9 +64,7 @@ def process(rec_id: str) -> None:
             scam_type=result["scam_type"],
             summary=result["summary"],
             evidence=json.dumps(result["evidence"] if is_scam or needs_review else [], ensure_ascii=False),
-            matches=json.dumps(
-                [{"id": m["id"], "name": m["name"], "advice": m["advice"]} for m in matches], ensure_ascii=False
-            ),
+            matches=json.dumps(public_matches(matches), ensure_ascii=False),
             needs_review=int(needs_review),
             # 일상 통화 원문은 보관하지 않습니다. 검토와 재학습에 필요한 건만 남깁니다.
             transcript=transcript if is_scam or needs_review else None,

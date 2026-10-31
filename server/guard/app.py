@@ -10,7 +10,7 @@ from fastapi.responses import FileResponse, PlainTextResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
-from . import config, db, passphrase, pipeline, providers
+from . import config, db, llm, passphrase, pipeline, providers, samples
 from .lock_apps import LOCK_APPS
 from .scam_kb import BY_ID, OTHER_SCAM, VOICE_PHISHING
 
@@ -163,6 +163,35 @@ def remove_guardian(guardian_id: str, device: str = Depends(current_device)):
     with db.connect() as conn:
         conn.execute("DELETE FROM family_links WHERE protected_id = ? AND guardian_id = ?", (device, guardian_id))
     return {"ok": True}
+
+
+# ---------- 시연용 예시 통화: 기록, 가족 알림, 잠금에 영향을 주지 않습니다 ----------
+_sample_results: dict[str, dict] = {}
+
+
+@app.get("/v1/samples")
+def list_samples(_: str = Depends(current_device)):
+    return {"items": samples.SAMPLES}
+
+
+@app.post("/v1/samples/{sample_id}/analyze")
+def analyze_sample(sample_id: str, _: str = Depends(current_device)):
+    sample = samples.BY_ID.get(sample_id)
+    if not sample:
+        raise HTTPException(404)
+    # 눌러 볼 때마다 LLM 비용이 나가지 않도록 서버가 켜져 있는 동안 결과를 재사용합니다.
+    if sample_id not in _sample_results:
+        text = samples.transcript(sample)
+        result = llm.analyze(text)
+        _sample_results[sample_id] = {
+            "status": "done",
+            "label": result["label"],
+            "review_label": None,
+            "evidence": result["evidence"],
+            "matches": pipeline.public_matches(pipeline.find_matches(result, text)),
+            "expected": sample["expected"],
+        }
+    return _sample_results[sample_id]
 
 
 # ---------- 가족 암구호 ----------
