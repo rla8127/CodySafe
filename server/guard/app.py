@@ -11,6 +11,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from . import config, db, pipeline, providers
+from .lock_apps import LOCK_APPS
 from .scam_kb import BY_ID, OTHER_SCAM, VOICE_PHISHING
 
 INVITE_TTL = 600
@@ -75,6 +76,10 @@ class RecordingIn(BaseModel):
     content_type: str = "application/octet-stream"
 
 
+class LockIn(BaseModel):
+    minutes: int = Field(ge=1, le=60)
+
+
 class ReviewIn(BaseModel):
     label: str = Field(pattern="^(voice_phishing|other_scam|normal)$")
     scam_type: str | None = None
@@ -131,16 +136,60 @@ def family(device: str = Depends(current_device)):
             (device,),
         ).fetchall()
         protected = conn.execute(
-            "SELECT d.id, d.name FROM family_links f JOIN devices d ON d.id = f.protected_id WHERE f.guardian_id = ?",
-            (device,),
+            "SELECT d.id, d.name, d.lock_until > ? AS locked FROM family_links f JOIN devices d ON d.id = f.protected_id"
+            " WHERE f.guardian_id = ?",
+            (db.now(), device),
         ).fetchall()
-    return {"guardians": [dict(r) for r in guardians], "protected": [dict(r) for r in protected]}
+    return {
+        "guardians": [dict(r) for r in guardians],
+        "protected": [{**dict(r), "locked": bool(r["locked"])} for r in protected],
+    }
 
 
 @app.delete("/v1/family/guardians/{guardian_id}")
 def remove_guardian(guardian_id: str, device: str = Depends(current_device)):
     with db.connect() as conn:
         conn.execute("DELETE FROM family_links WHERE protected_id = ? AND guardian_id = ?", (device, guardian_id))
+    return {"ok": True}
+
+
+# ---------- 금융 앱 잠금 ----------
+@app.get("/v1/lock")
+def lock_state(device: str = Depends(current_device)):
+    with db.connect() as conn:
+        until = conn.execute("SELECT lock_until FROM devices WHERE id = ?", (device,)).fetchone()["lock_until"]
+    # 기기 시계가 틀려도 동작하도록 시각이 아니라 남은 초를 보냅니다.
+    remaining = max(0, int(until - db.now()))
+    return {"locked": remaining > 0, "remaining": remaining, "apps": LOCK_APPS}
+
+
+@app.post("/v1/lock")
+def lock_now(body: LockIn, device: str = Depends(current_device)):
+    with db.connect() as conn:
+        db.extend_lock(conn, device, body.minutes * 60)
+    return lock_state(device)
+
+
+@app.post("/v1/lock/release")
+def request_release(device: str = Depends(current_device)):
+    """사기범이 시켜서 푸는 경우에 대비해 본인 해제는 대기 시간을 거칩니다."""
+    with db.connect() as conn:
+        conn.execute(
+            "UPDATE devices SET lock_until = MIN(lock_until, ?) WHERE id = ?",
+            (db.now() + config.LOCK_RELEASE_WAIT, device),
+        )
+    return lock_state(device)
+
+
+@app.post("/v1/family/protected/{protected_id}/unlock")
+def guardian_unlock(protected_id: str, device: str = Depends(current_device)):
+    with db.connect() as conn:
+        link = conn.execute(
+            "SELECT 1 FROM family_links WHERE protected_id = ? AND guardian_id = ?", (protected_id, device)
+        ).fetchone()
+        if not link:
+            raise HTTPException(404)
+        conn.execute("UPDATE devices SET lock_until = 0 WHERE id = ?", (protected_id,))
     return {"ok": True}
 
 

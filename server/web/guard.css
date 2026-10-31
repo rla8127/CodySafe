@@ -24,5 +24,8 @@
 .kv span:first-child { color: var(--sub); flex: none; }
 .kv span:last-child { font-weight: 600; text-align: right; overflow-wrap: anywhere; }
 .code-big { font-size: 28px; font-weight: 800; letter-spacing: .12em; text-align: center; color: var(--pri); margin: 8px 0 12px; }
+a.btn { text-decoration: none; }
+.lock-banner { display: flex; align-items: center; gap: 10px; width: 100%; text-align: left; margin-bottom: 12px; font-size: 14px; line-height: 1.45; color: var(--ink2); }
+.lock-banner svg.lucide { width: 22px; height: 22px; color: var(--danger); flex: none; }
 /* 모바일에서 대화 첫 줄이 진행 막대에 가리지 않게 합니다. */
 @media (max-width: 500px) { #playWrap .chat { padding-top: 84px; } }

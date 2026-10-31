@@ -33,6 +33,15 @@ class Store(context: Context) {
         get() = p.getInt("lastAlert", 0)
         set(v) = p.edit().putInt("lastAlert", v).apply()
 
+    var lockUntil: Long
+        get() = p.getLong("lockUntil", 0)
+        set(v) = p.edit().putLong("lockUntil", v).apply()
+    var lockApps: Set<String>
+        get() = p.getStringSet("lockApps", emptySet())!!
+        set(v) = p.edit().putStringSet("lockApps", v).apply()
+    val locked: Boolean
+        get() = System.currentTimeMillis() < lockUntil
+
     fun isUploaded(key: String) = p.getStringSet("uploaded", emptySet())!!.contains(key)
     fun markUploaded(key: String) {
         val next = HashSet(p.getStringSet("uploaded", emptySet())!!)
@@ -102,6 +111,7 @@ class ApiError(val code: Int, message: String) : IOException("HTTP $code: $messa
 object Sync {
     private val EXTENSIONS = setOf("m4a", "mp3", "mp4", "wav", "flac", "ogg", "amr", "webm", "txt")
     private const val SETTLE_MS = 30_000L
+    private const val LOCK_NOTICE_ID = -1
 
     /** 폴더 연결 이후 생긴 파일만 올립니다. 과거 녹음이 한꺼번에 나가지 않게 하려는 기준입니다. */
     fun uploadNewFiles(context: Context, store: Store): Int {
@@ -126,6 +136,18 @@ object Sync {
             store.markUploaded(key)
         }
         return count
+    }
+
+    /** 서버에 못 닿으면 저장된 시각까지 잠금을 유지합니다. */
+    fun checkLock(context: Context, store: Store) {
+        val state = Api(store).call("GET", "/v1/lock")
+        val wasLocked = store.locked
+        val apps = state.getJSONArray("apps")
+        store.lockApps = (0 until apps.length()).map { apps.getString(it) }.toSet()
+        store.lockUntil = System.currentTimeMillis() + state.getLong("remaining") * 1000
+        if (!wasLocked && store.locked) {
+            Notifier.show(context, LOCK_NOTICE_ID, "금융 앱을 잠갔습니다", "보이스피싱이 의심됩니다. 지금 돈을 보내지 마세요.")
+        }
     }
 
     fun checkAlerts(context: Context, store: Store) {

@@ -11,6 +11,7 @@ import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.provider.Settings
 import android.webkit.JavascriptInterface
 import android.webkit.ValueCallback
 import android.webkit.WebChromeClient
@@ -27,6 +28,7 @@ class MainActivity : Activity() {
     private lateinit var web: WebView
     private var filePick: ValueCallback<Array<Uri>>? = null
     private val handler = Handler(Looper.getMainLooper())
+    private var openedBlockerSettings = false
 
     private val pollAlerts = object : Runnable {
         override fun run() {
@@ -34,6 +36,7 @@ class MainActivity : Activity() {
                 thread {
                     try {
                         Sync.checkAlerts(this@MainActivity, store)
+                        Sync.checkLock(this@MainActivity, store)
                     } catch (e: Exception) {
                         // 다음 주기에 다시 확인합니다.
                     }
@@ -90,7 +93,13 @@ class MainActivity : Activity() {
         load()
     }
 
-    private fun load() = web.loadUrl("$SERVER/app/")
+    private fun load() = web.loadUrl(if (intent.getBooleanExtra(EXTRA_LOCK, false)) "$SERVER/app/#/lock" else "$SERVER/app/")
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        if (intent.getBooleanExtra(EXTRA_LOCK, false)) web.evaluateJavascript("location.hash = '#/lock'", null)
+    }
 
     private fun retryDialog() {
         AlertDialog.Builder(this)
@@ -104,6 +113,10 @@ class MainActivity : Activity() {
     override fun onResume() {
         super.onResume()
         handler.post(pollAlerts)
+        if (openedBlockerSettings) {
+            openedBlockerSettings = false
+            web.evaluateJavascript("render()", null)
+        }
     }
 
     override fun onPause() {
@@ -150,14 +163,38 @@ class MainActivity : Activity() {
         }
 
         @JavascriptInterface
+        fun blockerEnabled(): Boolean {
+            val enabled = Settings.Secure.getString(contentResolver, Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES) ?: ""
+            return enabled.contains("$packageName/") && enabled.contains(GuardService::class.java.simpleName)
+        }
+
+        @JavascriptInterface
+        fun openBlockerSettings() {
+            openedBlockerSettings = true
+            runOnUiThread { startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)) }
+        }
+
+        @JavascriptInterface
+        fun syncLock() {
+            thread {
+                try {
+                    Sync.checkLock(this@MainActivity, store)
+                } catch (e: Exception) {
+                    // 화면이 열려 있으면 다음 주기에 다시 확인합니다.
+                }
+            }
+        }
+
+        @JavascriptInterface
         fun syncNow() {
             SyncWorker.runNow(this@MainActivity)
         }
     }
 
-    private companion object {
-        const val POLL_MS = 5_000L
-        const val REQ_FILE = 1
-        const val REQ_FOLDER = 2
+    companion object {
+        const val EXTRA_LOCK = "lock"
+        private const val POLL_MS = 5_000L
+        private const val REQ_FILE = 1
+        private const val REQ_FOLDER = 2
     }
 }

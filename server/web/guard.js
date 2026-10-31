@@ -30,7 +30,7 @@ if (store.get('token')) native?.setToken(store.get('token'));
 
 /* ---------------- 시안 화면 제거 ---------------- */
 ['image', 'voice', 'call', 'url', 'verify', 'report', 'generate', 'weakness', 'training', 'copilot', 'checkup'].forEach((k) => delete SCREENS[k]);
-Object.assign(TAB_OF, { home: 'home', sim: 'sim', play: 'sim', detect: 'detect', family: 'family', me: 'me' });
+Object.assign(TAB_OF, { home: 'home', sim: 'sim', play: 'sim', detect: 'detect', family: 'family', me: 'me', lock: 'home' });
 delete PARENT.family;
 
 renderTabs = function (on) {
@@ -162,12 +162,13 @@ SCREENS.home = gated(() => `<div class="page">
   <div id="data"></div>
 </div>`);
 
-function homeData({ recordings, recs, family, alerts }) {
+function homeData({ recordings, recs, family, alerts, lock }) {
   const items = recordings.items;
   const flagged = items.filter((r) => ['voice_phishing', 'other_scam'].includes(r.review_label || r.label)).length;
   const reviews = items.filter((r) => r.needs_review).length;
   const unread = alerts.items.filter((a) => !a.acked);
-  return `<div class="hero">
+  return `${lock.locked ? `<button class="card soft-danger lock-banner" onclick="go('lock')">${ic('lock')}<span><b>금융 앱 잠금 중</b><br>${lockMinutes(lock)}분 남음 · 눌러서 확인</span></button>` : ''}
+    <div class="hero">
       <div class="hero-label">분석한 통화</div>
       <div class="hero-score">${recs.analyzed}<small>건</small></div>
       <div class="hero-meta">사기 의심 <b>${flagged}건</b> · 연결된 가족 <b>${family.guardians.length}명</b></div>
@@ -181,6 +182,63 @@ function homeData({ recordings, recs, family, alerts }) {
       <div class="call-text" style="color:var(--pri);font-weight:700;font-size:13px">추천 훈련 · ${esc(r.training)}</div></div>`).join('') : emptyCard('아직 사기로 판정된 통화가 없습니다.')}
     <div class="sec-title">최근 분석 <button class="more" onclick="go('detect')">전체 보기${ic('chevron-right')}</button></div>
     ${items.length ? items.slice(0, 3).map(recordingCard).join('') : emptyCard('아직 분석한 통화가 없습니다.')}`;
+}
+
+/* ---------------- 금융 앱 잠금 ---------------- */
+const lockMinutes = (lock) => Math.ceil(lock.remaining / 60);
+
+SCREENS.lock = gated(() => `<div class="page">
+  <div class="lead" style="margin-top:6px">금융 앱 잠금</div>
+  <div class="lead-sub" style="margin-top:6px">보이스피싱이 강하게 의심되면 은행, 간편결제, 증권, 원격제어 앱을 잠시 막습니다.</div>
+  <div id="data"></div>
+</div>`);
+
+function blockerBlock() {
+  if (!native?.blockerEnabled) {
+    return `<div class="card mt soft-warn">${native ? '앱을 최신 버전으로 업데이트하면 금융 앱을 실제로 막을 수 있습니다.' : '브라우저에서는 다른 앱을 막을 수 없습니다. 안드로이드 앱에서만 실제로 막습니다.'}</div>`;
+  }
+  const on = native.blockerEnabled();
+  return `<div class="card mt"><div class="row between"><div class="b">앱 차단 권한</div><span class="chip ${on ? 'safe' : 'danger'}">${on ? '켜짐' : '꺼짐'}</span></div>
+    <div class="muted small" style="margin-top:6px">접근성 권한으로 지금 열린 앱의 이름만 확인합니다. 화면 내용과 입력한 글자는 읽지 않습니다.</div>
+    ${on ? '' : '<button class="btn pri block mt" onclick="CodySafeNative.openBlockerSettings()">접근성 설정 열기</button><div class="muted small" style="margin-top:8px">설치된 서비스에서 CodySafe를 켜 주세요. 제한된 설정이라고 나오면 앱 정보 오른쪽 위 메뉴에서 제한을 먼저 풀어야 합니다.</div>'}
+  </div>`;
+}
+
+function lockData({ lock }) {
+  if (!lock.locked) {
+    return `<div class="card mt"><span class="chip safe">${ic('shield-check')}잠금 없음</span>
+        <div class="call-text">이상한 전화를 받았다면 판정을 기다리지 말고 직접 잠글 수 있습니다.</div>
+        <div class="btn-col"><button class="btn danger block" onclick="lockNow(60)">1시간 잠그기</button><button class="btn line block" onclick="lockNow(2)">2분만 시험해 보기</button></div></div>
+      ${blockerBlock()}`;
+  }
+  return `<div class="card mt soft-danger"><span class="chip danger">${ic('siren')}잠금 중</span>
+      <div class="call-title" style="font-size:20px">지금 돈을 보내지 마세요</div>
+      <div class="call-text">${lockMinutes(lock)}분 뒤 풀립니다. 검찰, 금감원, 은행은 전화로 이체나 앱 설치를 요구하지 않습니다. 누군가 이 잠금을 풀라고 시켰다면 사기일 가능성이 높습니다.</div></div>
+    <div class="btn-col">
+      <a class="btn danger block" href="tel:112">${ic('phone')}경찰 112</a>
+      <a class="btn line block" href="tel:1332">${ic('phone')}금융감독원 1332</a>
+    </div>
+    <div class="card mt"><div class="b">잠금을 풀려면</div>
+      <div class="call-text">먼저 가족에게 직접 전화해 확인하세요. 연결된 가족은 가족 탭에서 바로 풀 수 있습니다.</div>
+      <div class="link-row"><button class="quiet" onclick="releaseSheet()">사기가 아니에요, 직접 풀기</button></div></div>
+    ${blockerBlock()}`;
+}
+
+async function lockNow(minutes) {
+  await act('POST', '/v1/lock', { minutes });
+  native?.syncLock?.();
+}
+
+function releaseSheet() {
+  openSheet(`<div class="b" style="font-size:18px">정말 직접 푸시겠어요?</div>
+    <div class="muted small" style="margin-top:6px">10분 뒤에 풀립니다. 그동안 가족이나 112에 확인해 보세요.</div>
+    <div class="btn-col"><button class="btn danger block" onclick="act('POST','/v1/lock/release')">아무도 시키지 않았습니다. 10분 뒤 풀기</button><button class="btn line block" onclick="closeSheet()">취소</button></div>`);
+}
+
+function unlockSheet(id) {
+  openSheet(`<div class="b" style="font-size:18px">가족의 금융 앱 잠금을 풀까요?</div>
+    <div class="muted small" style="margin-top:6px">본인과 직접 통화해 사기가 아닌 것을 확인한 뒤에 풀어 주세요.</div>
+    <div class="btn-col"><button class="btn danger block" onclick="act('POST','/v1/family/protected/${esc(id)}/unlock')">잠금 풀기</button><button class="btn line block" onclick="closeSheet()">취소</button></div>`);
 }
 
 /* ---------------- 검사 ---------------- */
@@ -375,8 +433,9 @@ SCREENS.family = gated(() => `<div class="page">
 </div>`);
 
 function familyData({ family, alerts }) {
-  const person = (p, note, removable) => `<div class="card mt"><div class="row between"><div class="grow"><div class="b">${esc(p.name)}</div><div class="muted small" style="margin-top:2px">${note}</div></div>
-    ${removable ? `<button class="btn line sm" onclick="act('DELETE','/v1/family/guardians/${esc(p.id)}')">해제</button>` : ''}</div></div>`;
+  const person = (p, note, removable) => `<div class="card mt"><div class="row between"><div class="grow"><div class="b">${esc(p.name)}${p.locked ? ` <span class="chip danger">${ic('lock')}금융 앱 잠금 중</span>` : ''}</div><div class="muted small" style="margin-top:2px">${note}</div></div>
+    ${removable ? `<button class="btn line sm" onclick="act('DELETE','/v1/family/guardians/${esc(p.id)}')">해제</button>` : ''}
+    ${p.locked ? `<button class="btn danger sm" onclick="unlockSheet('${esc(p.id)}')">잠금 풀기</button>` : ''}</div></div>`;
   return `<div class="sec-title">받은 가족 경고</div>
     ${alerts.items.length ? alerts.items.map(alertCard).join('') : emptyCard('받은 경고가 없습니다.')}
     <div class="sec-title">내 경고를 받는 가족</div>
@@ -418,6 +477,7 @@ SCREENS.me = gated(() => `<div class="page">
     <div class="kv"><span>서버</span><span>${esc(location.host)}</span></div>
     <div class="kv"><span>실행 환경</span><span>${native ? '안드로이드 앱' : '브라우저'}</span></div>
   </div>
+  <button class="btn ghost block mt" onclick="go('lock')">${ic('lock')}금융 앱 잠금</button>
   <div class="sec-title">데이터 처리</div>
   <div class="card"><ul class="notice">
     ${['음성은 분석 후 삭제합니다. 실패한 음성은 재시도나 삭제 전까지 남습니다.', '일상 통화는 글자 기록을 남기지 않습니다.', '분석 내용은 본인만 볼 수 있습니다.', '가족에게는 보이스피싱 의심 여부만 전달됩니다.'].map((t) => `<li>${ic('lock')}<span>${t}</span></li>`).join('')}
@@ -460,7 +520,7 @@ simResult = function () {
 };
 
 /* ---------------- 데이터 갱신 ---------------- */
-const DATA_VIEWS = { home: homeData, detect: detectData, family: familyData };
+const DATA_VIEWS = { home: homeData, detect: detectData, family: familyData, lock: lockData };
 let lastData = '';
 
 async function refresh() {
@@ -469,14 +529,14 @@ async function refresh() {
   const draw = DATA_VIEWS[key];
   if (!draw || !signedIn() || !$('#data')) return;
   try {
-    const [recordings, recs, family, alerts] = await Promise.all([
-      api('GET', '/v1/recordings'), api('GET', '/v1/recommendations'), api('GET', '/v1/family'), api('GET', '/v1/alerts'),
+    const [recordings, recs, family, alerts, lock] = await Promise.all([
+      api('GET', '/v1/recordings'), api('GET', '/v1/recommendations'), api('GET', '/v1/family'), api('GET', '/v1/alerts'), api('GET', '/v1/lock'),
     ]);
-    const snapshot = key + JSON.stringify([recordings, recs, family, alerts]);
+    const snapshot = key + JSON.stringify([recordings, recs, family, alerts, lockMinutes(lock), lock.locked]);
     const host = $('#data');
     if (snapshot === lastData || !host || (route().r || 'home') !== r) return;
     lastData = snapshot;
-    host.innerHTML = draw({ recordings, recs, family, alerts });
+    host.innerHTML = draw({ recordings, recs, family, alerts, lock });
     icons();
   } catch (e) {
     if ($('#data') && !$('#data').innerHTML) $('#data').innerHTML = emptyCard('서버에 연결할 수 없습니다.');
@@ -525,7 +585,7 @@ async function pollAlerts() {
   }
 }
 
-['home', 'detect', 'family'].forEach((k) => { INIT[k] = () => { lastData = ''; refresh(); }; });
+['home', 'detect', 'family', 'lock'].forEach((k) => { INIT[k] = () => { lastData = ''; refresh(); }; });
 setInterval(refresh, 5000);
 setInterval(pollAlerts, 5000);
 setInterval(scanFolder, SCAN_MS);

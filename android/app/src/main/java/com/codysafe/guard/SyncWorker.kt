@@ -22,6 +22,7 @@ class SyncWorker(context: Context, params: WorkerParameters) : CoroutineWorker(c
         try {
             Sync.uploadNewFiles(applicationContext, store)
             Sync.checkAlerts(applicationContext, store)
+            Sync.checkLock(applicationContext, store)
             Result.success()
         } catch (e: IOException) {
             Result.retry()

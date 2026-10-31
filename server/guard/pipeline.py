@@ -67,6 +67,9 @@ def process(rec_id: str) -> None:
         )
         if alert:
             _notify_family(rec_id, row["device_id"])
+        if label == VOICE_PHISHING and confidence >= config.LOCK_THRESHOLD:
+            with db.connect() as conn:
+                db.extend_lock(conn, row["device_id"], config.LOCK_SECONDS)
         # 분석이 끝난 뒤에 지워야 LLM 실패 시 다시 시도할 수 있습니다.
         providers.delete_audio(row["s3_key"])
     except Exception as exc:

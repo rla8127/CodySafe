@@ -26,6 +26,10 @@ TITAN_MODEL = os.getenv("GUARD_TITAN_MODEL", "amazon.titan-embed-text-v2:0")
 
 # 오탐 알림은 가족에게 실제 불안을 주므로, 이 값 미만이면 알림 대신 사람 검토로 보냅니다.
 ALERT_THRESHOLD = float(os.getenv("GUARD_ALERT_THRESHOLD", "0.7"))
+# 잠금은 알림보다 오탐 피해가 크므로 기준을 더 높게 둡니다.
+LOCK_THRESHOLD = float(os.getenv("GUARD_LOCK_THRESHOLD", "0.9"))
+LOCK_SECONDS = int(os.getenv("GUARD_LOCK_SECONDS", "3600"))
+LOCK_RELEASE_WAIT = int(os.getenv("GUARD_LOCK_RELEASE_WAIT", "600"))
 MAX_UPLOAD_BYTES = int(os.getenv("GUARD_MAX_UPLOAD_BYTES", str(200 * 1024 * 1024)))
 AUDIO_EXTENSIONS = {"m4a", "mp3", "mp4", "wav", "flac", "ogg", "amr", "webm"}
 OPENAI_STT_EXTENSIONS = {"m4a", "mp3", "mp4", "wav", "flac", "ogg", "webm"}

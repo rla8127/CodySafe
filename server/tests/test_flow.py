@@ -207,3 +207,44 @@ def test_web_ui_is_served_without_exposing_repo(client):
     assert client.get("/app/css/style.css").headers["cache-control"] == "no-cache"
     for path in ("/app/.git/config", "/app/server/guard/config.py", "/app/js/../../server/.env", "/app/web/../guard/config.py"):
         assert client.get(path).status_code == 404, path
+
+
+def test_high_confidence_phishing_locks_only_that_device(client):
+    p, g = linked(client)
+    assert client.get("/v1/lock", headers=p).json()["locked"] is False
+    send(client, p, WEAK, "weak-lock")
+    assert client.get("/v1/lock", headers=p).json()["locked"] is False
+    rec = send(client, p, PHISHING, "lock")
+    state = client.get("/v1/lock", headers=p).json()
+    assert state["locked"] and 0 < state["remaining"] <= config.LOCK_SECONDS and "viva.republica.toss" in state["apps"]
+    assert client.get("/v1/lock", headers=g).json()["locked"] is False
+    # 잠금 상태만 가족에게 보이고, 사기범이 시킨 판정 변경이나 삭제로는 풀리지 않습니다.
+    assert client.get("/v1/family", headers=g).json()["protected"][0]["locked"] is True
+    client.post(f"/v1/recordings/{rec['id']}/review", headers=p, json={"label": "normal"})
+    client.delete(f"/v1/recordings/{rec['id']}", headers=p)
+    assert client.get("/v1/lock", headers=p).json()["locked"] is True
+
+
+def test_self_release_waits_and_cannot_extend_or_unlock_immediately(client):
+    p = device(client, "해제")
+    assert client.post("/v1/lock", headers=p, json={"minutes": 0}).status_code == 422
+    assert client.post("/v1/lock", headers=p, json={"minutes": 61}).status_code == 422
+    assert client.post("/v1/lock/release", headers=p).json()["locked"] is False
+    client.post("/v1/lock", headers=p, json={"minutes": 60})
+    first = client.post("/v1/lock/release", headers=p).json()
+    assert first["locked"] and first["remaining"] <= config.LOCK_RELEASE_WAIT
+    assert client.post("/v1/lock/release", headers=p).json()["remaining"] <= first["remaining"]
+    # 짧은 수동 잠금이 남은 시간을 줄이지 않습니다.
+    client.post("/v1/lock", headers=p, json={"minutes": 60})
+    assert client.post("/v1/lock", headers=p, json={"minutes": 1}).json()["remaining"] > 3000
+
+
+def test_only_linked_guardian_can_unlock(client):
+    p, g = linked(client)
+    pid = client.get("/v1/family", headers=g).json()["protected"][0]["id"]
+    client.post("/v1/lock", headers=p, json={"minutes": 60})
+    assert client.post(f"/v1/family/protected/{pid}/unlock", headers=device(client, "남")).status_code == 404
+    assert client.get("/v1/lock", headers=p).json()["locked"] is True
+    assert client.post(f"/v1/family/protected/{pid}/unlock", headers=g).status_code == 200
+    assert client.get("/v1/lock", headers=p).json()["locked"] is False
+    assert client.get("/v1/family", headers=g).json()["protected"][0]["locked"] is False
