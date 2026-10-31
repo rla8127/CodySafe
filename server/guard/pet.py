@@ -24,7 +24,7 @@ RED_HOURS = 24
 YELLOW_DAYS = 7
 QUIZ_SIZE = 3
 REVEAL_WEEKDAY, REVEAL_HOUR = 6, 21  # 일요일 밤 9시면 전원이 풀지 않아도 공개합니다.
-DEMO_SCORES = {"demo-dad": 1, "demo-mom": 3, "demo-brother": 2, "demo-uncle": 2}
+DEMO_SCORES = {"demo-dad": 0, "demo-mom": 3, "demo-brother": 2, "demo-uncle": 2}
 
 def _kst(at: float | None = None) -> time.struct_time:
     return time.gmtime((at if at is not None else time.time()) + 9 * 3600)
@@ -95,7 +95,7 @@ def status(conn: sqlite3.Connection, device: str) -> dict:
         "stage_start": STAGES[index][0],
         "next_xp": next_stage[0] if next_stage else None,
         "next_name": next_stage[1] if next_stage else None,
-        "stages": [{"name": s[1], "xp": s[0]} for s in STAGES],
+        "stages": [{"name": s[1], "xp": s[0], "text": s[2]} for s in STAGES],
         "mood": _mood(conn, device, group),
         "family_size": len(group),
         "trained_today": bool(trained),
@@ -134,7 +134,9 @@ def week_cards(week: str) -> list[dict]:
 
 def _answers(conn: sqlite3.Connection, device: str, week: str) -> dict:
     rows = conn.execute("SELECT card_id, answer, correct FROM quiz_answers WHERE device_id = ? AND week = ?", (device, week)).fetchall()
-    return {r["card_id"]: dict(r) for r in rows}
+    # 카드를 교체해도 지난 답이 오류를 내지 않도록 이번 주 카드의 답만 셉니다.
+    current = {c["id"] for c in week_cards(week)}
+    return {r["card_id"]: dict(r) for r in rows if r["card_id"] in current}
 
 
 def _seed_demo_answers(conn: sqlite3.Connection, viewer: str, group: list[str], week: str) -> None:

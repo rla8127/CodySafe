@@ -17,7 +17,15 @@ function codyHtml(p, cls = '') {
   </span>`;
 }
 
-const petPercent = (p) => (p.next_xp ? Math.min(100, Math.round((p.xp - p.stage_start) / (p.next_xp - p.stage_start) * 100)) : 100);
+let lastPet = null;
+let rainbowTimer = null;
+
+// 가족을 연결하면 100 XP 전에도 부화하므로 아기 코디 단계는 항상 0부터 셉니다.
+const petPercent = (p) => {
+  if (!p.next_xp) return 100;
+  const start = p.stage === 1 ? 0 : p.stage_start;
+  return Math.min(100, Math.round((p.xp - start) / (p.next_xp - start) * 100));
+};
 
 function nextScenario(p) {
   if (p.recommend && SCENARIOS[p.recommend]) return p.recommend;
@@ -45,6 +53,7 @@ const petPage = () => `<div class="page">
 
 function petData({ pet: p }) {
   if (!p) return emptyCard('코디를 불러오지 못했어요.');
+  lastPet = p;
   const scenario = nextScenario(p);
   const title = SCENARIOS[scenario]?.title || '사기 체험';
   const fresh = !p.played.includes(scenario);
@@ -71,8 +80,24 @@ function petData({ pet: p }) {
       <span class="xp">${doneQuiz ? '결과 보기' : '최대 +55 XP'}</span>
     </button>
     <div class="sec-title">성장 단계</div>
-    <div class="stage-strip">${p.stages.map((s, i) => `<div class="${i <= p.stage ? 'on' : ''}"><i></i>${esc(s.name)}</div>`).join('')}</div>
+    <div class="stage-strip">${p.stages.map((s, i) => `<button class="${i <= p.stage ? 'on' : ''} ${i === p.stage ? 'now' : ''}" onclick="previewStage(${i})" aria-label="${esc(s.name)} 미리 보기">${codyHtml({ ...p, stage: i, mood: { key: 'green' } })}<span>${esc(s.name)}</span></button>`).join('')}</div>
     <div class="call-text" style="margin:12px 2px 0;font-size:12.5px;color:var(--sub)">코디 색은 의심 알림 여부만 나타내요. 통화 내용이나 사기 유형은 가족에게 보이지 않아요. 빨간색은 사기 확정이 아니라 확인이 필요하다는 뜻이에요.</div>`;
+}
+
+function previewStage(i) {
+  const p = lastPet;
+  const s = p?.stages[i];
+  if (!s) return;
+  const note = i < p.stage ? '이미 지나온 단계예요.' : i === p.stage ? '지금 우리 코디예요.'
+    : i === 1 && p.family_size === 1 ? '가족을 연결하거나 100 XP를 모으면 만날 수 있어요.' : `${s.xp - p.xp} XP를 더 모으면 만날 수 있어요.`;
+  openSheet(`<div class="stage-preview">
+    ${codyHtml({ ...p, stage: i, mood: { key: 'green' } }, 'big')}
+    <div class="pet-name">${esc(s.name)}</div>
+    <div class="pet-stage-text">${esc(s.text)}</div>
+    <div class="stage-note">${esc(note)}</div>
+    <button class="btn pri block mt" onclick="closeSheet()">닫기</button>
+  </div>`);
+  icons();
 }
 
 function pokeCody(btn) {
@@ -80,6 +105,12 @@ function pokeCody(btn) {
   cody.classList.remove('wiggle');
   void cody.offsetWidth;
   cody.classList.add('wiggle');
+  // 경고 중에는 색이 뜻을 가지므로 무지개로 바꾸지 않습니다.
+  if (cody.classList.contains('mood-green')) {
+    cody.classList.add('rainbow');
+    clearTimeout(rainbowTimer);
+    rainbowTimer = setTimeout(() => cody.classList.remove('rainbow'), 1800);
+  }
   const say = document.getElementById('petSay');
   if (say) say.textContent = CODY_LINES[Math.floor(Math.random() * CODY_LINES.length)];
 }

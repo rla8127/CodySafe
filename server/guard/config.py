@@ -23,9 +23,6 @@ LOCAL_AUDIO_DIR = Path(os.getenv("GUARD_LOCAL_AUDIO_DIR", str(ROOT / "data" / "a
 PUBLIC_BASE_URL = os.getenv("GUARD_PUBLIC_BASE_URL", "http://localhost:8091").rstrip("/")
 # 웹 시연용 가족. 접속한 누구나 이 계정으로 들어올 수 있으니 실제 통화를 올리면 안 됩니다. 운영에서는 0으로 끕니다.
 DEMO_FAMILY = os.getenv("GUARD_DEMO_FAMILY", "1") == "1"
-ADMIN_TOKEN = os.getenv("GUARD_ADMIN_TOKEN", "")
-# 글자 기록이 든 데이터셋은 대시보드보다 강한 토큰으로 따로 지킬 수 있습니다.
-DATASET_TOKEN = os.getenv("GUARD_DATASET_TOKEN", "") or ADMIN_TOKEN
 AWS_REGION = os.getenv("GUARD_AWS_REGION", "ap-northeast-2")
 
 STORAGE = os.getenv("GUARD_STORAGE", "local")  # local | s3

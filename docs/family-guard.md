@@ -48,7 +48,7 @@ LLM은 API 키나 Bedrock 중에서 고릅니다. 키는 저장소에 넣지 말
 S3와 Transcribe로 처리하려면 다음을 더합니다.
 
 ```bash
-GUARD_STORAGE=s3 GUARD_S3_BUCKET=<버킷> GUARD_STT=transcribe GUARD_ADMIN_TOKEN=<임의 값> \
+GUARD_STORAGE=s3 GUARD_S3_BUCKET=<버킷> GUARD_STT=transcribe \
 .venv/bin/uvicorn guard.app:app --host 0.0.0.0 --port 8091
 ```
 
@@ -86,10 +86,6 @@ GUARD_STT=openai
 ## PC 화면
 
 폭 1001px 이상에서는 왼쪽 메뉴와 넓은 내용 화면으로 보여 줍니다. 폭 1181px 이상에서는 오른쪽에 접을 수 있는 모바일 미리보기가 나옵니다. 미리보기는 같은 앱을 iframe으로 띄운 것으로, 로그인과 화면 이동을 함께 따라갑니다.
-
-## 관리자 대시보드
-
-시연용으로 비밀번호 없이 열립니다. 공개 주소에서는 누구나 집계를 볼 수 있으므로 실제 운영 전에 인증을 넣어야 합니다. PC는 왼쪽 메뉴, 모바일은 MY 아래 링크나 `/app/#/admin`으로 들어갑니다. 글자 기록이 든 `review-dataset.jsonl`은 `GUARD_DATASET_TOKEN`으로 계속 보호합니다.
 
 ## 트레이싱
 

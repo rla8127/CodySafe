@@ -9,7 +9,7 @@ from pathlib import PurePosixPath
 
 from fastapi.concurrency import run_in_threadpool
 from fastapi import BackgroundTasks, Depends, FastAPI, Header, HTTPException, Query, Request
-from fastapi.responses import FileResponse, PlainTextResponse, RedirectResponse
+from fastapi.responses import FileResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
@@ -29,7 +29,6 @@ async def lifespan(_: FastAPI):
     db.init()
     if config.DEMO_FAMILY:
         db.seed_demo_family()
-        db.seed_demo_analytics()
     config.LOCAL_AUDIO_DIR.mkdir(parents=True, exist_ok=True)
     yield
     tracing.shutdown()
@@ -648,7 +647,7 @@ def review(rec_id: str, body: ReviewIn, device: str = Depends(current_device)):
     return {"ok": True, "in_dataset": in_dataset}
 
 
-# ---------- 대시보드: 사용자는 자기 기록만, 관리자는 개인을 알 수 없는 집계만 봅니다 ----------
+# ---------- 대시보드: 사용자는 자기 기록만 봅니다 ----------
 @app.post("/v1/training")
 def save_training(body: TrainingIn, device: str = Depends(current_device)):
     with db.connect() as conn:
@@ -685,35 +684,3 @@ def quiz_answer(card_id: str, body: QuizAnswerIn, device: str = Depends(current_
 def my_dashboard(device: str = Depends(current_device)):
     with db.connect() as conn:
         return dashboard.user(conn, device)
-
-
-@app.get("/v1/admin/dashboard")
-def admin_dashboard(include_demo: bool = True):
-    with db.connect() as conn:
-        return dashboard.admin(conn, include_demo)
-
-
-@app.get("/v1/admin/ops")
-def admin_ops(hours: int = 168, include_demo: bool = True):
-    if hours not in dashboard.RANGES:
-        raise HTTPException(400, "unknown range")
-    with db.connect() as conn:
-        return dashboard.ops(conn, hours, include_demo, db.now())
-
-
-@app.get("/v1/admin/feedback-dataset.jsonl", response_class=PlainTextResponse)
-def export_feedback():
-    with db.connect() as conn:
-        rows = conn.execute(
-            "SELECT model_label, model_confidence, human_label, reason, scam_type, created_at FROM recording_feedback ORDER BY created_at"
-        ).fetchall()
-    return "\n".join(json.dumps(dict(r), ensure_ascii=False) for r in rows)
-
-
-@app.get("/v1/admin/review-dataset.jsonl", response_class=PlainTextResponse)
-def export_dataset(x_admin_token: str = Header(default="")):
-    if not config.DATASET_TOKEN or not hmac.compare_digest(config.DATASET_TOKEN, x_admin_token):
-        raise HTTPException(403)
-    with db.connect() as conn:
-        rows = conn.execute("SELECT * FROM review_dataset ORDER BY created_at").fetchall()
-    return "\n".join(json.dumps(dict(r), ensure_ascii=False) for r in rows)

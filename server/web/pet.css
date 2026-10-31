@@ -6,6 +6,13 @@
 .cody.mood-yellow { --cody: #E2A100; --mood-soft: #FFF5D9; --mood-ink: #946A00; }
 .cody.mood-red { --cody: #E0313F; --mood-soft: #FDECEE; --mood-ink: #C21E2C; animation: cody-alert .9s ease-in-out infinite; }
 .cody.mood-blue { --cody: #2F66E0; --mood-soft: #E8F0FB; --mood-ink: #0047AB; }
+/* 평소 색은 성장 단계를 따릅니다. 빨강(확인 필요)과 파랑(확인 완료)은 경고 의미로만 쓰고, 언제나 이 색보다 우선합니다. */
+.cody.mood-green.s2 { --cody: #0FA3B1; --mood-ink: #0B7C87; }
+.cody.mood-green.s3 { --cody: #7A5AF8; --mood-ink: #5B3FD6; }
+.cody.mood-green.s4, .cody.rainbow { --cody: linear-gradient(115deg, #FF4D5E, #FF9F2E, #FFD43B, #2FC97F, #2F9BFF, #7A5AF8, #E94FC0, #FF4D5E); }
+.cody.mood-green.s4 .cody-body, .cody.rainbow .cody-body, .cody.mood-green.s4 .cody-egg { background-size: 160% 100%; animation: cody-rainbow 5s linear infinite; }
+.cody.mood-green.s4 .cody-item { color: #7A5AF8; }
+.cody.rainbow .cody-body { animation-duration: 1.2s; }
 .cody.small { --size: 66px; }
 .cody.s1 { transform: scale(.72); } .cody.s2 { transform: scale(.84); } .cody.s3 { transform: scale(.94); } .cody.s4 { transform: scale(1); }
 .cody.wiggle { animation: cody-wiggle .55s ease; }
@@ -45,11 +52,17 @@
 .mission.done { opacity: .62; }
 .mission.done .xp { background: #EDF1F7; color: var(--sub); }
 
-.stage-strip { display: flex; justify-content: space-between; gap: 4px; margin-top: 10px; padding: 14px 10px; border-radius: 18px; background: #fff; box-shadow: var(--shadow); }
-.stage-strip div { flex: 1; min-width: 0; color: #B4BBC9; font-size: 11.5px; font-weight: 700; line-height: 1.3; text-align: center; }
-.stage-strip i { display: block; width: 12px; height: 12px; margin: 0 auto 6px; border-radius: 50%; background: #E3E8F3; }
-.stage-strip .on { color: var(--ink); }
-.stage-strip .on i { background: var(--pri); }
+.stage-strip { display: flex; gap: 2px; margin-top: 10px; padding: 12px 6px; border-radius: 18px; background: #fff; box-shadow: var(--shadow); }
+.stage-strip button { flex: 1; min-width: 0; padding: 6px 1px; border: 0; border-radius: 12px; background: none; color: #A7AFBF; font-size: 11px; font-weight: 700; line-height: 1.25; }
+.stage-strip button .cody { --size: 44px; margin: 0 auto 5px; filter: grayscale(1) opacity(.42); }
+.stage-strip button .cody-item { box-shadow: none; }
+.stage-strip button.on { color: var(--ink); }
+.stage-strip button.on .cody { filter: none; }
+.stage-strip button.now { background: var(--pri-soft); color: var(--pri); }
+.stage-preview { display: grid; justify-items: center; text-align: center; }
+.stage-preview .btn { width: 100%; }
+.stage-preview .cody.big { --size: 190px; margin: 8px 0 4px; }
+.stage-note { margin-top: 12px; padding: 7px 12px; border-radius: 10px; background: var(--pri-soft); color: var(--pri); font-size: 13.5px; font-weight: 700; }
 
 .quiz-progress { margin: 10px 2px 8px; color: var(--sub); font-size: 13px; font-weight: 700; }
 .quiz-msg { padding: 16px; border-radius: 20px; background: #fff; box-shadow: var(--shadow); }
@@ -73,10 +86,13 @@
 .dishes b { display: block; margin-top: 2px; font-size: 22px; font-weight: 900; }
 .talk-card { margin-top: 12px; padding: 16px; border-radius: 20px; background: var(--pri-soft); font-size: 14.5px; font-weight: 700; line-height: 1.5; }
 
+/* 160% 크기의 그림은 266.67%를 움직이면 끊김 없이 한 바퀴 돕니다. */
+@keyframes cody-rainbow { to { background-position: 266.67% 0; } }
 @keyframes cody-alert { 0%, 100% { translate: 0 0; } 50% { translate: 0 -5px; } }
 @keyframes cody-wiggle { 25% { rotate: -7deg; } 75% { rotate: 7deg; } }
 @keyframes cody-rock { 0%, 100% { rotate: -4deg; } 50% { rotate: 4deg; } }
 @keyframes quiz-rise { from { opacity: 0; translate: 0 8px; } to { opacity: 1; translate: 0 0; } }
 @media (prefers-reduced-motion: reduce) {
   .cody.mood-red, .cody.wiggle, .cody-egg, .quiz-result { animation: none; }
+  .cody.mood-green.s4 .cody-body, .cody.rainbow .cody-body { animation: none; }
 }

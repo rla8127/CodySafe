@@ -12,7 +12,6 @@ os.environ.update(
     GUARD_STT="text",
     GUARD_LLM="rule",
     GUARD_EMBED="hash",
-    GUARD_ADMIN_TOKEN="admin",
 )
 
 import pytest
@@ -85,12 +84,13 @@ def test_other_scam_review_goes_to_separate_dataset(client):
     rec = send(client, p, INVEST, "inv")
     assert rec["label"] == "other_scam" and rec["needs_review"]
     assert client.get("/v1/alerts", headers=g).json()["items"] == []
-    assert client.get("/v1/admin/review-dataset.jsonl").status_code == 403
     assert client.post(f"/v1/recordings/{rec['id']}/review", headers=p, json={"label": "other_scam"}).json()["in_dataset"]
-    dump = client.get("/v1/admin/review-dataset.jsonl", headers={"X-Admin-Token": "admin"}).text
-    assert rec["id"] in dump and "리딩방" in dump
+    with db.connect() as conn:
+        row = conn.execute("SELECT transcript FROM review_dataset WHERE recording_id = ?", (rec["id"],)).fetchone()
+    assert "리딩방" in row["transcript"]
     assert client.post(f"/v1/recordings/{rec['id']}/review", headers=p, json={"label": "normal"}).json()["in_dataset"] is False
-    assert rec["id"] not in client.get("/v1/admin/review-dataset.jsonl", headers={"X-Admin-Token": "admin"}).text
+    with db.connect() as conn:
+        assert not conn.execute("SELECT 1 FROM review_dataset WHERE recording_id = ?", (rec["id"],)).fetchone()
 
 
 def test_normal_call_keeps_no_transcript_and_audio_is_deleted(client):
@@ -435,7 +435,7 @@ def test_keep_audio_stores_after_analysis_until_user_deletes(client, monkeypatch
     assert not path.exists()
 
 
-def test_feedback_and_dashboards_separate_user_and_admin(client):
+def test_feedback_and_user_dashboard(client):
     with db.connect() as conn:
         for table in ("recording_feedback", "training_results", "response_events"):
             conn.execute(f"DELETE FROM {table}")
@@ -455,26 +455,14 @@ def test_feedback_and_dashboards_separate_user_and_admin(client):
     assert me["training"]["count"] == 3 and [w["scenario"] for w in me["training"]["weak"]] == ["loan"]
     assert me["calls"]["confirmed"] == 2
     assert client.get("/v1/dashboard/me", headers=b).json()["training"]["count"] == 0
-    # 대시보드는 비밀번호 없이 열리지만 이름과 통화 내용은 없습니다.
-    assert client.get("/v1/admin/dashboard").status_code == 200
-    admin = {"X-Admin-Token": "admin"}
-    data = client.get("/v1/admin/dashboard", headers=admin).json()
-    fb = data["feedback"]
-    assert fb["confirmed"] == 3 and fb["false_alarm_n"] == [1, 2] and fb["false_alarm_rate"] == 50.0
-    assert fb["miss_n"] == [1, 2] and fb["small_sample"] is True
-    text = client.get("/v1/admin/dashboard", headers=admin).text + client.get("/v1/admin/feedback-dataset.jsonl", headers=admin).text
-    assert "대시A" not in text and "수사관" not in text and "device_id" not in text
     # 사용자가 기록을 지우면 라벨도 함께 지워집니다.
     client.delete(f"/v1/recordings/{normal['id']}", headers=a)
-    assert client.get("/v1/admin/dashboard", headers=admin).json()["feedback"]["confirmed"] == 2
+    assert client.get("/v1/dashboard/me", headers=a).json()["calls"]["confirmed"] == 1
 
 
-def test_transcript_dataset_can_use_stronger_token_than_dashboard(client, monkeypatch):
-    monkeypatch.setattr(config, "DATASET_TOKEN", "strong")
-    weak, strong = {"X-Admin-Token": "admin"}, {"X-Admin-Token": "strong"}
-    assert client.get("/v1/admin/dashboard", headers=weak).status_code == 200
-    assert client.get("/v1/admin/review-dataset.jsonl", headers=weak).status_code == 403
-    assert client.get("/v1/admin/review-dataset.jsonl", headers=strong).status_code == 200
+def test_admin_api_is_removed(client):
+    for path in ("dashboard", "ops", "feedback-dataset.jsonl", "review-dataset.jsonl"):
+        assert client.get(f"/v1/admin/{path}").status_code == 404
 
 
 def test_landing_demo_runs_only_fixed_samples_without_login(client):
@@ -482,38 +470,6 @@ def test_landing_demo_runs_only_fixed_samples_without_login(client):
     assert len(client.get("/v1/demo/samples").json()["items"]) == 6
     assert client.post("/v1/demo/samples/prosecutor/analyze").json()["label"] == "voice_phishing"
     assert client.post("/v1/demo/samples/none/analyze").status_code == 404
-
-
-def test_ops_finds_surge_masks_numbers_and_excludes_normal_calls(client):
-    import sqlite3
-
-    from guard import dashboard
-
-    with db.connect() as conn:
-        for table in ("recordings", "recording_feedback", "response_events"):
-            conn.execute(f"DELETE FROM {table}")
-    db.seed_demo_analytics()
-    with db.connect() as conn:
-        now = db.now()
-        for i in range(3):
-            db.add_demo_recording(conn, f"n{i}", "demo-seed-1", "통화 01099998888_260101_120000.m4a", "normal", "none", now - 60)
-    admin = {"X-Admin-Token": "admin"}
-    assert client.get("/v1/admin/ops").status_code == 200
-    assert client.get("/v1/admin/ops?hours=5", headers=admin).status_code == 400
-    data = client.get("/v1/admin/ops?hours=168", headers=admin).json()
-    assert any(s["type"] == "family_impersonation" for s in data["surges"])
-    top = data["callers"][0]
-    assert top["number"] == "010-****-1001" and top["calls"] >= 16
-    text = str(data)
-    assert "9998888" not in text and "8888" not in text and "01000001001" not in text
-    assert len(data["heatmap"]) == 7 and len(data["heatmap"][0]) == 24
-    assert data["funnel"][0][0] == "보이스피싱 의심" and data["totals"]["phishing"] > 0
-    empty = client.get("/v1/admin/ops?hours=24&include_demo=false", headers=admin).json()
-    assert empty["totals"]["calls"] == 0 and empty["callers"] == []
-    # 시연 집계용 기기는 가족 목록과 실제 사용자 기록에 섞이지 않습니다.
-    assert sqlite3.connect(config.DB_PATH).execute("SELECT COUNT(*) FROM family_links WHERE protected_id LIKE 'demo-seed-%'").fetchone()[0] == 0
-    assert dashboard._number("통화 김철수_260101_120000.m4a") is None
-    assert dashboard._number("통화 010-1234-5678_260101_120000.m4a") == "01012345678"
 
 
 def test_one_analysis_is_one_trace_and_other_requests_add_none(client, monkeypatch):
@@ -616,4 +572,22 @@ def test_quiz_cards_clue_appears_in_text():
 
     assert len(CARDS) == 15
     for card in CARDS:
-        assert card["clue"] in card["text"] or card["clue"] == card["sender"], card["id"]
+        assert card["clue"] in card["text"], card["id"]
+    # 발신자만 보고 찍을 수 없어야 합니다.
+    assert not any(card["sender"] == "모르는 번호" for card in CARDS)
+    scam_senders = {card["sender"] for card in CARDS if card["is_scam"]}
+    assert scam_senders & {card["sender"] for card in CARDS if not card["is_scam"]}
+
+
+def test_quiz_ignores_answers_to_retired_cards(client):
+    p = device(client, "교체")
+    from guard import pet
+
+    with db.connect() as conn:
+        device_id = conn.execute("SELECT id FROM devices WHERE token = ?", (p["Authorization"].removeprefix("Bearer "),)).fetchone()["id"]
+        conn.execute(
+            "INSERT INTO quiz_answers (device_id, week, card_id, answer, correct, created_at) VALUES (?, ?, 'retired', 1, 0, ?)",
+            (device_id, pet.week_key(), db.now()),
+        )
+    assert client.get("/v1/pet", headers=p).json()["quiz_answered"] == 0
+    assert client.get("/v1/quiz", headers=p).status_code == 200
