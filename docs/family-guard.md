@@ -15,7 +15,7 @@
 | S3 전송 | WorkManager 15분 주기와 수동 동기화. 기기에 AWS 키 없이 presigned URL 사용 |
 | STT → LLM | OpenAI 전사 또는 Amazon Transcribe(ko-KR) → OpenAI, Claude API, Bedrock 중 선택, 스키마 출력 |
 | 개인화 추천 | 기기별 판정 기록을 유형별로 집계해 상위 3개와 훈련 제시 |
-| 가족 알림 | 초대 코드로 연결. 확신도 0.7 이상 보이스피싱만, 요약만 전달 |
+| 가족 알림 | 초대 코드로 연결. 확신도 0.7 이상 보이스피싱의 의심 여부만 전달. 요약·유형·녹취는 본인만 조회 |
 | 유형 판별 | 음절 2-gram BM25 + 벡터 → RRF → LLM 재순위 |
 | 비보이스피싱 사기 | 사람이 확정한 건만 `review_dataset`에 보관, JSONL로 내보내기 |
 
@@ -54,6 +54,10 @@ GUARD_STORAGE=s3 GUARD_S3_BUCKET=<버킷> GUARD_STT=transcribe GUARD_ADMIN_TOKEN
 
 버킷은 공개 차단과 수명 주기 삭제 규칙을 켜 두세요. 분석에 실패한 음성은 재시도를 위해 남기 때문입니다.
 
+## 화면 수정
+
+화면은 서버의 `/app/`에서 제공합니다(`server/web/`, 공용 `css/`, `js/`). 앱은 이를 WebView로 띄우므로, 화면을 고치면 APK를 다시 빌드하지 않아도 브라우저와 앱에 바로 반영됩니다. 앱을 다시 빌드할 일은 폴더 접근, 동기화, 알림을 바꿀 때뿐입니다.
+
 ## 앱 빌드
 
 - **GitHub Actions:** 브랜치를 올린 뒤 Actions의 `Android APK`에서 `codysafe-guard-debug-apk`를 받습니다.
@@ -61,10 +65,10 @@ GUARD_STORAGE=s3 GUARD_S3_BUCKET=<버킷> GUARD_STT=transcribe GUARD_ADMIN_TOKEN
 
 ## 2분 테스트
 
-1. 폰 A(보호 대상)와 폰 B(가족)에 앱을 설치하고 각각 등록합니다.
+1. 기기 A(보호 대상)와 B(가족)에서 앱이나 브라우저로 `/app/`을 열어 각각 등록합니다.
 2. A의 가족 탭에서 초대 코드를 만들어 B에 입력합니다.
-3. A에서 `테스트 파일 1개 올리기`로 파일을 올립니다. 테스트 모드에서는 `.txt`로 된 대본도 됩니다.
-4. A에 판정이 나오고, 앱을 켜 둔 B에 5초 안에 알림이 오는지 확인합니다.
+3. A의 검사 탭에서 파일을 올립니다.
+4. A에는 분석 결과가, B에는 의심 여부만 나오는지 확인합니다.
 
 ## 제약
 

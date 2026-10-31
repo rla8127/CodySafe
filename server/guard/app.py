@@ -6,7 +6,8 @@ from contextlib import asynccontextmanager
 from pathlib import PurePosixPath
 
 from fastapi import BackgroundTasks, Depends, FastAPI, Header, HTTPException, Query, Request
-from fastapi.responses import PlainTextResponse
+from fastapi.responses import FileResponse, PlainTextResponse, RedirectResponse
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from . import config, db, pipeline, providers
@@ -24,6 +25,31 @@ async def lifespan(_: FastAPI):
 
 
 app = FastAPI(title="CodySafe Family Guard", lifespan=lifespan)
+
+
+# 웹 MVP의 파일을 복사하지 않고 필요한 폴더만 내보냅니다. 저장소 루트는 내보내지 않습니다.
+WEB_DIR = config.ROOT / "web"
+for path, folder in (("css", "css"), ("js", "js"), ("assets", "assets")):
+    app.mount(f"/app/{path}", StaticFiles(directory=config.ROOT.parent / folder), name=f"app-{path}")
+app.mount("/app/web", StaticFiles(directory=WEB_DIR), name="app-web")
+
+
+@app.middleware("http")
+async def no_stale_ui(request: Request, call_next):
+    response = await call_next(request)
+    if request.url.path.startswith("/app"):
+        response.headers["Cache-Control"] = "no-cache"
+    return response
+
+
+@app.get("/app", include_in_schema=False)
+def app_redirect():
+    return RedirectResponse("/app/")
+
+
+@app.get("/app/", include_in_schema=False)
+def app_index():
+    return FileResponse(WEB_DIR / "index.html")
 
 
 def current_device(authorization: str = Header(default="")) -> str:

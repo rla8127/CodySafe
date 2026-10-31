@@ -17,7 +17,7 @@ os.environ.update(
 import pytest
 from fastapi.testclient import TestClient
 
-from guard import config, rag
+from guard import config, db, rag
 from guard.app import app
 
 PHISHING = "서울중앙지검 수사관입니다. 명의가 도용되어 구속 수사 대상입니다. 안전 계좌로 옮기세요."
@@ -63,9 +63,13 @@ def test_phishing_alerts_guardian_without_transcript(client):
     assert rec["label"] == "voice_phishing" and not rec["needs_review"]
     assert rec["matches"][0]["id"] == "prosecutor_impersonation"
     items = client.get("/v1/alerts", headers=g).json()["items"]
-    assert len(items) == 1 and "엄마" in items[0]["title"]
-    assert "안전 계좌로 옮기세요" not in items[0]["body"]
+    assert len(items) == 1 and items[0]["title"] == "엄마님 보이스피싱 의심 통화"
+    assert items[0]["body"] == db.FAMILY_ALERT_BODY
+    assert set(items[0]) == {"id", "title", "body", "acked", "created_at"}
     assert "transcript" not in rec
+    # 가족은 분석 결과를 조회할 수 없습니다.
+    assert client.get("/v1/recordings", headers=g).json()["items"] == []
+    assert client.post(f"/v1/recordings/{rec['id']}/review", headers=g, json={"label": "normal"}).status_code == 404
 
 
 def test_low_confidence_goes_to_review_not_alert(client):
@@ -195,3 +199,11 @@ def test_samsung_3gp_header_becomes_m4a_without_touching_audio():
     assert out[24:] == body and len(out) == len(head + body)
     amr = head + b"samr"
     assert _as_m4a(amr) == amr
+
+
+def test_web_ui_is_served_without_exposing_repo(client):
+    assert client.get("/app/").status_code == 200 and "guard.js" in client.get("/app/").text
+    assert client.get("/app/js/app.js").status_code == 200
+    assert client.get("/app/css/style.css").headers["cache-control"] == "no-cache"
+    for path in ("/app/.git/config", "/app/server/guard/config.py", "/app/js/../../server/.env", "/app/web/../guard/config.py"):
+        assert client.get(path).status_code == 404, path

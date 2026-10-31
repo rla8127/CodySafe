@@ -18,18 +18,12 @@ import java.net.URL
 class Store(context: Context) {
     private val p: SharedPreferences = context.getSharedPreferences("guard", Context.MODE_PRIVATE)
 
-    var consented: Boolean
-        get() = p.getBoolean("consented", false)
-        set(v) = p.edit().putBoolean("consented", v).apply()
     var server: String
         get() = p.getString("server", "") ?: ""
         set(v) = p.edit().putString("server", v.trim().trimEnd('/')).apply()
     var token: String
         get() = p.getString("token", "") ?: ""
         set(v) = p.edit().putString("token", v).apply()
-    var name: String
-        get() = p.getString("name", "") ?: ""
-        set(v) = p.edit().putString("name", v).apply()
     var folder: String
         get() = p.getString("folder", "") ?: ""
         set(v) = p.edit().putString("folder", v).apply()
