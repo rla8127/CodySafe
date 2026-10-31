@@ -51,6 +51,9 @@ a.btn { text-decoration: none; }
 .lock-alert-icon svg.lucide { width: 32px; height: 32px; }
 .lock-alert-title { font-size: 23px; font-weight: 800; letter-spacing: -0.03em; }
 .lock-alert-text { margin-top: 10px; font-size: 14.5px; line-height: 1.55; color: var(--ink2); }
+.fact-note { margin-top: 5px; font-size: 12px; line-height: 1.45; color: var(--mute); }
+.fact-head { margin-top: 10px; font-size: 12.5px; font-weight: 700; color: var(--sub); }
+.type-box small { display: block; font-size: 12px; font-weight: 600; color: var(--sub); }
 .lock-banner { display: flex; align-items: center; gap: 10px; width: 100%; text-align: left; margin-bottom: 12px; font-size: 14px; line-height: 1.45; color: var(--ink2); }
 .lock-banner svg.lucide { width: 22px; height: 22px; color: var(--danger); flex: none; }
 /* 모바일에서 대화 첫 줄이 진행 막대에 가리지 않게 합니다. */

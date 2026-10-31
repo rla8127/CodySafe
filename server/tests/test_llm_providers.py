@@ -53,3 +53,28 @@ def test_refusal_is_an_error(monkeypatch):
     monkeypatch.setattr(llm, "_client", NS(messages=NS(create=lambda **k: NS(stop_reason="refusal", content=[]))))
     with pytest.raises(RuntimeError):
         llm.analyze("안녕")
+
+
+def analyzed(monkeypatch, label, evidence):
+    answer = {**RESULT, "label": label, "scam_type": "unknown", "evidence": evidence}
+    monkeypatch.setattr(config, "LLM", "anthropic")
+    response = NS(stop_reason="end_turn", content=[NS(type="text", text=json.dumps(answer))])
+    monkeypatch.setattr(llm, "_client", NS(messages=NS(create=lambda **k: response)))
+    return llm.analyze("저는 은행 직원입니다. 계좌번호 1234 불러 주시고 앱을 설치하세요.")
+
+
+def test_only_quotes_found_in_transcript_are_kept(monkeypatch):
+    result = analyzed(monkeypatch, "voice_phishing", ["앱을  설치하세요", "계좌번호 *** 불러 주시고", "이 사람은 대출상담사다"])
+    assert result["evidence"] == ["앱을  설치하세요", "계좌번호 *** 불러 주시고"]
+    assert result["label"] == "voice_phishing"
+
+
+def test_scam_verdict_without_real_quote_becomes_uncertain(monkeypatch):
+    assert analyzed(monkeypatch, "voice_phishing", ["최근 비슷한 사건이 있었다"])["label"] == "uncertain"
+    assert analyzed(monkeypatch, "other_scam", ["***"])["label"] == "uncertain"
+    assert analyzed(monkeypatch, "normal", [])["label"] == "normal"
+
+
+def test_prompt_forbids_identity_and_outside_facts():
+    for rule in ("단정하지 않습니다", "최근 사건", "글자 그대로"):
+        assert rule in llm.ANALYSIS_SYSTEM

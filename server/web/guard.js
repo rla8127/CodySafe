@@ -85,7 +85,7 @@ const gated = (fn) => (arg) => (signedIn() ? fn(arg) : onboardingPage());
 const CHIPS = {
   voice_phishing: ['danger', 'siren', '보이스피싱 의심'],
   other_scam: ['warn', 'triangle-alert', '다른 사기 의심'],
-  normal: ['safe', 'shield-check', '사기 징후 없음'],
+  normal: ['safe', 'shield-check', '사기 징후 못 찾음'],
 };
 const STEP = { queued: '대기 중', transcribing: '음성 변환 중', analyzing: '분석 중' };
 
@@ -108,10 +108,10 @@ function recordingCard(r) {
   return `<div class="card mt">
     ${verdictChip(r, label)}
     <div class="call-title">${callTitle(r.filename)}</div>
-    ${r.summary ? `<div class="call-text">${esc(r.summary)}</div>` : ''}
+    ${r.summary ? `<div class="call-text">${esc(r.summary)}</div><div class="fact-note">음성을 글자로 바꾼 내용을 AI가 요약했습니다. 상대의 실제 신분은 확인되지 않았습니다.</div>` : ''}
     ${r.status === 'failed' ? '<div class="call-text">처리에 실패했습니다. 다시 시도해 주세요.</div>' : ''}
-    ${r.evidence.map((e) => `<div class="quote">“${esc(e)}”</div>`).join('')}
-    ${top ? `<div class="type-box"><b>${esc(top.name)}</b><p>${esc(top.advice)}</p></div>` : ''}
+    ${r.evidence.length ? `<div class="fact-head">통화에서 나온 말</div>${r.evidence.map((e) => `<div class="quote">“${esc(e)}”</div>`).join('')}` : ''}
+    ${top ? `<div class="type-box"><small>비슷한 수법</small><b>${esc(top.name)}</b><p>${esc(top.advice)}</p></div>` : ''}
     <div class="link-row">
       ${r.status === 'failed' ? `<button onclick="act('POST','/v1/recordings/${r.id}/complete')">다시 시도</button>` : ''}
       ${r.status === 'done' ? `<button onclick="reviewSheet('${r.id}')">${r.needs_review ? '판정 확인' : '판정 고치기'}</button>` : ''}
@@ -177,8 +177,8 @@ function homeData({ recordings, recs, family, alerts, lock }) {
     </div>
     ${unread.map(alertCard).join('')}
     ${reviews ? `<button class="card mt soft-warn" style="width:100%;text-align:left" onclick="go('detect')"><b>검토가 필요한 통화 ${reviews}건</b><br>판정을 확인해 주시면 탐지 개선에 쓰입니다.</button>` : ''}
-    <div class="sec-title">자주 노출된 사기 유형</div>
-    ${recs.items.length ? recs.items.map((r) => `<div class="card mt"><span class="chip pri">${r.count}회 노출</span>
+    <div class="sec-title">자주 의심된 사기 유형</div>
+    ${recs.items.length ? recs.items.map((r) => `<div class="card mt"><span class="chip pri">${r.count}회 의심</span>
       <div class="call-title">${esc(r.name)}</div><div class="call-text">${esc(r.advice)}</div>
       <div class="call-text" style="color:var(--pri);font-weight:700;font-size:13px">추천 훈련 · ${esc(r.training)}</div></div>`).join('') : emptyCard('아직 사기로 판정된 통화가 없습니다.')}
     <div class="sec-title">최근 분석 <button class="more" onclick="go('detect')">전체 보기${ic('chevron-right')}</button></div>
