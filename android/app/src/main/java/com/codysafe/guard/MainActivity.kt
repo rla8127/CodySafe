@@ -11,6 +11,7 @@ import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.provider.DocumentsContract
 import android.provider.Settings
 import android.webkit.JavascriptInterface
 import android.webkit.ValueCallback
@@ -162,6 +163,18 @@ class MainActivity : Activity() {
             runOnUiThread { startActivityForResult(Intent(Intent.ACTION_OPEN_DOCUMENT_TREE), REQ_FOLDER) }
         }
 
+        /** 폴더 선택 화면을 삼성 통화 녹음 폴더에서 엽니다. 권한은 사용자가 직접 허용해야 합니다. */
+        @JavascriptInterface
+        fun pickCallFolder() {
+            val start = DocumentsContract.buildDocumentUri(EXTERNAL_STORAGE, SAMSUNG_CALL_FOLDER)
+            runOnUiThread {
+                startActivityForResult(
+                    Intent(Intent.ACTION_OPEN_DOCUMENT_TREE).putExtra(DocumentsContract.EXTRA_INITIAL_URI, start),
+                    REQ_FOLDER,
+                )
+            }
+        }
+
         @JavascriptInterface
         fun blockerEnabled(): Boolean {
             val enabled = Settings.Secure.getString(contentResolver, Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES) ?: ""
@@ -194,6 +207,8 @@ class MainActivity : Activity() {
     companion object {
         const val EXTRA_LOCK = "lock"
         private const val POLL_MS = 5_000L
+        private const val EXTERNAL_STORAGE = "com.android.externalstorage.documents"
+        private const val SAMSUNG_CALL_FOLDER = "primary:Recordings/Call"
         private const val REQ_FILE = 1
         private const val REQ_FOLDER = 2
     }
