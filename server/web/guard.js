@@ -194,9 +194,7 @@ SCREENS.detect = gated(() => `<div class="page">
 </div>`);
 
 function folderBlock() {
-  if (!native) {
-    return `<div class="b">녹음 폴더 자동 검사</div><div class="muted small" style="margin-top:6px">폴더 연결은 안드로이드 앱에서만 할 수 있습니다.</div>`;
-  }
+  if (!native) return webFolderBlock();
   const folder = native.folderLabel();
   return `<div class="row between"><div class="b">녹음 폴더</div><span class="chip ${folder ? 'safe' : ''}">${folder ? '연결됨' : '연결 안 됨'}</span></div>
     <div class="muted small" style="margin-top:6px">${folder ? esc(folder) + ' · ' : ''}연결한 뒤에 새로 저장된 파일만 분석합니다.</div>
@@ -205,19 +203,158 @@ function folderBlock() {
 
 const detectData = ({ recordings }) => (recordings.items.length ? recordings.items.map(recordingCard).join('') : emptyCard('아직 올린 파일이 없습니다.'));
 
+async function uploadFile(file, clientKey) {
+  const r = await api('POST', '/v1/recordings', { filename: file.name, client_key: clientKey, content_type: 'application/octet-stream' });
+  if (r.already_uploaded) return false;
+  const url = new URL(r.upload_url);
+  // 로컬 저장 모드는 지금 접속한 주소로 보내 주소 설정과 무관하게 동작하게 합니다.
+  const target = url.pathname.startsWith('/v1/local-upload/') ? url.pathname + url.search : r.upload_url;
+  const put = await fetch(target, { method: 'PUT', headers: { 'Content-Type': 'application/octet-stream' }, body: file });
+  if (!put.ok) throw new Error(put.status);
+  await api('POST', `/v1/recordings/${r.id}/complete`);
+  return true;
+}
+
+/* ---------------- 웹 폴더 검사 ----------------
+   HTTPS 브라우저: 폴더를 연결해 두면 페이지를 연 동안 새 파일을 자동으로 올립니다.
+   그 외: 폴더를 고를 때마다 확인을 받고 아직 안 보낸 파일을 올립니다. */
+const AUDIO_EXT = /\.(m4a|mp3|mp4|wav|flac|ogg|amr|webm|txt)$/i;
+const SCAN_MS = 30000;
+const SETTLE_MS = 30000;
+const fileKey = (f) => `${f.name}|${f.size}|${f.lastModified}`;
+const canWatch = () => !native && window.isSecureContext && !!window.showDirectoryPicker;
+let folderHandle = null;
+let folderGranted = false;
+let scanning = false;
+let pendingFiles = [];
+
+function seenKeys() {
+  try { return new Set(JSON.parse(store.get('seen') || '[]')); } catch (e) { return new Set(); }
+}
+function markSeen(key) {
+  const seen = seenKeys();
+  seen.add(key);
+  store.set('seen', JSON.stringify([...seen]));
+}
+
+async function sendFiles(files) {
+  let sent = 0;
+  for (const f of files) {
+    const key = fileKey(f);
+    try {
+      if (await uploadFile(f, key)) sent++;
+      markSeen(key);
+    } catch (e) {
+      // 받지 않는 형식은 다시 시도하지 않고, 그 외 오류는 다음 검사에서 다시 올립니다.
+      if (e.message === '415') markSeen(key);
+    }
+  }
+  lastData = '';
+  refresh();
+  return sent;
+}
+
+function idb(mode, fn) {
+  return new Promise((resolve, reject) => {
+    const open = indexedDB.open('guard', 1);
+    open.onupgradeneeded = () => open.result.createObjectStore('kv');
+    open.onerror = () => reject(open.error);
+    open.onsuccess = () => {
+      const req = fn(open.result.transaction('kv', mode).objectStore('kv'));
+      req.onsuccess = () => resolve(req.result);
+      req.onerror = () => reject(req.error);
+    };
+  });
+}
+
+async function connectFolder() {
+  try {
+    folderHandle = await window.showDirectoryPicker({ mode: 'read' });
+  } catch (e) {
+    return; // 사용자가 취소함
+  }
+  await idb('readwrite', (s) => s.put(folderHandle, 'folder')).catch(() => {});
+  store.set('folderSince', String(Date.now()));
+  folderGranted = true;
+  render();
+}
+
+async function regrantFolder() {
+  folderGranted = (await folderHandle.requestPermission({ mode: 'read' })) === 'granted';
+  render();
+  scanFolder();
+}
+
+async function restoreFolder() {
+  if (!canWatch()) return;
+  folderHandle = await idb('readonly', (s) => s.get('folder')).catch(() => null);
+  if (!folderHandle) return;
+  folderGranted = (await folderHandle.queryPermission({ mode: 'read' })) === 'granted';
+  if (route().r === 'detect') render();
+}
+
+async function scanFolder() {
+  if (!folderHandle || !folderGranted || scanning || !signedIn()) return 0;
+  scanning = true;
+  try {
+    const since = Number(store.get('folderSince')) || 0;
+    const seen = seenKeys();
+    const files = [];
+    for await (const entry of folderHandle.values()) {
+      if (entry.kind !== 'file' || !AUDIO_EXT.test(entry.name)) continue;
+      const f = await entry.getFile();
+      if (f.lastModified >= since && Date.now() - f.lastModified >= SETTLE_MS && !seen.has(fileKey(f))) files.push(f);
+    }
+    return await sendFiles(files);
+  } catch (e) {
+    folderGranted = false;
+    return 0;
+  } finally {
+    scanning = false;
+  }
+}
+
+function webFolderBlock() {
+  if (canWatch()) {
+    const on = folderHandle && folderGranted;
+    return `<div class="row between"><div class="b">녹음 폴더</div><span class="chip ${on ? 'safe' : ''}">${on ? '자동 검사 중' : folderHandle ? '권한 필요' : '연결 안 됨'}</span></div>
+      <div class="muted small" style="margin-top:6px">${folderHandle ? esc(folderHandle.name) + ' · ' : ''}이 페이지를 열어 둔 동안, 연결 후 새로 저장된 파일을 자동으로 분석합니다.</div>
+      <div class="row" style="margin-top:12px">
+        ${folderHandle && !folderGranted ? '<button class="btn pri sm grow" onclick="regrantFolder()">권한 다시 허용</button>' : ''}
+        <button class="btn ghost sm grow" onclick="connectFolder()">폴더 선택</button>
+        ${on ? `<button class="btn line sm grow" onclick="scanFolder().then((n)=>toast(n?n+'개 파일을 올렸습니다':'새 파일이 없습니다'))">지금 검사</button>` : ''}
+      </div>`;
+  }
+  return `<div class="row between"><div class="b">녹음 폴더</div><span class="chip">선택할 때 검사</span></div>
+    <div class="muted small" style="margin-top:6px">폴더를 고르면 아직 보내지 않은 녹음을 확인한 뒤 올립니다. 자동 감시는 HTTPS 접속이나 안드로이드 앱에서 동작합니다.</div>
+    <button class="btn ghost sm block" style="margin-top:12px" onclick="$('#dirPick').click()">폴더 골라 검사</button>`;
+}
+
+$('#dirPick').addEventListener('change', (e) => {
+  const seen = seenKeys();
+  pendingFiles = [...e.target.files].filter((f) => AUDIO_EXT.test(f.name) && !seen.has(fileKey(f)));
+  e.target.value = '';
+  if (!pendingFiles.length) return toast('새로 보낼 파일이 없습니다', 'circle-alert');
+  openSheet(`<div class="b" style="font-size:18px">파일 ${pendingFiles.length}개를 분석할까요?</div>
+    <div class="muted small" style="margin-top:6px">선택한 폴더의 녹음이 서버로 전송되고, 통화 상대의 음성도 포함됩니다.</div>
+    <div class="btn-col"><button class="btn pri block" onclick="confirmFolderUpload()">보내기</button><button class="btn line block" onclick="closeSheet()">취소</button></div>`);
+});
+
+async function confirmFolderUpload() {
+  closeSheet();
+  toast('업로드 중입니다', 'upload');
+  const sent = await sendFiles(pendingFiles);
+  pendingFiles = [];
+  toast(`${sent}개 파일을 올렸습니다`);
+}
+
 $('#filePick').addEventListener('change', async (e) => {
   const file = e.target.files[0];
   e.target.value = '';
   if (!file) return;
   toast('업로드 중입니다', 'upload');
   try {
-    const r = await api('POST', '/v1/recordings', { filename: file.name, client_key: `manual|${file.name}|${Date.now()}`, content_type: 'application/octet-stream' });
-    const url = new URL(r.upload_url);
-    // 로컬 저장 모드는 지금 접속한 주소로 보내 주소 설정과 무관하게 동작하게 합니다.
-    const target = url.pathname.startsWith('/v1/local-upload/') ? url.pathname + url.search : r.upload_url;
-    const put = await fetch(target, { method: 'PUT', headers: { 'Content-Type': 'application/octet-stream' }, body: file });
-    if (!put.ok) throw new Error(put.status);
-    await api('POST', `/v1/recordings/${r.id}/complete`);
+    await uploadFile(file, `manual|${file.name}|${Date.now()}`);
     toast('업로드 완료. 분석 중입니다');
     lastData = '';
     refresh();
@@ -285,8 +422,17 @@ SCREENS.me = gated(() => `<div class="page">
   <div class="card"><ul class="notice">
     ${['음성은 분석 후 삭제합니다. 실패한 음성은 재시도나 삭제 전까지 남습니다.', '일상 통화는 글자 기록을 남기지 않습니다.', '분석 내용은 본인만 볼 수 있습니다.', '가족에게는 보이스피싱 의심 여부만 전달됩니다.'].map((t) => `<li>${ic('lock')}<span>${t}</span></li>`).join('')}
   </ul></div>
+  ${browserNotifyBlock()}
   <button class="btn line block mt" onclick="signOut()">이 기기 등록 해제</button>
 </div>`);
+
+function browserNotifyBlock() {
+  if (native) return '';
+  const available = window.isSecureContext && 'Notification' in window;
+  if (!available) return '<div class="muted small mt">시스템 알림은 HTTPS 접속에서 켤 수 있습니다. 지금은 페이지를 열어 둔 동안 화면 경고와 소리로 알려 드립니다.</div>';
+  if (Notification.permission === 'granted') return '<div class="muted small mt">시스템 알림이 켜져 있습니다. 브라우저가 실행 중인 동안 받을 수 있습니다.</div>';
+  return '<button class="btn ghost block mt" onclick="Notification.requestPermission().then(render)">브라우저 알림 켜기</button>';
+}
 
 function signOut() {
   store.del('token');
@@ -337,6 +483,52 @@ async function refresh() {
   }
 }
 
+/* ---------------- 웹 가족 경고 (앱은 네이티브 알림을 씁니다) ---------------- */
+const baseTitle = document.title;
+
+function beep() {
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const osc = ctx.createOscillator();
+    osc.frequency.value = 880;
+    osc.connect(ctx.destination);
+    osc.start();
+    osc.stop(ctx.currentTime + 0.25);
+  } catch (e) { }
+}
+
+async function pollAlerts() {
+  if (native || !signedIn()) return;
+  try {
+    const known = store.get('lastAlert');
+    const { items } = await api('GET', `/v1/alerts?after=${known || 0}`);
+    if (!items.length) {
+      if (!known) store.set('lastAlert', '0');
+      return;
+    }
+    store.set('lastAlert', String(items[0].id));
+    // 처음 접속한 기기에는 지난 경고를 한꺼번에 울리지 않습니다. 가족 탭에서 볼 수 있습니다.
+    if (!known) return;
+    const a = items[0];
+    document.title = '🚨 가족 경고 · ' + baseTitle;
+    vibrate([200, 100, 200]);
+    beep();
+    if (window.isSecureContext && window.Notification?.permission === 'granted') new Notification(a.title, { body: a.body });
+    openSheet(`<span class="chip danger">${ic('siren')}가족 경고</span>
+      <div class="b" style="font-size:18px;margin-top:10px">${esc(a.title)}</div>
+      <div class="call-text">${esc(a.body)}</div>
+      <button class="btn danger block mt" onclick="document.title=baseTitle;closeSheet();go('family')">확인하기</button>`);
+    lastData = '';
+    refresh();
+  } catch (e) {
+    // 다음 주기에 다시 확인합니다.
+  }
+}
+
 ['home', 'detect', 'family'].forEach((k) => { INIT[k] = () => { lastData = ''; refresh(); }; });
 setInterval(refresh, 5000);
+setInterval(pollAlerts, 5000);
+setInterval(scanFolder, SCAN_MS);
 render();
+pollAlerts();
+restoreFolder().then(scanFolder);
