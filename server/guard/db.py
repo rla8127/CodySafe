@@ -51,6 +51,14 @@ CREATE TABLE IF NOT EXISTS training_results (
   id INTEGER PRIMARY KEY AUTOINCREMENT, device_id TEXT NOT NULL, scenario TEXT NOT NULL, tag TEXT NOT NULL,
   score INTEGER NOT NULL, created_at REAL NOT NULL
 );
+CREATE TABLE IF NOT EXISTS pet_events (
+  id INTEGER PRIMARY KEY AUTOINCREMENT, device_id TEXT NOT NULL, kind TEXT NOT NULL, points INTEGER NOT NULL,
+  dedupe_key TEXT NOT NULL, created_at REAL NOT NULL, UNIQUE (device_id, dedupe_key)
+);
+CREATE TABLE IF NOT EXISTS quiz_answers (
+  device_id TEXT NOT NULL, week TEXT NOT NULL, card_id TEXT NOT NULL, answer INTEGER NOT NULL, correct INTEGER NOT NULL,
+  created_at REAL NOT NULL, PRIMARY KEY (device_id, week, card_id)
+);
 CREATE TABLE IF NOT EXISTS response_events (
   id INTEGER PRIMARY KEY AUTOINCREMENT, device_id TEXT NOT NULL, kind TEXT NOT NULL, created_at REAL NOT NULL
 );

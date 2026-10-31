@@ -13,7 +13,7 @@ from fastapi.responses import FileResponse, PlainTextResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
-from . import config, dashboard, db, llm, passphrase, pipeline, providers, reports, samples
+from . import config, dashboard, db, llm, passphrase, pet, pipeline, providers, reports, samples, tracing
 from .lock_apps import LOCK_APPS
 from .scam_kb import BY_ID, OTHER_SCAM, VOICE_PHISHING
 
@@ -32,6 +32,7 @@ async def lifespan(_: FastAPI):
         db.seed_demo_analytics()
     config.LOCAL_AUDIO_DIR.mkdir(parents=True, exist_ok=True)
     yield
+    tracing.shutdown()
 
 
 # uvicorn 기본 설정에서는 guard 로그의 INFO가 보이지 않습니다.
@@ -133,6 +134,10 @@ class ReviewIn(BaseModel):
     scam_type: str | None = None
     note: str = Field(default="", max_length=500)
     reason: str | None = Field(default=None, max_length=40)
+
+
+class QuizAnswerIn(BaseModel):
+    is_scam: bool
 
 
 class TrainingIn(BaseModel):
@@ -245,7 +250,8 @@ def create_scenario(report_id: int, device: str = Depends(current_device)):
         if not item["rank"]:
             raise HTTPException(403, "top reports only")
         try:
-            scenario = reports.generate(item["title"], item["body"])
+            with tracing.trace("시나리오 생성", metadata={"report": report_id}):
+                scenario = reports.generate(item["title"], item["body"])
         except Exception as exc:
             logging.getLogger("guard.reports").exception("scenario failed")
             raise HTTPException(502, "scenario generation failed") from exc
@@ -349,17 +355,18 @@ def _analyze_sample(sample_id: str) -> dict:
     # 로그인 없는 랜딩에서도 부르므로 동시에 눌러도 샘플당 한 번만 분석합니다.
     with _sample_lock:
         if sample_id not in _sample_results:
-            text = samples.transcript(sample)
-            result = llm.analyze(text)
-            _sample_results[sample_id] = {
-                "status": "done",
-                "label": result["label"],
-                "confidence": result["confidence"],
-                "review_label": None,
-                "evidence": result["evidence"],
-                "matches": pipeline.public_matches(pipeline.find_matches(result, text)),
-                "expected": sample["expected"],
-            }
+            with tracing.trace("예시 통화 분석", metadata={"sample": sample_id}):
+                text = samples.transcript(sample)
+                result = llm.analyze(text)
+                _sample_results[sample_id] = {
+                    "status": "done",
+                    "label": result["label"],
+                    "confidence": result["confidence"],
+                    "review_label": None,
+                    "evidence": result["evidence"],
+                    "matches": pipeline.public_matches(pipeline.find_matches(result, text)),
+                    "expected": sample["expected"],
+                }
         return _sample_results[sample_id]
 
 
@@ -598,6 +605,7 @@ def ack(alert_id: int, device: str = Depends(current_device)):
     with db.connect() as conn:
         if conn.execute("UPDATE alerts SET acked = 1 WHERE id = ? AND guardian_id = ? AND acked = 0", (alert_id, device)).rowcount:
             db.log_event(conn, device, "alert_ack")
+            pet.record_alert_check(conn, device)
     return {"ok": True}
 
 
@@ -648,7 +656,29 @@ def save_training(body: TrainingIn, device: str = Depends(current_device)):
             "INSERT INTO training_results (device_id, scenario, tag, score, created_at) VALUES (?, ?, ?, ?, ?)",
             (device, body.scenario, body.tag, body.score, db.now()),
         )
-    return {"ok": True}
+        return {"ok": True, "pet": pet.record_training(conn, device, body.scenario)}
+
+
+# ---------- 가족 마스코트와 저녁 식탁 퀴즈 ----------
+@app.get("/v1/pet")
+def pet_status(device: str = Depends(current_device)):
+    with db.connect() as conn:
+        return pet.status(conn, device)
+
+
+@app.get("/v1/quiz")
+def quiz_view(device: str = Depends(current_device)):
+    with db.connect() as conn:
+        return pet.quiz(conn, device)
+
+
+@app.post("/v1/quiz/{card_id}/answer")
+def quiz_answer(card_id: str, body: QuizAnswerIn, device: str = Depends(current_device)):
+    with db.connect() as conn:
+        result = pet.answer(conn, device, card_id, body.is_scam)
+    if result is None:
+        raise HTTPException(404)
+    return result
 
 
 @app.get("/v1/dashboard/me")

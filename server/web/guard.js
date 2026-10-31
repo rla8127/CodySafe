@@ -33,8 +33,10 @@ if (store.get('token')) native?.setToken(store.get('token'));
 
 /* ---------------- 시안 화면 제거 ---------------- */
 ['image', 'voice', 'call', 'url', 'verify', 'report', 'generate', 'weakness', 'training', 'copilot', 'checkup'].forEach((k) => delete SCREENS[k]);
-Object.assign(TAB_OF, { home: 'home', sim: 'sim', play: 'sim', detect: 'detect', family: 'family', me: '', admin: 'admin', lock: 'home', passphrase: 'family', report: 'report' });
+Object.assign(TAB_OF, { home: 'home', sim: 'sim', play: 'sim', detect: 'detect', family: 'family', me: '', admin: 'admin', lock: 'home', passphrase: 'family', report: 'report', pet: 'home', quiz: 'home' });
 delete PARENT.family;
+PARENT.pet = 'home';
+PARENT.quiz = 'pet';
 // 체험 대화 중에도 아래 메뉴를 그대로 보여 줍니다.
 FULL.splice(FULL.indexOf('play'), 1);
 PARENT.passphrase = 'family';
@@ -366,12 +368,13 @@ SCREENS.home = gated(() => `<div class="page">
   <div id="data"></div>
 </div>`);
 
-function homeData({ recordings, recs, family, alerts, lock, reports }) {
+function homeData({ recordings, recs, family, alerts, lock, reports, pet }) {
   const items = recordings.items;
   const flagged = items.filter((r) => ['voice_phishing', 'other_scam'].includes(r.review_label || r.label)).length;
   const reviews = items.filter((r) => r.needs_review).length;
   const unread = alerts.items.filter((a) => !a.acked);
   return `${lock.locked ? `<button class="card soft-danger lock-banner" onclick="go('lock')">${ic('lock')}<span><b>금융 앱 잠금 중</b><br>${lockMinutes(lock)}분 남음 · 눌러서 확인</span></button>` : ''}
+    ${petHomeCard(pet)}
     <div class="hero">
       <div class="hero-label">분석한 통화</div>
       <div class="hero-score">${recs.analyzed}<small>건</small></div>
@@ -1334,11 +1337,14 @@ function saveTraining() {
   const { r, arg } = route();
   if (r !== 'play' || !signedIn() || !sim) return;
   const ok = sim.answers.filter((a) => a.ok).length;
-  api('POST', '/v1/training', { scenario: arg || 'family', tag: sim.s.tag, score: Math.round(ok / sim.s.steps.length * 100) }).catch(() => {});
+  api('POST', '/v1/training', { scenario: arg || 'family', tag: sim.s.tag, score: Math.round(ok / sim.s.steps.length * 100) })
+    .then((res) => showPetReward(res.pet)).catch(() => {});
 }
 
 /* ---------------- 데이터 갱신 ---------------- */
-const DATA_VIEWS = { home: homeData, detect: detectData, family: familyData, lock: lockData, passphrase: passphraseData, report: reportData, me: userDashboard };
+SCREENS.pet = gated(petPage);
+SCREENS.quiz = gated(quizPage);
+const DATA_VIEWS = { pet: petData, home: homeData, detect: detectData, family: familyData, lock: lockData, passphrase: passphraseData, report: reportData, me: userDashboard };
 const REPORT_VIEWS = ['home', 'report'];
 const PHRASE_VIEWS = ['family', 'passphrase'];
 let lastData = '';
@@ -1356,12 +1362,14 @@ async function refresh() {
     // 제보를 못 불러와도 홈의 나머지 내용은 보여 줍니다.
     const reportList = REPORT_VIEWS.includes(key) ? await loadReportScenarios().catch(() => []) : [];
     const dash = key === 'me' ? await api('GET', '/v1/dashboard/me') : null;
+    // 코디를 못 불러와도 나머지 화면은 보여 줍니다.
+    const pet = ['home', 'pet'].includes(key) ? await api('GET', '/v1/pet').catch(() => null) : null;
     const shownPhrase = phrase && { ...phrase, seconds_left: Math.ceil((phrase.seconds_left || 0) / 60) };
-    const snapshot = key + JSON.stringify([recordings, recs, family, alerts, lockMinutes(lock), lock.locked, shownPhrase, reportList, dash]);
+    const snapshot = key + JSON.stringify([recordings, recs, family, alerts, lockMinutes(lock), lock.locked, shownPhrase, reportList, dash, pet]);
     const host = $('#data');
     if (snapshot === lastData || !host || (route().r || 'home') !== r) return;
     lastData = snapshot;
-    host.innerHTML = draw({ recordings, recs, family, alerts, lock, phrase, reports: reportList, dash });
+    host.innerHTML = draw({ recordings, recs, family, alerts, lock, phrase, reports: reportList, dash, pet });
     icons();
   } catch (e) {
     if ($('#data') && !$('#data').innerHTML) $('#data').innerHTML = emptyCard('서버에 연결할 수 없습니다.');
@@ -1411,7 +1419,8 @@ async function pollAlerts() {
 }
 
 INIT.admin = () => loadAdmin();
-['home', 'detect', 'family', 'lock', 'passphrase', 'report', 'me'].forEach((k) => { INIT[k] = () => { lastData = ''; refresh(); if (k === 'detect') loadSamples(); if ($('#flowStage')) runFlow(); }; });
+INIT.quiz = () => loadQuiz();
+['home', 'pet', 'detect', 'family', 'lock', 'passphrase', 'report', 'me'].forEach((k) => { INIT[k] = () => { lastData = ''; refresh(); if (k === 'detect') loadSamples(); if ($('#flowStage')) runFlow(); }; });
 setInterval(refresh, 5000);
 setInterval(pollAlerts, 5000);
 setInterval(pollLock, 5000);
