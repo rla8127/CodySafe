@@ -33,8 +33,10 @@ if (store.get('token')) native?.setToken(store.get('token'));
 
 /* ---------------- 시안 화면 제거 ---------------- */
 ['image', 'voice', 'call', 'url', 'verify', 'report', 'generate', 'weakness', 'training', 'copilot', 'checkup'].forEach((k) => delete SCREENS[k]);
-Object.assign(TAB_OF, { home: 'home', sim: 'sim', play: 'sim', detect: 'detect', family: 'family', me: '', admin: 'admin', lock: 'home', passphrase: 'family', report: 'report' });
+Object.assign(TAB_OF, { home: 'home', sim: 'sim', play: 'sim', detect: 'detect', family: 'family', me: '', lock: 'home', passphrase: 'family', report: 'report', pet: 'home', quiz: 'home' });
 delete PARENT.family;
+PARENT.pet = 'home';
+PARENT.quiz = 'pet';
 // 체험 대화 중에도 아래 메뉴를 그대로 보여 줍니다.
 FULL.splice(FULL.indexOf('play'), 1);
 PARENT.passphrase = 'family';
@@ -43,7 +45,7 @@ renderTabs = function (on) {
   const tabs = [['home', 'house', '홈'], ['sim', 'gamepad-2', '체험'], ['detect', 'shield-check', '검사'], ['report', 'messages-square', '커뮤니티'], ['family', 'users', '가족']];
   $('#tabbar').innerHTML = `<button class="side-logo" onclick="logoHome()" aria-label="소개 페이지로"><img src="assets/brand/logo-horizontal.png" alt="Cody Safe"></button>` + tabs.map(([k, i, t]) => k === 'detect'
     ? `<button class="tab tab-center ${on === k ? 'on' : ''}" onclick="go('${k}')"><span class="fab">${ic(i)}</span><span>${t}</span></button>`
-    : `<button class="tab ${on === k ? 'on' : ''}" onclick="go('${k}')">${ic(i)}<span>${t}</span></button>`).join('') + `<button class="tab admin-tab ${on === 'admin' ? 'on' : ''}" onclick="go('admin')">${ic('chart-column')}<span>관리자</span></button>`;
+    : `<button class="tab ${on === k ? 'on' : ''}" onclick="go('${k}')">${ic(i)}<span>${t}</span></button>`).join('');
   icons();
 };
 
@@ -260,6 +262,7 @@ function verdictChip(r, label) {
 
 // 파일명의 이름과 전화번호를 화면에 드러내지 않고 시각만 보여 줍니다. 파일명에 시각이 없으면 올린 시각을 씁니다.
 function callTitle(r) {
+  if (r.sample) return esc(r.filename);
   const m = /_\d{2}(\d{2})(\d{2})_(\d{2})(\d{2})\d{2}\./.exec(r.filename);
   if (m) return `${+m[1]}월 ${+m[2]}일 ${m[3]}:${m[4]} 통화`;
   const d = new Date(r.created_at * 1000);
@@ -296,7 +299,7 @@ function recordingCard(r) {
   const label = r.review_label || r.label;
   const top = r.matches[0];
   return `<div class="card mt">
-    ${verdictChip(r, label)}
+    ${r.sample ? '<span class="chip">예시 통화</span> ' : ''}${verdictChip(r, label)}
     <div class="call-title">${callTitle(r)}</div>
     ${confidenceBar(r)}
     ${r.status === 'failed' ? '<div class="call-text">처리에 실패했습니다. 다시 시도해 주세요.</div>' : ''}
@@ -335,7 +338,7 @@ async function act(method, path, body) {
 
 // 사람의 확인을 오탐률과 다음 개선의 근거로 모읍니다.
 function feedbackActions(r) {
-  if (r.status !== 'done') return '';
+  if (r.status !== 'done' || r.sample) return '';
   if (r.review_label) return `<span class="feedback-done">${ic('circle-check')}확인 완료</span><button class="quiet" onclick="reviewSheet('${r.id}')">고치기</button>`;
   const known = ['voice_phishing', 'other_scam', 'normal'].includes(r.label);
   if (!known) return `<button onclick="reviewSheet('${r.id}')">판정 확인</button>`;
@@ -366,12 +369,14 @@ SCREENS.home = gated(() => `<div class="page">
   <div id="data"></div>
 </div>`);
 
-function homeData({ recordings, recs, family, alerts, lock, reports }) {
-  const items = recordings.items;
+function homeData({ recordings, recs, family, alerts, lock, reports, pet }) {
+  // 예시 통화는 홈의 통화 수와 의심 건수에 넣지 않습니다.
+  const items = recordings.items.filter((r) => !r.sample);
   const flagged = items.filter((r) => ['voice_phishing', 'other_scam'].includes(r.review_label || r.label)).length;
   const reviews = items.filter((r) => r.needs_review).length;
   const unread = alerts.items.filter((a) => !a.acked);
   return `${lock.locked ? `<button class="card soft-danger lock-banner" onclick="go('lock')">${ic('lock')}<span><b>금융 앱 잠금 중</b><br>${lockMinutes(lock)}분 남음 · 눌러서 확인</span></button>` : ''}
+    ${petHomeCard(pet)}
     <div class="hero">
       <div class="hero-label">분석한 통화</div>
       <div class="hero-score">${recs.analyzed}<small>건</small></div>
@@ -420,7 +425,7 @@ function flowDemo() {
     <div class="flow-track" style="--count:${FLOW_STEPS.length}"><i id="flowFill"></i>
       ${FLOW_STEPS.map((s, i) => `<button class="flow-node" data-i="${i}" onclick="jumpFlow(${i})" aria-label="${s[1]}">${ic(s[0])}<span>${s[1]}</span></button>`).join('')}
     </div>
-    <p class="flow-admin">${ic('info')}관리자의 이해를 돕기 위한 설명 화면입니다. 안드로이드 앱 사용자에게는 표시되지 않습니다.</p>
+    <p class="flow-admin">${ic('info')}서비스 이해를 돕기 위한 설명 화면입니다. 안드로이드 앱 사용자에게는 표시되지 않습니다.</p>
   </section>`;
 }
 
@@ -470,203 +475,6 @@ function userDashboard({ dash }) {
     <div class="sec-title">다음에 연습할 수법</div>
     ${recommend.length ? `<div class="card trend-list">${recommend.map((w) => `<button class="trend-row top-row" onclick="go('play/${esc(w.scenario)}')"><time>${w.score}점</time><span><strong>${esc(SCENARIOS[w.scenario].title)}</strong><small>${esc(w.tag)} · 다시 풀면 추천이 갱신됩니다</small></span>${ic('chevron-right')}</button>`).join('')}</div>` : emptyCard(t.count ? '틀린 수법이 없습니다. 다른 시나리오도 도전해 보세요.' : '체험을 마치면 약한 수법을 추천해 드립니다.')}`;
 }
-
-/* ---------------- 관리자 대시보드: 개인을 알 수 없는 집계만 ---------------- */
-let adminIncludeDemo = true;
-let opsTimer = null;
-const LABEL_NAME = { voice_phishing: '보이스피싱 의심', other_scam: '다른 사기 의심', normal: '사기 징후 못 찾음', uncertain: '판단 어려움' };
-const EVENT_NAME = { family_alert: '가족 경고 발송', alert_ack: '가족 경고 확인', lock_auto: '자동 잠금', lock_manual: '직접 잠금', unlock_family: '가족 해제', unlock_self: '본인 해제 요청' };
-
-SCREENS.admin = () => `<div class="page admin-page">
-  <div class="lead" style="margin-top:6px">관리자 대시보드</div>
-  <div class="lead-sub" style="margin-top:6px">이름과 통화 내용 없이 집계로 사기 흐름을 봅니다.</div>
-  <div id="adminBody"></div>
-</div>`;
-
-async function adminFetch(path) {
-  const res = await fetch(path);
-  if (!res.ok) throw new Error(res.status);
-  return res;
-}
-
-async function downloadDataset() {
-  try {
-    const url = URL.createObjectURL(await (await adminFetch('/v1/admin/feedback-dataset.jsonl')).blob());
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'feedback-dataset.jsonl';
-    a.click();
-    URL.revokeObjectURL(url);
-  } catch (e) {
-    toast('내려받지 못했습니다', 'circle-alert');
-  }
-}
-
-async function loadAdmin() {
-  const body = $('#adminBody');
-  if (!body) return;
-  try {
-    const [summary, o] = await Promise.all([
-      adminFetch(`/v1/admin/dashboard?include_demo=${adminIncludeDemo}`).then((r) => r.json()),
-      adminFetch(`/v1/admin/ops?hours=${opsHours}&include_demo=${adminIncludeDemo}`).then((r) => r.json()),
-    ]);
-    if (!$('#adminBody')) return;
-    const scrollY = view.scrollTop;
-    $('#adminBody').innerHTML = adminView({ f: summary.feedback, o, include_demo: summary.include_demo });
-    view.scrollTop = scrollY;
-    bindOpsTips();
-    icons();
-    clearTimeout(opsTimer);
-    opsTimer = setTimeout(() => { if (route().r === 'admin' && !document.querySelector('.ops-table[open]')) loadAdmin(); }, 30000);
-  } catch (e) {
-    body.innerHTML = '<div class="card mt"><div class="empty">대시보드를 불러오지 못했습니다.</div></div>';
-  }
-}
-
-/* 관제 화면. 차트 색은 어두운 면에서 검증한 범주 색을 고정 순서로 씁니다. */
-const OPS_RANGES = [[24, '24시간'], [168, '7일'], [720, '30일']];
-const OPS_COLORS = ['#3987e5', '#d95926', '#199e70', '#c98500', '#d55181'];
-const OPS_OTHER = '#8a8a84';
-const WEEKDAYS = ['월', '화', '수', '목', '금', '토', '일'];
-let opsHours = 168;
-const typeName = (t) => (t === 'other' ? '기타' : BY_TYPE_NAME[t] || t);
-const pad2 = (n) => String(n).padStart(2, '0');
-function kstParts(epoch) {
-  const d = new Date((epoch + 9 * 3600) * 1000);
-  return { mo: d.getUTCMonth() + 1, da: d.getUTCDate(), h: d.getUTCHours() };
-}
-const opsTime = (epoch, hours) => {
-  const p = kstParts(epoch);
-  return hours <= 24 ? `${pad2(p.h)}시` : hours <= 168 ? `${p.mo}/${p.da} ${pad2(p.h)}시` : `${p.mo}/${p.da}`;
-};
-const change = (now, before) => (before ? `${now >= before ? '+' : ''}${Math.round((now - before) / before * 100)}%` : '이전 없음');
-const opsTip = (t) => `data-tip="${esc(t)}" tabindex="0"`;
-
-function stackedChart(d) {
-  const keys = Object.keys(d.series);
-  const color = (k, i) => (k === 'other' ? OPS_OTHER : OPS_COLORS[i]);
-  const totals = d.buckets.map((_, i) => keys.reduce((n, k) => n + d.series[k][i], 0));
-  const max = Math.max(1, ...totals);
-  const W = 760, H = 220, L = 30, B = 22, T = 8;
-  const plotH = H - B - T;
-  const bw = (W - L) / d.buckets.length;
-  const bars = d.buckets.map((b, i) => {
-    let y = H - B;
-    const rects = keys.map((k, n) => {
-      const v = d.series[k][i];
-      if (!v) return '';
-      const h = v / max * plotH;
-      y -= h;
-      return `<rect x="${L + i * bw + 1}" y="${y + 1}" width="${Math.max(bw - 2, 1)}" height="${Math.max(h - 2, 1)}" rx="1.5" fill="${color(k, n)}"/>`;
-    }).join('');
-    const tip = `${opsTime(b, d.hours)} · 총 ${totals[i]}건\n` + keys.filter((k) => d.series[k][i]).map((k) => `${typeName(k)} ${d.series[k][i]}건`).join('\n');
-    return `<g class="ops-col" ${opsTip(tip)}><rect x="${L + i * bw}" y="${T}" width="${bw}" height="${plotH}" fill="transparent"/>${rects}</g>`;
-  }).join('');
-  const grid = [0, .5, 1].map((r) => `<line x1="${L}" x2="${W}" y1="${H - B - r * plotH}" y2="${H - B - r * plotH}" class="ops-grid"/><text x="${L - 6}" y="${H - B - r * plotH + 4}" text-anchor="end" class="ops-axis">${Math.round(max * r)}</text>`).join('');
-  const every = Math.max(1, Math.ceil(d.buckets.length / 7));
-  const ticks = d.buckets.map((b, i) => (i % every ? '' : `<text x="${L + i * bw + bw / 2}" y="${H - 6}" text-anchor="middle" class="ops-axis">${opsTime(b, d.hours)}</text>`)).join('');
-  const legend = keys.map((k, n) => `<span><i style="background:${color(k, n)}"></i>${esc(typeName(k))}</span>`).join('');
-  const table = `<details class="ops-table"><summary>표로 보기</summary><table><thead><tr><th>구간</th>${keys.map((k) => `<th>${esc(typeName(k))}</th>`).join('')}</tr></thead><tbody>${d.buckets.map((b, i) => (totals[i] ? `<tr><td>${opsTime(b, d.hours)}</td>${keys.map((k) => `<td>${d.series[k][i]}</td>`).join('')}</tr>` : '')).join('')}</tbody></table></details>`;
-  if (!keys.length) return opsEmpty();
-  return `<div class="ops-legend">${legend}</div><svg viewBox="0 0 ${W} ${H}" role="img" aria-label="시간대별 사기 유형 건수">${grid}${bars}${ticks}</svg>${table}`;
-}
-
-const opsEmpty = () => '<div class="ops-empty">이 기간에 데이터가 없습니다.</div>';
-
-function falseAlarmChart(d) {
-  const pts = d.false_alarm;
-  if (!pts.length) return opsEmpty();
-  const W = 360, H = 170, L = 34, B = 22, T = 10;
-  const t0 = pts[0].at, t1 = Math.max(pts[pts.length - 1].at, t0 + 1);
-  const x = (t) => (pts.length === 1 ? (L + W) / 2 : L + (t - t0) / (t1 - t0) * (W - L - 8));
-  const rate = (p) => p.wrong / p.total * 100;
-  const max = Math.max(20, ...pts.map(rate));
-  const y = (v) => H - B - v / max * (H - B - T);
-  const line = pts.map((p, i) => `${i ? 'L' : 'M'}${x(p.at).toFixed(1)} ${y(rate(p)).toFixed(1)}`).join(' ');
-  const grid = [0, .5, 1].map((r) => `<line x1="${L}" x2="${W}" y1="${y(max * r)}" y2="${y(max * r)}" class="ops-grid"/><text x="${L - 6}" y="${y(max * r) + 4}" text-anchor="end" class="ops-axis">${Math.round(max * r)}%</text>`).join('');
-  const dots = pts.map((p) => `<g ${opsTip(`${opsTime(p.at, d.hours)}\n오탐 ${p.wrong} / 확인 ${p.total}건 (${Math.round(rate(p))}%)`)}><circle cx="${x(p.at)}" cy="${y(rate(p))}" r="11" fill="transparent"/><circle cx="${x(p.at)}" cy="${y(rate(p))}" r="4" fill="#3987e5" stroke="#1a1a19" stroke-width="2"/></g>`).join('');
-  return `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="오탐률 추이">${grid}<path d="${line}" fill="none" stroke="#3987e5" stroke-width="2"/>${dots}<text x="${L}" y="${H - 6}" class="ops-axis">${opsTime(t0, d.hours)}</text><text x="${W}" y="${H - 6}" text-anchor="end" class="ops-axis">${opsTime(t1, d.hours)}</text></svg>`;
-}
-
-function heatmap(d) {
-  const max = Math.max(1, ...d.heatmap.flat());
-  const cell = (v) => `rgba(57, 135, 229, ${v ? (0.18 + 0.82 * v / max).toFixed(2) : 0.04})`;
-  const hours = Array.from({ length: 24 }, (_, h) => `<span>${h % 6 ? '' : h}</span>`).join('');
-  return `<div class="ops-heat"><span></span>${hours}${d.heatmap.map((row, w) => `<b>${WEEKDAYS[w]}</b>${row.map((v, h) => `<i style="background:${cell(v)}" ${opsTip(`${WEEKDAYS[w]}요일 ${pad2(h)}시 · ${v}건`)}></i>`).join('')}`).join('')}</div>`;
-}
-
-function funnel(d) {
-  const max = Math.max(1, ...d.funnel.map((f) => f[1]));
-  return d.funnel.map(([name, n]) => `<div class="ops-bar"><span>${esc(name)}</span><div><i style="width:${n / max * 100}%"></i></div><b>${n}</b></div>`).join('');
-}
-
-function adminView(d) {
-  const { f, o } = d;
-  const T = o.totals;
-  const stat = (label, value, note) => `<div class="ops-stat"><span>${label}</span><b>${value}</b><small>${note}</small></div>`;
-  const pct = (v) => (v == null ? '-' : `${v}%`);
-  const surge = o.surges.length
-    ? o.surges.map((s) => `<div class="ops-surge"><span class="ops-flag">${ic('trending-up')}급증</span><b>${esc(typeName(s.type))}</b><span>최근 ${s.recent}건 · 평소 ${s.baseline}건</span><em>${s.ratio ? `${s.ratio}배` : '신규'}</em></div>`).join('')
-    : '<div class="ops-empty">기준을 넘은 급증이 없습니다.</div>';
-  const callers = o.callers.length
-    ? `<table class="ops-list"><thead><tr><th>번호</th><th>통화</th><th>신고 기기</th><th>주요 유형</th><th>최근</th></tr></thead><tbody>${o.callers.map((c) => `<tr><td class="mono">${esc(c.number)}</td><td>${c.calls}</td><td>${c.devices}</td><td>${esc(typeName(c.type))}</td><td>${opsTime(c.last, 168)}</td></tr>`).join('')}</tbody></table><div class="ops-foot">보이스피싱으로 남은 통화만 집계하고, 번호 가운데를 가립니다. 번호를 알 수 없는 통화 ${o.callers_no_number}건 제외. 판정 기반이라 범죄 번호로 확정된 것은 아닙니다.</div>`
-    : opsEmpty();
-  return `<div class="ops">
-    <div class="ops-bar-top">
-      <div class="ops-range">${OPS_RANGES.map(([h, t]) => `<button class="${opsHours === h ? 'on' : ''}" onclick="opsHours=${h};loadAdmin()">${t}</button>`).join('')}</div>
-      <button class="ops-btn ${d.include_demo ? 'on' : ''}" onclick="adminIncludeDemo=!adminIncludeDemo;loadAdmin()">시연 데이터 ${d.include_demo ? '포함' : '제외'}</button>
-      <span class="ops-live"><i></i>30초마다 갱신</span>
-      <span class="ops-spacer"></span>
-      <button class="ops-btn" onclick="downloadDataset()">${ic('download')}라벨 데이터셋</button>
-    </div>
-    ${d.include_demo ? '<div class="ops-note">시연 데이터가 포함되어 있습니다. 가상의 기록이며 실제 피해 통계가 아닙니다.</div>' : ''}
-    <div class="ops-stats">
-      ${stat('AI 판정', T.calls.toLocaleString(), `이전 기간 대비 ${change(T.calls, T.calls_before)}`)}
-      ${stat('보이스피싱 의심', T.phishing.toLocaleString(), `이전 기간 대비 ${change(T.phishing, T.phishing_before)}`)}
-      ${stat('사기 의심 비중', pct(T.scam_share), '전체 판정 중')}
-      ${stat('오탐률', pct(f.false_alarm_rate), `사람 확인 ${f.false_alarm_n[1]}건 중 ${f.false_alarm_n[0]}건${f.small_sample ? ' · 표본 적음' : ''}`)}
-      ${stat('놓친 비율', pct(f.miss_rate), `신고 ${f.miss_n[1]}건 중 ${f.miss_n[0]}건`)}
-    </div>
-    <div class="ops-grid-layout">
-      <section class="ops-panel wide"><h3>시간대별 사기 유형</h3>${stackedChart(o)}</section>
-      <section class="ops-panel"><h3>급증 경보</h3>${surge}<div class="ops-foot">최근 구간이 평소의 2배 이상이고 3건 이상일 때</div></section>
-      <section class="ops-panel wide"><h3>반복 발신 번호 TOP 10</h3>${callers}</section>
-      <section class="ops-panel"><h3>오탐률 추이</h3>${falseAlarmChart(o)}<div class="ops-foot">사람이 확인한 보이스피싱 판정 기준</div></section>
-      <section class="ops-panel wide"><h3>요일·시간대 분포</h3>${heatmap(o)}<div class="ops-foot">사기 의심 통화를 올린 시각 기준 (한국 시간)</div></section>
-      <section class="ops-panel"><h3>대응 흐름</h3>${funnel(o)}</section>
-    </div>
-    <div class="ops-foot">재학습과 검색 색인 반영은 추후 과제입니다.</div>
-    <div class="ops-tip" id="opsTip" hidden></div>
-  </div>`;
-}
-
-function bindOpsTips() {
-  const root = document.querySelector('.ops');
-  const tip = $('#opsTip');
-  if (!root || !tip) return;
-  const show = (el, x, y) => {
-    tip.textContent = el.dataset.tip;
-    tip.hidden = false;
-    const box = root.getBoundingClientRect();
-    tip.style.left = `${Math.min(x - box.left + 12, box.width - tip.offsetWidth - 8)}px`;
-    tip.style.top = `${y - box.top + 12}px`;
-  };
-  root.addEventListener('mousemove', (e) => {
-    const el = e.target.closest('[data-tip]');
-    if (el) show(el, e.clientX, e.clientY);
-    else tip.hidden = true;
-  });
-  root.addEventListener('mouseleave', () => { tip.hidden = true; });
-  root.addEventListener('focusin', (e) => {
-    const el = e.target.closest('[data-tip]');
-    if (!el) return;
-    const r = el.getBoundingClientRect();
-    show(el, r.left, r.bottom);
-  });
-  root.addEventListener('focusout', () => { tip.hidden = true; });
-}
-
-const BY_TYPE_NAME = { prosecutor_impersonation: '검찰·경찰·금감원 사칭', loan_refinance: '저금리 대환대출 사기', family_impersonation: '가족·지인 사칭', bank_security: '은행·카드사 보안 사칭', government_benefit: '정부 지원금·환급 사칭', investment_rebate: '투자 리딩방·코인 사기', romance_scam: '로맨스 스캠', secondhand_fraud: '중고거래·티켓 사기', job_mule: '고수익 알바·통장 대여', extortion_sextortion: '몸캠·협박형 사기', unknown: '기타', none: '기타' };
 
 /* ---------------- 커뮤니티 제보 ---------------- */
 let reportCategories = [];
@@ -979,7 +787,7 @@ SCREENS.detect = gated(() => `<div class="page">
   <div class="card mt">${folderBlock()}<button class="guide-link" onclick="folderGuide()">${ic('circle-help')}녹음 폴더 설정 가이드${ic('chevron-right')}</button></div>
   <button class="btn grad block mt" onclick="$('#filePick').click()">${ic('upload')}파일 직접 올려 검사</button>
   <div class="sec-title">예시로 체험하기</div>
-  <div class="muted small sample-intro">가상의 통화 대본으로 분석 결과를 미리 봅니다. 기록에 남지 않고 가족 알림과 잠금도 일어나지 않습니다.</div>
+  <div class="muted small sample-intro">가상의 통화 대본으로 분석 결과를 미리 봅니다. ${native ? '기록에 남지 않고' : '아래 분석 결과에 예시로 표시되며,'} 가족 알림과 잠금은 일어나지 않습니다.</div>
   <div id="samples"></div>
   <div class="sec-title">분석 결과</div>
   <div id="data"></div>
@@ -1031,8 +839,9 @@ async function openSample(id) {
     <button class="btn line block mt" onclick="closeSheet()">닫기</button></div>`);
   icons();
   try {
-    const r = await api('POST', `/v1/samples/${id}/analyze`);
+    const r = await api('POST', `/v1/samples/${id}/analyze?record=${native ? 0 : 1}`);
     if ($('#sampleResult')) $('#sampleResult').innerHTML = sampleResultHtml(r);
+    if (!native) { lastData = ''; refresh(); }
   } catch (e) {
     if ($('#sampleResult')) $('#sampleResult').innerHTML = '<div class="sample-wait">분석에 실패했습니다. 잠시 뒤 다시 시도해 주세요.</div>';
   }
@@ -1290,7 +1099,6 @@ SCREENS.me = gated(() => `<div class="page">
     ${[keepAudio ? '음성은 사용자별로 저장되며, 기록을 삭제하면 함께 지워집니다.' : '음성은 분석 후 삭제합니다. 실패한 음성은 재시도나 삭제 전까지 남습니다.', '일상 통화는 글자 기록을 남기지 않습니다.', '분석 내용은 본인만 볼 수 있습니다.', '가족에게는 보이스피싱 의심 여부만 전달됩니다.'].map((t) => `<li>${ic('lock')}<span>${t}</span></li>`).join('')}
   </ul></div>
   ${browserNotifyBlock()}
-  <button class="admin-link" onclick="go('admin')">관리자 대시보드</button>
   <button class="btn line block mt" onclick="signOut()">${demoMembers.length ? '다른 가족으로 보기' : '이 기기 등록 해제'}</button>
 </div>`);
 
@@ -1334,11 +1142,14 @@ function saveTraining() {
   const { r, arg } = route();
   if (r !== 'play' || !signedIn() || !sim) return;
   const ok = sim.answers.filter((a) => a.ok).length;
-  api('POST', '/v1/training', { scenario: arg || 'family', tag: sim.s.tag, score: Math.round(ok / sim.s.steps.length * 100) }).catch(() => {});
+  api('POST', '/v1/training', { scenario: arg || 'family', tag: sim.s.tag, score: Math.round(ok / sim.s.steps.length * 100) })
+    .then((res) => showPetReward(res.pet)).catch(() => {});
 }
 
 /* ---------------- 데이터 갱신 ---------------- */
-const DATA_VIEWS = { home: homeData, detect: detectData, family: familyData, lock: lockData, passphrase: passphraseData, report: reportData, me: userDashboard };
+SCREENS.pet = gated(petPage);
+SCREENS.quiz = gated(quizPage);
+const DATA_VIEWS = { pet: petData, home: homeData, detect: detectData, family: familyData, lock: lockData, passphrase: passphraseData, report: reportData, me: userDashboard };
 const REPORT_VIEWS = ['home', 'report'];
 const PHRASE_VIEWS = ['family', 'passphrase'];
 let lastData = '';
@@ -1356,12 +1167,14 @@ async function refresh() {
     // 제보를 못 불러와도 홈의 나머지 내용은 보여 줍니다.
     const reportList = REPORT_VIEWS.includes(key) ? await loadReportScenarios().catch(() => []) : [];
     const dash = key === 'me' ? await api('GET', '/v1/dashboard/me') : null;
+    // 코디를 못 불러와도 나머지 화면은 보여 줍니다.
+    const pet = ['home', 'pet'].includes(key) ? await api('GET', '/v1/pet').catch(() => null) : null;
     const shownPhrase = phrase && { ...phrase, seconds_left: Math.ceil((phrase.seconds_left || 0) / 60) };
-    const snapshot = key + JSON.stringify([recordings, recs, family, alerts, lockMinutes(lock), lock.locked, shownPhrase, reportList, dash]);
+    const snapshot = key + JSON.stringify([recordings, recs, family, alerts, lockMinutes(lock), lock.locked, shownPhrase, reportList, dash, pet]);
     const host = $('#data');
     if (snapshot === lastData || !host || (route().r || 'home') !== r) return;
     lastData = snapshot;
-    host.innerHTML = draw({ recordings, recs, family, alerts, lock, phrase, reports: reportList, dash });
+    host.innerHTML = draw({ recordings, recs, family, alerts, lock, phrase, reports: reportList, dash, pet });
     icons();
   } catch (e) {
     if ($('#data') && !$('#data').innerHTML) $('#data').innerHTML = emptyCard('서버에 연결할 수 없습니다.');
@@ -1410,8 +1223,8 @@ async function pollAlerts() {
   }
 }
 
-INIT.admin = () => loadAdmin();
-['home', 'detect', 'family', 'lock', 'passphrase', 'report', 'me'].forEach((k) => { INIT[k] = () => { lastData = ''; refresh(); if (k === 'detect') loadSamples(); if ($('#flowStage')) runFlow(); }; });
+INIT.quiz = () => loadQuiz();
+['home', 'pet', 'detect', 'family', 'lock', 'passphrase', 'report', 'me'].forEach((k) => { INIT[k] = () => { lastData = ''; refresh(); if (k === 'detect') loadSamples(); if ($('#flowStage')) runFlow(); }; });
 setInterval(refresh, 5000);
 setInterval(pollAlerts, 5000);
 setInterval(pollLock, 5000);

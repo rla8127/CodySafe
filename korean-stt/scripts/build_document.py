@@ -1,0 +1,213 @@
+from pathlib import Path
+import json,re
+from docx import Document
+from docx.shared import Pt,Cm
+from docx.oxml import OxmlElement
+from docx.oxml.ns import qn
+
+ROOT=Path(__file__).resolve().parents[1]
+B=ROOT/'benchmark'
+OUT=ROOT/'docs'
+summary=json.loads((B/'summary.json').read_text())
+verification=json.loads((B/'verification.json').read_text())
+labels={'komix':'한국어 특화 Whisper Medium INT8','whisper_turbo':'Whisper large-v3-turbo INT8','whisper_large':'Whisper large-v3 INT8','qwen06':'Qwen3-ASR 0.6B BF16','qwen17':'Qwen3-ASR 1.7B 실험용 동적 INT8'}
+real={}
+for name in labels:
+ rows={r['id']:r for r in map(json.loads,(B/'results'/f'{name}.jsonl').read_text().splitlines())}
+ real[name]=rows['user_recording']['inference_seconds']
+lines=['# 한국어 STT 모델 선정 및 비교 평가 기록','',
+'작성일: 2026-11-01 (한국 시간)  |  상태: 평가·결과 검증 완료  |  문서 버전: 1.3','',
+'## 1. 다른 문서에 넣을 수 있는 요약','',
+'GPU가 없는 2 vCPU·RAM 3.7 GiB 서버에서 한국어 음성 인식 모델 다섯 배포 설정을 비교했다. Amazon Polly의 한국어 목소리 두 개로 대본 여덟 개를 합성하고 전화 대역·잡음 조건을 추가하여 총 20개, 182.17초의 평가 음성을 만들었다. 원문 표기 CER는 Whisper large-v3가 3.02%로 가장 낮았으며, 숫자 표기를 통일한 보조 CER는 large-v3와 large-v3-turbo가 1.41%로 같았다. 두 설정의 RTF는 각각 2.077과 1.172였다. 이 소규모 평가에서는 turbo를 정확도와 처리 시간의 균형이 좋은 후속 운영 검증 후보로 판단했다. Qwen3-ASR 0.6B는 RTF 0.729로 짧은 평가 음성의 처리량이 가장 높았다. 합성 음성 예비 평가이므로 실제 한국어 통화 전체의 성능이나 통계적으로 유의한 우열을 확정한 결과는 아니다.','',
+'## 2. 평가 목적과 실행 환경','',
+'- 목적: 기존 한국어 특화 Whisper 모델이 현재 서버에서 적절한 선택인지 확인하고 대체 후보의 정확도·속도·메모리를 비교한다.',
+'- 서버: EC2, CPU 2 vCPU, RAM 3.7 GiB, GPU 없음, swap 4 GiB. CPU 스레드는 두 개로 제한했다.',
+'- 자원 제약으로 모델을 하나씩 로딩했다. 다섯 모델을 동시에 상주시킨 구성은 아니다.',
+'- Whisper: faster-whisper 1.2.1 / CTranslate2 4.8.4, INT8, 한국어 고정, beam_size=5, VAD 사용, 이전 전사 문맥 조건 비활성화.',
+'- Qwen: 공식 qwen-asr 0.0.6 / Transformers 4.57.6 / PyTorch CPU, SDPA, 한국어 고정, batch=1, max_new_tokens=256. 0.6B는 BF16을 사용했다.',
+'- Qwen 1.7B 원본 BF16은 메모리 교체와 디스크 읽기 대기로 사전 구동만 2분 이상 걸려 중단했다. 별도 실험용 설정으로 Linear 344개를 동적 INT8로 변환하고 나머지는 BF16으로 유지했다. 이는 원본 1.7B의 정확도 평가와 구분해야 한다.',
+'- 모델 커밋과 실행 패키지는 benchmark/model_provenance.json, environment.json, requirements.lock.txt에 기록되어 있다.','',
+'## 3. 데이터셋과 측정 방법','',
+'- 생성 서비스: Amazon Polly, 서울 리전(ap-northeast-2), Seoyeon·Jihye neural 목소리.',
+'- 대본 여덟 개: 일상 안내, 고객 상담, 보이스피싱 예방, 이름·주소, 금융·수량, 의료 용어, 기술 용어, 구어체.',
+'- 깨끗한 음성 16개: 대본 여덟 개 × 목소리 두 개.',
+'- 변형 음성 네 개: 보이스피싱 예방·이름/주소 문장의 두 목소리에 300–3400 Hz 대역 제한, 8 kHz 왕복 변환, 백색 잡음 10 dB SNR을 적용했다. 실제 통신망 코덱을 재현한 것은 아니다.',
+'- 전체 20개, 182.17초. WAV 16 kHz, mono, 16-bit PCM. 난수 seed=20261101. 파일별 정답과 SHA256은 manifest.json에 있다.',
+'- 대본과 변형 조건은 추론 전에 고정했다. 정답 대본이나 용어 힌트를 모델에 주지 않았으며, 평가 음성을 학습·튜닝에 사용하지 않았다.',
+'- CER: NFC·소문자 처리 후 공백과 문장부호를 제거하고, 문자 단위 편집 거리를 정답 문자 수로 나눈다. 전체 점수는 문자 수로 가중 합산하며 숫자 표기는 유지한다.',
+'- 숫자 정규화 CER: 숫자 쉼표를 정리하고 정수를 한글 수사로 변환하며 3시/세 시 표기를 통일한 보조 지표다. 모든 발음·의미 동치를 보장하지는 않는다.',
+'- RTF: 추론 시간 합 / 음성 길이 합. 1 미만이면 해당 파일 처리량이 음성 길이보다 빠르다. 스트리밍 응답 지연이나 실시간 대화 가능 여부를 측정한 값은 아니다.',
+'- 모델 초기 로딩과 warmup은 추론 시간에서 제외했다. 서로 다른 런타임·정밀도·탐색 방법을 사용했으므로 모델 구조만의 비교가 아닌 실제 배포 설정 비교다.',
+'- 각 파일은 한 번 측정했다. 반복 측정, 동시 요청 부하 평가, 통계적 유의성 검증은 하지 않았다.','',
+'## 4. 정량 결과','',
+'모든 설정에서 동일한 20개 평가 음성의 전사를 완료했다. CER와 RTF는 낮을수록 좋다.','',
+'| 배포 설정 | CER | 숫자 정규화 CER | RTF | 최대 RSS |',
+'|---|---:|---:|---:|---:|']
+for s in summary:
+ lines.append(f"| {labels[s['model']]} | {s['cer']:.2%} | {s['numeric_cer']:.2%} | {s['rtf']:.3f} | {s['peak_rss_mib']:.0f} MiB |")
+lines += ['',
+'최대 RSS는 프로세스에서 관측한 최대값으로, 정상 추론 시의 상시 메모리나 swap·파일 캐시 전체 사용량을 뜻하지 않는다. 초기 로딩 시간과 조건별 오류율, WER 등은 원시 결과와 상세 보고서에서 확인할 수 있다.','',
+'## 5. 실제 MP3 비교와 오류 사례','',
+'사용자가 제공한 박철민검사.mp3(44.43초)도 다섯 설정으로 전사했다. 정답 대본이 없어 CER/WER와 정확도 순위에서는 제외했다. 아래 수치는 해당 파일 한 건의 처리 시간이다.','',
+'| 배포 설정 | MP3 처리 시간 |', '|---|---:|']
+for key in ['whisper_turbo','komix','qwen06','qwen17','whisper_large']:
+ lines.append(f'| {labels[key]} | {real[key]:.2f}초 |')
+lines += ['',
+'- 현재 한국어 특화 Medium: 실제 녹음에서 “법원 안전수사팀 맞으시죠? 단점 계좌”처럼 문맥이 어색한 출력이 있었다. 정답 대본 없이 이 부분의 정확한 발화를 확정하지는 않았다.',
+'- turbo: 같은 녹음의 해당 부분을 “법원 안정계좌”로 출력했다. 정확한 음성을 확인할 수 있도록 상세 HTML에 원본 음성과 모든 모델의 전사문을 포함했다.',
+'- Qwen 0.6B: 짧은 합성 음성의 평균 처리량은 가장 높았지만, 이 44초 MP3에서는 turbo보다 느렸다. 짧은 문장 평가 결과를 긴 파일에 그대로 적용할 수 없다.',
+'- Qwen 1.7B 실험용 INT8: Seoyeon 기술 문장에서 두 번째 문장을 누락했고, 실제 MP3에서는 같은 문장을 반복했다. 이 실험용 설정은 현재 서버의 서비스용으로 권장하지 않는다. 이는 원본 1.7B 모델 자체의 일반적인 성능을 뜻하지 않는다.',
+'- 이름·주소는 다른 모델에서도 오류가 발생했다. 샘플별 정답·전사문·오류율은 per_sample.csv와 REPORT.html에 남겼다.','',
+'## 6. 판단과 현재 운영 상태','',
+'- 균형을 우선한 후속 운영 검증 후보: Whisper large-v3-turbo. 숫자 정규화 CER가 large-v3와 같았고, 합성 음성 전체 및 제공 MP3 모두 처리 시간이 짧았다. 작은 정확도 차이에 대한 유의성은 확인하지 않았다.',
+'- 짧은 파일 처리량을 우선한 비교 후보: Qwen3-ASR 0.6B. 잡음 조건과 실제 업무 음성의 정확도·지연을 추가 검증할 필요가 있다.',
+'- 자원 사용을 고려한 기존 설정: 한국어 특화 Medium. 이번 측정의 최대 RSS가 다섯 설정 중 가장 낮았다.',
+'- 제외한 설정: Qwen 1.7B 실험용 동적 INT8은 누락·반복 문제로 서비스 후보에서 제외한다. 더 충분한 메모리의 환경에서 원본 모델을 별도 평가할 수 있다.',
+'- 비교 평가 종료 당시에는 기본 API를 한국어 특화 Medium으로 유지했다. 이후 사용자가 turbo INT8 기동을 요청하여 전환했다. 최신 운영 상태와 전환 검증은 10항을 참조한다.',
+'- 현재 API: http://3.38.144.231:8000/v1/audio/transcriptions. 사용자 요청으로 공인 IPv4 접속을 활성화했다(11항 참조). 인증 키 자체는 이 문서에 포함하지 않는다.',
+'- 추가 설치 모델은 benchmark/transcribe.py로 선택 실행한다. 실행 중 메모리를 확보하기 위해 기본 API를 일시 중지하고 완료 후 다시 시작한다.',
+'- Amazon Transcribe는 당시 계정의 SubscriptionRequiredException(HTTP 403) 때문에 평가에 포함하지 못했다. Polly 음성 생성은 정상 수행했다.','',
+'## 7. 한계와 다음 평가 항목','',
+'- 이 문서의 결론은 합성 음성 20개를 이용한 예비 평가에 한정한다. 대본은 여덟 개이며 같은 대본의 목소리·변형은 독립적인 새 문장이 아니다.',
+'- 합성 음성은 실제 통화의 사투리, 억양, 중첩 발화, 통신망 압축, 다양한 배경음을 충분히 반영하지 않는다.',
+'- 원문 표기 CER와 숫자 정규화 CER의 순위가 다를 수 있다. 서비스가 요구하는 출력 표기를 먼저 정하고 지표를 해석해야 한다.',
+'- 다음 비교에는 사람이 검수한 실제 통화 정답 대본, 더 많은 화자·기기·길이·잡음 조건, 긴 파일, 반복 측정과 동시 요청 부하를 포함한다.',
+'- 최종 운영 모델을 변경할 때는 대상 업무의 오류 허용 범위와 지연·메모리 조건을 함께 확인하고 별도 변경 기록을 남긴다.','',
+'## 8. 증빙과 재현 파일','',
+'- 음성 비교 부록: /home/ubuntu/korean-stt/benchmark/REPORT.html. 텍스트 생성 원본은 benchmark/internal/REPORT.md이며 주 문서와 구분해 보관한다.',
+'- 데이터·결과·코드 묶음: /home/ubuntu/korean-stt/benchmark/korean-stt-evaluation.zip',
+'- 정답·음성 파일 해시: benchmark/manifest.json',
+'- 샘플별 수치와 전사문: benchmark/per_sample.csv, results/*.jsonl',
+'- 집계 수치: benchmark/summary.json',
+'- 모델 원본 커밋: benchmark/model_provenance.json',
+'- 실행 환경: benchmark/environment.json, requirements.lock.txt',
+'- 검증 결과: benchmark/verification.json. 음성 해시 20/20, 동일 평가 샘플 20개 × 다섯 설정, 실제 녹음 다섯 설정의 처리 완료 및 API 회귀 검증을 확인했다. 처리 완료는 전사 내용의 정확성 보장을 뜻하지 않는다.',
+'- 재현 순서와 모델별 실행 방법: /home/ubuntu/korean-stt/benchmark/README.md','',
+'## 9. 추가 실험 기록 양식','',
+'후속 실험도 다음 항목을 채워 이 문서와 동일한 기준으로 남긴다. 아래는 미실행 항목을 위한 빈 양식이며 확정된 계획이나 결과가 아니다.','',
+'| 항목 | 추가 기록 |', '|---|---|',
+'| 평가 날짜·버전 |  |', '| 목적·적용 업무 |  |', '| 서버·메모리·GPU·스레드 |  |',
+'| 모델·원본 커밋·양자화·실행기 |  |', '| 데이터 출처·화자·개수·길이·정답 검수 |  |',
+'| 정규화·CER/WER·지연·RTF·메모리 |  |', '| 누락·반복·고유명사 등 오류 사례 |  |',
+'| 결론·채택/보류 이유・운영 변경 여부 |  |', '| 원시 결과·코드·검증 파일 위치 |  |', '']
+deployment_path=ROOT/'deployment/turbo-verification.json'
+if deployment_path.exists():
+    deployment=json.loads(deployment_path.read_text())
+    lines += ['## 10. 운영 모델 전환 기록 (2026-11-01)','',
+        '- 변경 근거: 사용자가 평가 결과를 확인한 뒤 Whisper large-v3-turbo INT8 기동을 요청했다.',
+        '- 이전 기본 모델: seastar105/whisper-medium-komixv2.',
+        '- 현재 기본 모델: openai/whisper-large-v3-turbo. 가중치는 dropbox-dash/faster-whisper-large-v3-turbo의 CTranslate2 변환본이며 CPU에서 compute_type=int8로 로딩한다.',
+        '- 서비스: korean-stt.service. 재기동 후 active 상태와 부팅 시 자동 시작 설정을 확인했다. 당시 기존 인증 토큰과 localhost:8000 주소를 유지했다. 이후 공인 접속 변경은 11항에 기록한다.',
+        '- /health 및 전사 응답의 model 필드가 실제 기본 모델을 반환하도록 수정했다. 이전 한국어 특화 모델 ID를 명시한 요청은 거부해 잘못된 모델로 처리하지 않도록 했다.',
+        '- 요청 모델명: korean-stt, whisper-1, whisper-large-v3-turbo, openai/whisper-large-v3-turbo.',
+        f"- 실파일 검증: 박철민검사.mp3 {deployment['user_audio_seconds']:.2f}초를 API로 {deployment['user_audio_processing_seconds']:.2f}초에 전사했다(RTF {deployment['user_audio_rtf']:.3f}). 이는 운영 전환 후 재측정값이며 위 비교 평가의 수치를 대체하지 않는다.",
+        '- 검증 통과: 모델 정보 일치, 인증, 이전 모델 ID 거부, 빈/손상 파일, 언어 검증, 무음, FLEURS MP3, 실제 MP3, 처리 중 상태 확인 응답, 동시 전사 요청 429.',
+        '- 전환 전 app.py와 .env 백업: /home/ubuntu/korean-stt/backups/pre-turbo/. 인증 키 값은 문서에 기록하지 않는다.',
+        '- 전환 증빙: /home/ubuntu/korean-stt/deployment/turbo-verification.json.',
+        '- 실제 전사 결과: /home/ubuntu/korean-stt/박철민검사.whisper-turbo-api.json 및 .txt.','']
+public_path=ROOT/'deployment/public-access.json'
+if public_path.exists():
+    public=json.loads(public_path.read_text())
+    lines += ['## 11. 공인 IP 접속 전환 기록 (2026-11-01)','',
+        '- 변경 근거: 사용자가 localhost 대신 서버 공인 IP로 접속할 수 있도록 요청했다.',
+        '- 바인딩: systemd 서비스의 uvicorn --host를 0.0.0.0으로 변경하고 포트 8000으로 재기동했다.',
+        f"- 공인 IPv4: {public['public_ip']}. 인스턴스: {public['instance_id']} (서울 리전).",
+        f"- 전사 API: {public['api_url']}", f"- 상태 확인: {public['health_url']}",
+        f"- 추가 보안 그룹: {public['security_group_id']}. 해당 서버의 기본 네트워크 인터페이스에 기존 그룹을 유지한 채 추가했다. TCP 8000을 0.0.0.0/0에 허용하며 기존 SSH 보안 그룹은 유지했다.",
+        '- 기존 Bearer 인증을 유지한다. 공인 IP 경유 검증에서 인증 없는 전사는 401, 인증한 MP3 전사는 200을 반환했다.',
+        '- 검증 요청은 해당 EC2에서 공인 IPv4 주소를 대상으로 수행했다. 0.0.0.0:8000 리스너와 인스턴스에 연결된 보안 그룹 설정을 함께 확인했다.',
+        '- systemd 재기동과 부팅 시 자동 시작을 유지한다. 전환 전 서비스 설정은 backups/pre-public-bind/korean-stt.service에 보관했다.',
+        '- 접속 설정과 검증 증빙: /home/ubuntu/korean-stt/deployment/public-access.json.','']
+evidence_path=ROOT/'deployment/local-inference-evidence.json'
+if evidence_path.exists():
+    evidence=json.loads(evidence_path.read_text())
+    isolated=evidence['offline_test']
+    weights=next(x for x in evidence['model_artifacts'] if x['path'].endswith('/model.bin'))
+    lines += ['## 12. 자체 호스팅·로컬 추론 채택 근거 및 증빙','',
+        '다른 문서에 인용할 수 있는 설명', '',
+        '본 시스템은 OpenAI의 공개 음성 인식 모델 Whisper large-v3-turbo를 자체 EC2 서버에 배포하고, faster-whisper 기반 CPU INT8 추론으로 실행하였다. 음성 전사는 자체 서버에서 수행하며 OpenAI·Amazon Transcribe 등 외부 상용 STT API 호출을 사용하지 않도록 구현하였다. 다른 서비스와의 연동에는 자체 구축한 REST API를 사용하였다. 여기서 로컬 모델은 사용자 PC에 설치한 모델이 아니라 자체 EC2 내부에서 직접 실행하는 모델을 뜻한다.', '',
+        '이 방식을 채택한 이유', '',
+        '- 음성 처리 위치와 접근 권한을 직접 관리하고, 외부 STT 업체로 전사 요청을 전달하는 단계를 없애기 위해서다.',
+        '- 모델 버전, 한국어 지정, INT8 정밀도, VAD와 탐색 설정을 직접 고정하고 재현 가능한 비교를 수행하기 위해서다.',
+        '- 외부 STT 서비스의 사용 가능 여부·요청 제한·호출량 기반 과금에 대한 의존도를 줄이고 서버 자원과 운영 비용을 직접 관리하기 위해서다. EC2 비용과 운영 부담은 별도이며, 외부 API보다 항상 저렴하거나 정확하다는 주장은 하지 않는다.', '',
+        '현재 구현의 근거', '',
+        '- 로딩 코드: app.py의 WhisperModel(MODEL_PATH, device=cpu, compute_type=int8, local_files_only=True). 음성 해독 후 app.state.model.transcribe를 직접 호출해 추론한다.',
+        '- 로컬 가중치: /home/ubuntu/korean-stt/benchmark/models/whisper_turbo/model.bin. 모델 원본 커밋은 benchmark/model_provenance.json에 있다.',
+        f"- model.bin 크기: {weights['bytes']:,} bytes. SHA256: {weights['sha256']}.",
+        f"- 실행 코드 app.py SHA256: {evidence['model_loader']['source_sha256']}.",
+        '- 실행 설정: STT_MODEL_PATH는 서버 내 모델 디렉터리를 가리키고 HF_HUB_OFFLINE=1로 설정되어 있다. 서비스 프로세스의 허용 목록 환경변수와 systemd 설정을 증빙 JSON에 기록했다.',
+        '- 자체 REST API의 STT_API_KEY는 자체 인증 토큰이다. OpenAI API 키가 아니며, openai/whisper-large-v3-turbo라는 응답 모델명 역시 원본 모델 식별자다.',
+        '- API 동작과 실제 MP3 결과: deployment/turbo-verification.json, deployment/public-access.json 및 박철민검사.whisper-turbo-api.json.', '',
+        '네트워크 격리 재현 검증', '',
+        '- 운영 API와 다른 네트워크 네임스페이스에서 같은 가중치를 직접 실행했다. 해당 프로세스에는 lo만 존재했고 loopback도 비활성 상태여서 사용 가능한 네트워크 인터페이스가 없었다.',
+        f"- 결과: {isolated['audio_seconds']:.2f}초 한국어 음성의 전사 성공. 모델 로딩을 포함한 별도 실행 시간은 {isolated['elapsed_including_load_seconds']:.3f}초이며 다른 평가의 추론 시간과 비교하지 않는다.",
+        f"- 실제 출력: {isolated['text']}",
+        '- 재현 명령: sudo unshare --net -- /home/ubuntu/korean-stt/.venv/bin/python -B /home/ubuntu/korean-stt/scripts/verify_local_inference.py',
+        '- 원시 검증 기록: deployment/offline-inference-test.json. 코드·가중치 해시와 통합 증빙: deployment/local-inference-evidence.json.',
+        '- 이 결과는 동일 가중치가 외부 API 통신 없이 전사할 수 있다는 근거다. 운영 API의 모든 통신을 감사한 패킷 기록과는 구분한다. HF_HUB_OFFLINE와 local_files_only 자체가 프로세스 전체의 통신을 차단하는 것은 아니다.', '',
+        'Amazon Polly 사용과의 구분', '',
+        'Polly는 평가용 음성·정답 대본을 만들기 위한 외부 음성 합성(TTS) 단계에서 사용했다. 평가 음성을 전사하는 STT와 현재 운영 전사는 서버 내 모델이 수행한다. 따라서 전체 실험이 완전한 오프라인 작업이었다고 표현하지 않고, 전사 추론을 자체 호스팅했다고 표현한다.', '',
+        '문서 관리', '',
+        '- 최신 주 문서는 docs의 Word·Markdown 한 종으로 통합했다. REPORT.html은 음성 비교용 부록, internal/REPORT.md는 그 생성 원본이다.',
+        '- 구버전 문서, 임시 실행 로그·PID 대기 스크립트와 미사용 C 실행기는 제거했다. 평가 원본, 재현 코드, 모델 가중치, 운영 설정과 복구 백업은 유지했다.',
+        '- 정리 내역: deployment/cleanup-record.json. 문서 생성 원본: scripts/build_document.py.','']
+md='\n'.join(lines)
+base=OUT/'한국어_STT_모델_비교_평가_2026-11-01'
+base.with_suffix('.md').write_text(md)
+
+doc=Document()
+sec=doc.sections[0];sec.top_margin=Cm(2);sec.bottom_margin=Cm(2);sec.left_margin=Cm(1.8);sec.right_margin=Cm(1.8)
+normal=doc.styles['Normal'];normal.font.name='맑은 고딕';normal.font.size=Pt(10)
+normal.element.rPr.rFonts.set(qn('w:eastAsia'),'맑은 고딕')
+normal.paragraph_format.space_after=Pt(5)
+for style in ['Title','Heading 1','Heading 2']:
+ doc.styles[style].font.name='맑은 고딕';doc.styles[style].element.rPr.rFonts.set(qn('w:eastAsia'),'맑은 고딕')
+for_table=[]
+def flush():
+ if not for_table:return
+ rows=[[c.strip() for c in line.strip('|').split('|')] for line in for_table if not re.fullmatch(r'[|\s:\-]+',line)]
+ table=doc.add_table(rows=0,cols=len(rows[0]));table.style='Light Shading Accent 1'
+ for i,row in enumerate(rows):
+  cells=table.add_row().cells
+  for cell,value in zip(cells,row):
+   cell.text=value
+   for paragraph in cell.paragraphs:
+    for run in paragraph.runs:run.font.size=Pt(9)
+  if i==0:
+   repeat=OxmlElement('w:tblHeader');repeat.set(qn('w:val'),'true');table.rows[0]._tr.get_or_add_trPr().append(repeat)
+  keep=OxmlElement('w:cantSplit');table.rows[-1]._tr.get_or_add_trPr().append(keep)
+ for_table.clear()
+for line in lines:
+ if line.startswith('|'):
+  for_table.append(line);continue
+ flush()
+ if not line:continue
+ if line.startswith('# '):doc.add_heading(line[2:],0)
+ elif line.startswith('## '):doc.add_heading(line[3:],1)
+ elif line.startswith('- '):doc.add_paragraph(line[2:],style='List Bullet')
+ else:doc.add_paragraph(line)
+flush()
+footer=sec.footer.paragraphs[0];footer.alignment=2
+footer.add_run('한국어 STT 평가 기록 v1.3  |  ')
+fld=OxmlElement('w:fldSimple');fld.set(qn('w:instr'),'PAGE');footer._p.append(fld)
+doc.core_properties.title='한국어 STT 모델 선정 및 비교 평가 기록'
+doc.core_properties.subject='Polly 합성 음성과 실제 MP3를 이용한 다섯 배포 설정 비교'
+doc.save(base.with_suffix('.docx'))
+# Confirm a readable Word package and preserve measured values in the narrative.
+check=Document(base.with_suffix('.docx'))
+assert len(check.tables)==3
+assert len(summary)==5 and all(x['samples']==20 for x in summary)
+assert verification['api_regression']=='passed'
+print(base.with_suffix('.docx'))
+print(base.with_suffix('.md'))
+print('Document validated:',len(check.paragraphs),'paragraphs,',len(check.tables),'tables')
+
+# Regenerate the submission package after updating the primary document.
+import subprocess,sys
+subprocess.run([sys.executable,str(B/"score.py")],check=True,stdout=subprocess.DEVNULL)
+subprocess.run([sys.executable,str(B/"render_report.py")],check=True,stdout=subprocess.DEVNULL)
+import zipfile
+with zipfile.ZipFile(B/"korean-stt-evaluation.zip") as package:
+    assert package.testzip() is None
+    assert len(package.namelist())==len(set(package.namelist()))
+print("Submission ZIP synchronized")

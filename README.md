@@ -8,7 +8,7 @@
 
 - **대상:** 보이스피싱에 노출된 사용자와 그 가족
 - **범위:** 일반 앱은 통화 음성을 실시간으로 받을 수 없어 통화 후 분석합니다. 이유는 [기획서](docs/family-guard-plan.md#2-왜-실시간-통화-분석을-하지-않는가)에 있습니다.
-- **상태:** 동작하는 프로토타입입니다. [구현 상태](#구현-상태)를 함께 봐 주세요.
+- **상태:** 실제 안드로이드 폰에서 녹음 분석부터 금융 앱 차단까지 동작하는 프로토타입입니다. 탐지율은 아직 측정하지 않았습니다. [구현 상태](#구현-상태)를 함께 봐 주세요.
 
 ## 동작 흐름
 
@@ -32,10 +32,11 @@ flowchart LR
 | 가족 알림 | 초대 코드로 연결하며, 가족에게는 의심 여부와 잠금 상태만 전달합니다. |
 | 금융 앱 잠금 | 강한 의심 시 은행, 카드, 간편결제, 증권, 원격제어 앱 47개를 막고 경고합니다. |
 | 가족 암구호 | 연결된 가족이 매일 바뀌는 단어로 본인을 확인합니다. |
-| 사기 체험 | 12개 수법을 5턴 대화로 연습합니다. |
+| 사기 체험 | 13개 시나리오를 대화형으로 연습합니다. |
 | 커뮤니티 | 수법을 제보하고 추천합니다. 상위 3개는 AI 체험 시나리오로 만들 수 있습니다. |
 | 피드백 | 사용자가 판정을 확인하면 AI 판정과 사람 판정을 데이터셋에 쌓습니다. |
-| 대시보드 | 사용자는 자기 체험 점수와 약한 수법을, 관리자는 개인을 알 수 없는 집계와 오탐률을 봅니다. |
+| 대시보드 | 사용자가 자기 체험 점수와 약한 수법을 봅니다. |
+| 코디와 가족 퀴즈 | 퀴즈 카드 15장과 가족 마스코트로 예방 습관을 만듭니다. 점수는 예방 행동에만 줍니다. |
 
 ## 구현 상태
 
@@ -44,11 +45,13 @@ flowchart LR
 | 녹음 업로드, STT, LLM 판정 | 구현, 실제 음성 파일로 확인 |
 | 근거 대조, 가족 알림, 암구호, 커뮤니티 | 구현, 자동 테스트와 브라우저 시연으로 확인 |
 | 사용자별 S3 저장 | 구현, 실제 버킷에 시험 파일로 확인 |
-| 15초 폴더 감시, 금융 앱 차단 (Android) | 구현, 실기기 동작 미확인 |
-| 사례 검색 (RAG) | 외부 검색 서버를 `GUARD_RAG_URL`로 연결하면 판정 전에 참고 자료로 넣음. 내장 검색은 판정 뒤 유형 표시에 쓰며 벡터는 해시 임베딩. 효과 미측정 |
-| 피드백, 사용자·관리자 대시보드 | 구현, 자동 테스트와 브라우저로 확인 |
+| 폴더 연결, 분석 후 경고, 금융 앱 차단 (Android) | 구현, 실제 폰 1대에서 녹화로 확인 ([영상](server/web/media/demo.mp4)) |
+| 15초 감지 주기, 앱이 꺼진 뒤 주기 실행 (Android) | 구현, 주기와 지연은 미측정 |
+| 사례 검색 (RAG) | 별도 Elasticsearch 검색 서버를 `GUARD_RAG_URL`로 연결하면 판정 전에 참고 자료로 넣음. 코드와 실행 방법은 [infra/es-server](infra/es-server/codysafe-rag/README.md)에 있음. 원본 데이터는 올리지 않아 재현에 데이터 폴더가 필요. 서버가 없어도 LLM만으로 동작. 내장 검색은 판정 뒤 유형 표시에 쓰며 벡터는 해시 임베딩. 효과 미측정 |
+| 피드백, 사용자 대시보드 | 구현, 자동 테스트와 브라우저로 확인 |
 | 재학습, 검색 색인 갱신 | 추후 과제 |
-| L4 GPU 자체 STT | 미구현 |
+| 자체 STT (CPU, `whisper-large-v3-turbo` INT8) + OpenAI 대체 경로 | 구현. 실제 MP3 1건으로 실서버 전사부터 판정까지 확인. 대체 경로도 확인. 성능은 표본이 적어 근거로 쓰지 않음 |
+| GPU 서빙 | 미구현 |
 | 탐지율, 오탐률 | 미측정. 예시 대본 6건은 동작 확인용이며 성능 근거가 아님 |
 
 ## 실행
@@ -57,8 +60,10 @@ flowchart LR
 git clone https://github.com/rla8127/CodySafe.git
 cd CodySafe/server
 python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
-.venv/bin/python -m pytest -q
+.venv/bin/python -m pytest -q   # 70개, 외부 키 불필요
 ```
+
+Python 3.12에서 확인했습니다.
 
 키 없이 규칙 판정으로 실행합니다. `.txt` 파일을 녹취로 간주하는 테스트 모드입니다.
 
@@ -69,11 +74,19 @@ python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
 
 실제 분석에는 `server/.env`가 필요합니다. 이 파일은 커밋되지 않습니다.
 
+```bash
+cp .env.example .env
 ```
-ANTHROPIC_API_KEY=
-OPENAI_API_KEY=
+
+`.env`에서 다음 값을 채웁니다.
+
+```
+ANTHROPIC_API_KEY=<키>
+OPENAI_API_KEY=<키>
 GUARD_LLM=anthropic
-GUARD_STT=openai
+GUARD_STT=server
+STT_BASE_URL=<자체 STT 서버>
+STT_API_KEY=<키>
 ```
 
 S3 설정과 전체 옵션, APK 빌드는 [실행 문서](docs/family-guard.md)에 있습니다.
@@ -88,6 +101,8 @@ server/guard/    API, 판정 파이프라인, RAG, 제보, 암구호
 server/web/      웹 화면
 server/tests/    자동 테스트
 android/         WebView 앱, 폴더 감시, 금융 앱 차단
+korean-stt/      자체 STT 서버, 모델 비교 평가 코드와 보고서
+infra/es-server/ 사례 검색 서버 (Terraform, Elasticsearch, 검색 API, 색인 스크립트)
 index.html, css/, js/, assets/   공용 화면 자원과 초기 웹 MVP
 docs/family-guard-plan.md        기획서
 docs/project-plan.md             초기 QR 판독 기획 (이번 제출 범위 아님)
@@ -96,24 +111,35 @@ docs/project-plan.md             초기 QR 판독 기획 (이번 제출 범위 �
 ## 데이터와 개인정보
 
 - 통화 상대의 음성도 전송되므로 동의한 통화나 테스트 파일로만 사용합니다.
-- 음성은 STT를 위해 OpenAI로, 글자 기록은 판정을 위해 Anthropic으로 전송됩니다.
+- 음성은 자체 STT 서버에서 먼저 처리해 외부 전송과 외부 의존을 줄입니다. GPU 서버 사용 제약으로 CPU에서 서빙하며, 부하나 장애 시에는 OpenAI로 전송됩니다. 글자 기록은 판정을 위해 Anthropic으로 전송됩니다.
 - 시연 버킷은 미국 리전에 있습니다. 실제 서비스에는 국내 리전이나 국외 이전 고지, 서버 HTTPS가 필요합니다.
 - 분석 내용은 본인만 조회합니다. 일상 통화의 글자 기록은 저장하지 않습니다.
 
 ## 팀
 
-박병국, 김동현, 정호연, 유상우, 전선형
+박병국, 김동현, 김호연, 유상우, 전선형
 
 ## 외부 자원
 
 | 이름 | 용도 |
 |---|---|
 | Anthropic Claude (`claude-opus-5-5`) | 사기 판정, 재순위, 시나리오 생성 |
-| OpenAI `whisper-1` | 음성 변환 |
+| faster-whisper, CTranslate2, Whisper large-v3-turbo | 자체 STT 서버 ([비교 보고서](korean-stt/docs/한국어_STT_모델_비교_평가_2026-11-01.md)) |
+| Whisper large-v3, whisper-medium-komixv2, Qwen3-ASR 0.6B·1.7B | STT 비교 평가, 미채택 |
+| OpenAI `whisper-1` | 음성 변환 대체 경로 |
+| Amazon Polly | STT 평가용 한국어 음성 데이터셋 생성 |
+| ElevenLabs | 자연스러운 음성 생성 |
 | Amazon S3 | 음성 저장 |
+| [Langfuse Cloud](https://us.cloud.langfuse.com/project/cmvwspomu005fad0e5vr8sgrq/traces) | 처리 시간, 토큰, 비용 관측. 통화 내용은 보내지 않음. 프로젝트 권한이 있어야 열림 |
+| OpenAI `gpt-image-2` | 체험의 가상 인물 사진 3장 생성 |
+| Elasticsearch 8.17.0, analysis-nori | 사기 사례 검색 서버 (선택) |
+| BAAI/bge-m3, sentence-transformers, PyTorch | 검색 임베딩 |
+| Anthropic `claude-haiku-5-5` | 검색 문서 분류와 구조화 |
+| 금융당국 보도자료, KISA 118 상담 기반 합성 데이터, 금감원 공개 녹음 전사(KorCCVi, 내부 학습용으로 검색 결과에서 제외) | 검색 문서 원천 |
+| Terraform, Docker | 검색 서버 구성 |
 | FastAPI, SQLite | 서버 |
 | AndroidX WorkManager, DocumentFile | 앱 |
-| SUIT 2.0.5, Lucide 0.460.0 | 폰트, 아이콘 |
+| 네이버 나눔스퀘어 라운드, SUIT 2.0.5, Lucide 0.460.0 | 폰트, 아이콘 |
 
 **사전 보유 코드:** 웹 화면 코드(`index.html`, `css/`, `js/`, `assets/`)는 주제 공개(2026-10-30 11:00) 전인 2026-10-30 01시경 처음 작성됐습니다. 대회 규정에 따라 발표자료의 외부 자원 활용 내역에도 같은 내용을 적습니다.
 

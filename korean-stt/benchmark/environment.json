@@ -1,0 +1,18 @@
+{
+  "python": "3.12.16",
+  "platform": "Linux-7.0.0-1014-aws-x86_64-with-glibc2.43",
+  "threads": 2,
+  "gpu": false,
+  "ram_gib": 3.7,
+  "swap_gib": 4,
+  "qwen_runtime": "official qwen-asr 0.0.6",
+  "whisper_runtime": "faster-whisper 1.2.1 / CTranslate2 4.8.4",
+  "sample_order": "manifest.json order",
+  "repetitions": 1,
+  "qwen_decoding": "greedy, max_new_tokens 256",
+  "whisper_decoding": "beam_size 5, VAD enabled",
+  "model_load_excluded": true,
+  "qwen17_quantization": "All nn.Linear converted to PyTorch dynamic INT8 via quant_cpu.py; remaining weights and activations BF16",
+  "metrics_checks": "edit distance, NFC/spacing, integer verbalization, 3시/세 시 equivalence passed",
+  "quant_adapter_check": "random BF16 Linear relative MSE 0.00023580389097332954; shape/dtype/finite checks passed"
+}

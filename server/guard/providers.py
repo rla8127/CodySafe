@@ -1,9 +1,12 @@
 """음성 저장소와 STT. 기기에 AWS 자격 증명을 두지 않도록 S3 업로드는 presigned URL만 내려줍니다."""
 import json
+import logging
 import time
 from pathlib import Path
 
-from . import config
+from . import config, stt_client, tracing
+
+log = logging.getLogger("guard.providers")
 
 _s3 = None
 
@@ -130,7 +133,24 @@ def _openai_transcribe(key: str) -> str:
     return result.text.strip()
 
 
+def _server_transcribe(key: str) -> str:
+    """자체 STT를 먼저 쓰고, 부하나 장애로 못 쓰면 OpenAI로 넘깁니다. 파일 자체가 잘못된 400은 넘기지 않습니다."""
+    try:
+        return stt_client.transcribe(key.rsplit("/", 1)[-1], _as_m4a(_read(key)))
+    except stt_client.SttBadRequest:
+        raise
+    except stt_client.SttError as exc:
+        if config.STT_FALLBACK != "openai":
+            raise
+        reason = type(exc).__name__
+    log.warning("자체 STT 실패, OpenAI로 전환: %s", reason)
+    with tracing.observe("음성 변환 대체", metadata={"engine": "openai", "reason": reason}):
+        return _openai_transcribe(key)
+
+
 def transcribe(rec_id: str, key: str) -> str:
+    if config.STT == "server":
+        return _server_transcribe(key)
     if config.STT == "transcribe":
         return _transcribe(rec_id, key)
     if config.STT == "openai":
