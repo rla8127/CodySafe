@@ -1,0 +1,276 @@
+import hmac
+import json
+import secrets
+import uuid
+from contextlib import asynccontextmanager
+from pathlib import PurePosixPath
+
+from fastapi import BackgroundTasks, Depends, FastAPI, Header, HTTPException, Query, Request
+from fastapi.responses import PlainTextResponse
+from pydantic import BaseModel, Field
+
+from . import config, db, pipeline, providers
+from .scam_kb import BY_ID, OTHER_SCAM, VOICE_PHISHING
+
+INVITE_TTL = 600
+INVITE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
+
+
+@asynccontextmanager
+async def lifespan(_: FastAPI):
+    db.init()
+    config.LOCAL_AUDIO_DIR.mkdir(parents=True, exist_ok=True)
+    yield
+
+
+app = FastAPI(title="CodySafe Family Guard", lifespan=lifespan)
+
+
+def current_device(authorization: str = Header(default="")) -> str:
+    token = authorization.removeprefix("Bearer ").strip()
+    with db.connect() as conn:
+        row = conn.execute("SELECT id FROM devices WHERE token = ?", (token,)).fetchone()
+    if not token or not row:
+        raise HTTPException(401, "invalid token")
+    return row["id"]
+
+
+class DeviceIn(BaseModel):
+    name: str = Field(min_length=1, max_length=30)
+
+
+class LinkIn(BaseModel):
+    code: str
+
+
+class RecordingIn(BaseModel):
+    filename: str = Field(min_length=1, max_length=255)
+    client_key: str = Field(min_length=1, max_length=255)
+    content_type: str = "application/octet-stream"
+
+
+class ReviewIn(BaseModel):
+    label: str = Field(pattern="^(voice_phishing|other_scam|normal)$")
+    scam_type: str | None = None
+    note: str = Field(default="", max_length=500)
+
+
+@app.get("/healthz")
+def healthz():
+    return {"ok": True, "storage": config.STORAGE, "stt": config.STT, "llm": config.LLM, "embed": config.EMBED}
+
+
+@app.post("/v1/devices")
+def register(body: DeviceIn):
+    device_id, token = uuid.uuid4().hex, secrets.token_urlsafe(32)
+    with db.connect() as conn:
+        conn.execute(
+            "INSERT INTO devices (id, token, name, created_at) VALUES (?, ?, ?, ?)",
+            (device_id, token, body.name, db.now()),
+        )
+    return {"device_id": device_id, "token": token}
+
+
+# ---------- 가족 연결: 보호받는 사람이 코드를 만들어 직접 건네야 연결됩니다 ----------
+@app.post("/v1/family/invite")
+def create_invite(device: str = Depends(current_device)):
+    code = "".join(secrets.choice(INVITE_ALPHABET) for _ in range(8))
+    with db.connect() as conn:
+        conn.execute("DELETE FROM invites WHERE device_id = ? OR expires_at < ?", (device, db.now()))
+        conn.execute("INSERT INTO invites VALUES (?, ?, ?)", (code, device, db.now() + INVITE_TTL))
+    return {"code": code, "expires_in": INVITE_TTL}
+
+
+@app.post("/v1/family/link")
+def link_guardian(body: LinkIn, device: str = Depends(current_device)):
+    with db.connect() as conn:
+        row = conn.execute(
+            "SELECT device_id FROM invites WHERE code = ? AND expires_at >= ?", (body.code.strip().upper(), db.now())
+        ).fetchone()
+        if not row or row["device_id"] == device:
+            raise HTTPException(400, "invalid code")
+        conn.execute(
+            "INSERT OR IGNORE INTO family_links VALUES (?, ?, ?)", (row["device_id"], device, db.now())
+        )
+        conn.execute("DELETE FROM invites WHERE code = ?", (body.code.strip().upper(),))
+        name = conn.execute("SELECT name FROM devices WHERE id = ?", (row["device_id"],)).fetchone()["name"]
+    return {"protected_name": name}
+
+
+@app.get("/v1/family")
+def family(device: str = Depends(current_device)):
+    with db.connect() as conn:
+        guardians = conn.execute(
+            "SELECT d.id, d.name FROM family_links f JOIN devices d ON d.id = f.guardian_id WHERE f.protected_id = ?",
+            (device,),
+        ).fetchall()
+        protected = conn.execute(
+            "SELECT d.id, d.name FROM family_links f JOIN devices d ON d.id = f.protected_id WHERE f.guardian_id = ?",
+            (device,),
+        ).fetchall()
+    return {"guardians": [dict(r) for r in guardians], "protected": [dict(r) for r in protected]}
+
+
+@app.delete("/v1/family/guardians/{guardian_id}")
+def remove_guardian(guardian_id: str, device: str = Depends(current_device)):
+    with db.connect() as conn:
+        conn.execute("DELETE FROM family_links WHERE protected_id = ? AND guardian_id = ?", (device, guardian_id))
+    return {"ok": True}
+
+
+# ---------- 녹음 업로드 ----------
+@app.post("/v1/recordings")
+def create_recording(body: RecordingIn, device: str = Depends(current_device)):
+    ext = PurePosixPath(body.filename).suffix.lstrip(".").lower()
+    allowed = config.AUDIO_EXTENSIONS | (config.TEXT_EXTENSIONS if config.STT == "text" else set())
+    if ext not in allowed:
+        raise HTTPException(415, f"unsupported format: {ext}")
+
+    rec_id, token = uuid.uuid4().hex, secrets.token_urlsafe(24)
+    key = f"recordings/{device}/{rec_id}.{ext}"
+    with db.connect() as conn:
+        existing = conn.execute(
+            "SELECT id, status FROM recordings WHERE device_id = ? AND client_key = ?", (device, body.client_key)
+        ).fetchone()
+        if existing and existing["status"] != "pending_upload":
+            return {"id": existing["id"], "upload_url": None, "already_uploaded": True}
+        if existing:
+            conn.execute("DELETE FROM recordings WHERE id = ?", (existing["id"],))
+        conn.execute(
+            "INSERT INTO recordings (id, device_id, client_key, filename, s3_key, upload_token, status, created_at)"
+            " VALUES (?, ?, ?, ?, ?, ?, 'pending_upload', ?)",
+            (rec_id, device, body.client_key, body.filename, key, token, db.now()),
+        )
+    return {
+        "id": rec_id,
+        "upload_url": providers.upload_url(key, body.content_type, token, rec_id),
+        "already_uploaded": False,
+    }
+
+
+@app.put("/v1/local-upload/{rec_id}")
+async def local_upload(rec_id: str, request: Request, token: str = Query()):
+    if config.STORAGE != "local":
+        raise HTTPException(404)
+    with db.connect() as conn:
+        row = conn.execute("SELECT s3_key, upload_token FROM recordings WHERE id = ?", (rec_id,)).fetchone()
+    if not row or not hmac.compare_digest(row["upload_token"], token):
+        raise HTTPException(403)
+    path, size = providers.local_path(row["s3_key"]), 0
+    with path.open("wb") as out:
+        async for chunk in request.stream():
+            size += len(chunk)
+            if size > config.MAX_UPLOAD_BYTES:
+                out.close()
+                path.unlink(missing_ok=True)
+                raise HTTPException(413)
+            out.write(chunk)
+    return {"size": size}
+
+
+@app.post("/v1/recordings/{rec_id}/complete")
+def complete(rec_id: str, tasks: BackgroundTasks, device: str = Depends(current_device)):
+    with db.connect() as conn:
+        row = conn.execute("SELECT * FROM recordings WHERE id = ? AND device_id = ?", (rec_id, device)).fetchone()
+        if not row:
+            raise HTTPException(404)
+        if row["status"] not in ("pending_upload", "failed"):
+            return {"status": row["status"]}
+        size = providers.uploaded_size(row["s3_key"])
+        if size is None:
+            raise HTTPException(409, "upload not found")
+        if size > config.MAX_UPLOAD_BYTES:
+            providers.delete_audio(row["s3_key"])
+            raise HTTPException(413)
+        conn.execute("UPDATE recordings SET status = 'queued' WHERE id = ?", (rec_id,))
+    tasks.add_task(pipeline.process, rec_id)
+    return {"status": "queued"}
+
+
+@app.get("/v1/recordings")
+def list_recordings(device: str = Depends(current_device)):
+    with db.connect() as conn:
+        rows = conn.execute(
+            "SELECT * FROM recordings WHERE device_id = ? AND status != 'pending_upload' ORDER BY created_at DESC LIMIT 100",
+            (device,),
+        ).fetchall()
+    return {"items": [db.public_recording(r) for r in rows]}
+
+
+@app.delete("/v1/recordings/{rec_id}")
+def delete_recording(rec_id: str, device: str = Depends(current_device)):
+    with db.connect() as conn:
+        row = conn.execute("SELECT s3_key FROM recordings WHERE id = ? AND device_id = ?", (rec_id, device)).fetchone()
+        if not row:
+            raise HTTPException(404)
+        conn.execute("DELETE FROM recordings WHERE id = ?", (rec_id,))
+        conn.execute("DELETE FROM alerts WHERE recording_id = ?", (rec_id,))
+        conn.execute("DELETE FROM review_dataset WHERE recording_id = ?", (rec_id,))
+    providers.delete_audio(row["s3_key"])
+    return {"ok": True}
+
+
+@app.get("/v1/recommendations")
+def recommendations(device: str = Depends(current_device)):
+    return pipeline.recommendations(device)
+
+
+# ---------- 가족 알림 ----------
+@app.get("/v1/alerts")
+def alerts(after: int = 0, device: str = Depends(current_device)):
+    with db.connect() as conn:
+        rows = conn.execute(
+            "SELECT id, title, body, acked, created_at FROM alerts WHERE guardian_id = ? AND id > ? ORDER BY id DESC LIMIT 50",
+            (device, after),
+        ).fetchall()
+    return {"items": [dict(r) for r in rows]}
+
+
+@app.post("/v1/alerts/{alert_id}/ack")
+def ack(alert_id: int, device: str = Depends(current_device)):
+    with db.connect() as conn:
+        conn.execute("UPDATE alerts SET acked = 1 WHERE id = ? AND guardian_id = ?", (alert_id, device))
+    return {"ok": True}
+
+
+# ---------- 사람 검토: 보이스피싱 외 사기는 별도 데이터셋으로 ----------
+@app.post("/v1/recordings/{rec_id}/review")
+def review(rec_id: str, body: ReviewIn, device: str = Depends(current_device)):
+    if body.scam_type is not None and body.scam_type not in BY_ID:
+        raise HTTPException(400, "unknown scam_type")
+    with db.connect() as conn:
+        row = conn.execute("SELECT * FROM recordings WHERE id = ? AND device_id = ?", (rec_id, device)).fetchone()
+        if not row:
+            raise HTTPException(404)
+        if row["status"] != "done":
+            raise HTTPException(409, "not analyzed")
+        scam_type = body.scam_type or row["scam_type"]
+        if body.label == "normal":
+            # 사람이 정상으로 확인하면 원문을 지우고 데이터셋에서도 뺍니다.
+            conn.execute(
+                "UPDATE recordings SET review_label = ?, scam_type = 'none', transcript = NULL WHERE id = ?",
+                (body.label, rec_id),
+            )
+            conn.execute("DELETE FROM review_dataset WHERE recording_id = ?", (rec_id,))
+            return {"ok": True, "in_dataset": False}
+        conn.execute(
+            "UPDATE recordings SET review_label = ?, scam_type = ? WHERE id = ?", (body.label, scam_type, rec_id)
+        )
+        in_dataset = body.label == OTHER_SCAM and bool(row["transcript"])
+        if in_dataset:
+            conn.execute(
+                "INSERT OR REPLACE INTO review_dataset VALUES (?, ?, ?, ?, ?, ?, ?)",
+                (rec_id, row["transcript"], body.label, scam_type, row["label"], body.note, db.now()),
+            )
+        else:
+            conn.execute("DELETE FROM review_dataset WHERE recording_id = ?", (rec_id,))
+    return {"ok": True, "in_dataset": in_dataset}
+
+
+@app.get("/v1/admin/review-dataset.jsonl", response_class=PlainTextResponse)
+def export_dataset(x_admin_token: str = Header(default="")):
+    if not config.ADMIN_TOKEN or not hmac.compare_digest(config.ADMIN_TOKEN, x_admin_token):
+        raise HTTPException(403)
+    with db.connect() as conn:
+        rows = conn.execute("SELECT * FROM review_dataset ORDER BY created_at").fetchall()
+    return "\n".join(json.dumps(dict(r), ensure_ascii=False) for r in rows)
