@@ -80,9 +80,6 @@ a.btn { text-decoration: none; }
 .guide-link { display: flex; align-items: center; gap: 6px; width: 100%; margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--line); font-size: 13.5px; font-weight: 700; color: var(--pri); }
 .guide-link svg.lucide { width: 16px; height: 16px; }
 .guide-link svg.lucide:last-child { margin-left: auto; color: var(--mute); }
-.guide-tabs { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; margin-top: 14px; padding: 4px; border-radius: 14px; background: var(--bg); }
-.guide-tabs button { padding: 9px; border-radius: 11px; font-size: 14px; font-weight: 700; color: var(--sub); }
-.guide-tabs button.on { background: var(--card); color: var(--pri); box-shadow: var(--shadow); }
 .guide-steps { margin-top: 16px; }
 .guide-steps .phrase-step { font-weight: 500; }
 .guide-steps .step-no { width: 28px; height: 28px; border-radius: 50%; font-size: 13.5px; font-weight: 800; }
