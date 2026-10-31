@@ -28,6 +28,7 @@ def main() -> int:
     parser.add_argument("--holdout", default=str(ROOT / "eval" / "judge_holdout.csv"))
     parser.add_argument("--report", default=str(ROOT / "eval" / "judge_report.md"))
     parser.add_argument("--mode", choices=["rules", "env"], default="rules")
+    parser.add_argument("--note", default="", help="절차 절에 덧붙일 한 줄(예: 라벨 표기 변환)")
     args = parser.parse_args()
 
     if args.mode == "rules":
@@ -108,6 +109,7 @@ def main() -> int:
         "- 후보 60개는 판정 규칙을 보지 않은 별도 에이전트가 장면 대사만 보고 썼다(`eval/judge_candidates.csv`).",
         "- 라벨은 호연이 붙여 `eval/judge_holdout.csv`로 고정했다. 이후 판정 규칙·프롬프트를 고칠 때 이 파일을 보지 않는다.",
         "- 이 보고서에는 집계와 줄 id만 쓰고 답 원문은 쓰지 않는다.",
+    ] + ([f"- {args.note}"] if args.note else []) + [
         "- 한계: 후보 작성자와 판정기 작성자가 같은 모델 계열이다. 실제 어르신 발화가 아니다.",
         "",
     ]

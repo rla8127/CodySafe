@@ -920,6 +920,7 @@ function s2RenderResult(r) {
   .s2-best { color: #08875A; font-weight: 700; }
   .s2-call { padding-bottom: 24px; }
   .s2-call .caller { margin-top: 34px !important; }
+  @media (min-width: 501px) { .statusbar:has(~ #view .s2-call) { background: #121A33; } }
   .s2-call .transcript { max-height: 220px; overflow-y: auto; }
   .s2-line { font-size: 15px; line-height: 1.5; padding: 4px 0; }
   .s2-line b { opacity: .6; font-size: 12px; }
