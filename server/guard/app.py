@@ -66,8 +66,18 @@ def current_device(authorization: str = Header(default="")) -> str:
     return row["id"]
 
 
+ROLE_PATTERN = "^(mom|dad|me|son|daughter|child)$"
+
+
 class DeviceIn(BaseModel):
     name: str = Field(min_length=1, max_length=30)
+    role: str | None = Field(default=None, pattern=ROLE_PATTERN)
+    memo: str | None = Field(default=None, max_length=20)
+
+
+class ProfileIn(BaseModel):
+    role: str = Field(pattern=ROLE_PATTERN)
+    memo: str | None = Field(default=None, max_length=20)
 
 
 class LinkIn(BaseModel):
@@ -111,10 +121,24 @@ def register(body: DeviceIn):
     device_id, token = uuid.uuid4().hex, secrets.token_urlsafe(32)
     with db.connect() as conn:
         conn.execute(
-            "INSERT INTO devices (id, token, name, created_at) VALUES (?, ?, ?, ?)",
-            (device_id, token, body.name, db.now()),
+            "INSERT INTO devices (id, token, name, role, memo, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+            (device_id, token, body.name, body.role, body.memo, db.now()),
         )
     return {"device_id": device_id, "token": token}
+
+
+@app.get("/v1/devices/me")
+def my_profile(device: str = Depends(current_device)):
+    with db.connect() as conn:
+        row = conn.execute("SELECT name, role, memo FROM devices WHERE id = ?", (device,)).fetchone()
+    return dict(row)
+
+
+@app.put("/v1/devices/me")
+def update_profile(body: ProfileIn, device: str = Depends(current_device)):
+    with db.connect() as conn:
+        conn.execute("UPDATE devices SET role = ?, memo = ? WHERE id = ?", (body.role, body.memo, device))
+    return {"ok": True}
 
 
 # ---------- 가족 연결: 보호받는 사람이 코드를 만들어 직접 건네야 연결됩니다 ----------
@@ -147,11 +171,11 @@ def link_guardian(body: LinkIn, device: str = Depends(current_device)):
 def family(device: str = Depends(current_device)):
     with db.connect() as conn:
         guardians = conn.execute(
-            "SELECT d.id, d.name FROM family_links f JOIN devices d ON d.id = f.guardian_id WHERE f.protected_id = ?",
+            "SELECT d.id, d.name, d.role, d.memo FROM family_links f JOIN devices d ON d.id = f.guardian_id WHERE f.protected_id = ?",
             (device,),
         ).fetchall()
         protected = conn.execute(
-            "SELECT d.id, d.name, d.lock_until > ? AS locked FROM family_links f JOIN devices d ON d.id = f.protected_id"
+            "SELECT d.id, d.name, d.role, d.memo, d.lock_until > ? AS locked FROM family_links f JOIN devices d ON d.id = f.protected_id"
             " WHERE f.guardian_id = ?",
             (db.now(), device),
         ).fetchall()

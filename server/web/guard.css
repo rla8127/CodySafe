@@ -158,10 +158,38 @@ a.btn { text-decoration: none; }
 .sim-act { display: flex; align-items: center; justify-content: center; gap: 5px; color: var(--pri); font-weight: 700; line-height: 1.4; }
 .sim-act svg.lucide { width: 14px; height: 14px; flex: none; }
 .sim-photo { display: grid; justify-items: center; gap: 5px; width: 170px; padding: 10px; }
-.sim-face { display: grid; place-items: center; width: 100%; aspect-ratio: 1; border-radius: 12px; background: linear-gradient(145deg, #C9D3E6, #8E9CB8); color: #fff; }
-.sim-face svg.lucide { width: 74px; height: 74px; stroke-width: 1.4; }
+.sim-photo img { display: block; width: 100%; border-radius: 12px; }
 .sim-photo small { font-size: 12px; color: var(--ink2); }
 .sim-photo em { font-size: 11px; font-style: normal; color: var(--sub); }
+.sb-battery { position: relative; display: inline-block; width: 24px; height: 12px; padding: 1.5px; border: 1.3px solid currentColor; border-radius: 3.5px; }
+.sb-battery::after { content: ""; position: absolute; right: -3.5px; top: 3px; width: 2px; height: 4px; border-radius: 0 1px 1px 0; background: currentColor; }
+.sb-battery i { display: block; width: 78%; height: 100%; border-radius: 1.5px; background: currentColor; }
+.role-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+.role-btn { display: grid; justify-items: center; gap: 6px; padding: 12px 2px 10px; border: 1.5px solid var(--line); border-radius: 16px; background: #FAFBFD; font-size: 13.5px; font-weight: 700; color: var(--ink2); transition: .15s; }
+.role-btn span { font-size: 28px; line-height: 1.1; }
+.role-btn.on { border-color: var(--pri); background: var(--pri-soft); color: var(--pri); }
+.role-child { margin-top: 12px; }
+.role-child[hidden] { display: none; }
+.role-sub { height: 34px; padding: 0 14px; font-size: 13.5px; }
+.role-sub.on { background: var(--pri); color: #fff; }
+.role-av { display: inline-grid; place-items: center; flex: none; width: 40px; height: 40px; margin-right: 10px; border-radius: 50%; background: var(--pri-soft); font-size: 22px; font-weight: 800; color: var(--pri); }
+.role-av.big { width: 38px; height: 38px; font-size: 23px; vertical-align: -6px; }
+.role-kv { width: 100%; text-align: left; }
+.role-kv span:last-child { display: inline-flex; align-items: center; gap: 2px; color: var(--pri); }
+.role-kv svg.lucide { width: 16px; height: 16px; }
+.trend-stat { display: flex; align-items: center; gap: 14px; padding: 16px; border-radius: 20px; background: var(--navy); color: #fff; text-decoration: none; }
+.trend-stat > b { flex: none; font-size: 29px; font-weight: 800; letter-spacing: -0.03em; }
+.trend-stat strong { display: block; font-size: 13.5px; line-height: 1.4; }
+.trend-stat small { display: block; margin-top: 2px; font-size: 11.5px; line-height: 1.35; opacity: .78; }
+.trend-list { margin-top: 10px; padding: 4px 14px; }
+.trend-row { display: flex; align-items: center; gap: 10px; padding: 12px 0; border-top: 1px solid var(--line); color: var(--ink); text-decoration: none; }
+.trend-row:first-child { border-top: 0; }
+.trend-row time { flex: none; align-self: flex-start; padding-top: 1px; font-size: 12.5px; font-weight: 800; color: var(--pri); }
+.trend-row span { flex: 1; min-width: 0; }
+.trend-row strong { display: block; font-size: 13.5px; font-weight: 600; line-height: 1.4; }
+.trend-row small { display: block; margin-top: 2px; font-size: 11.5px; color: var(--sub); }
+.trend-row svg.lucide { width: 14px; height: 14px; color: var(--mute); }
+.trend-note { margin: 8px 2px 0; font-size: 11.5px; line-height: 1.45; color: var(--sub); }
 .lock-banner { display: flex; align-items: center; gap: 10px; width: 100%; text-align: left; margin-bottom: 12px; font-size: 14px; line-height: 1.45; color: var(--ink2); }
 .lock-banner svg.lucide { width: 22px; height: 22px; color: var(--danger); flex: none; }
 /* 모바일에서 대화 첫 줄이 진행 막대에 가리지 않게 합니다. */

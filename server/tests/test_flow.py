@@ -355,3 +355,18 @@ def test_s3_mode_keeps_voice_per_device_and_deletes_after_analysis(client, monke
     assert not (config.LOCAL_AUDIO_DIR / key.replace("/", "_")).exists()
     assert client.post(f"/v1/recordings/{r['id']}/complete", headers=h).status_code == 200
     assert fake.objects == {}
+
+
+def test_family_role_is_saved_shown_to_family_and_validated(client):
+    assert client.post("/v1/devices", json={"name": "x", "role": "boss"}).status_code == 422
+    token = client.post("/v1/devices", json={"name": "지수", "role": "daughter", "memo": "첫째"}).json()["token"]
+    child = {"Authorization": f"Bearer {token}"}
+    assert client.get("/v1/devices/me", headers=child).json() == {"name": "지수", "role": "daughter", "memo": "첫째"}
+    parent = device(client, "엄마")
+    code = client.post("/v1/family/invite", headers=child).json()["code"]
+    client.post("/v1/family/link", headers=parent, json={"code": code})
+    seen = client.get("/v1/family", headers=parent).json()["protected"][0]
+    assert seen["role"] == "daughter" and seen["memo"] == "첫째"
+    assert client.put("/v1/devices/me", headers=parent, json={"role": "mom"}).status_code == 200
+    assert client.get("/v1/family", headers=child).json()["guardians"][0]["role"] == "mom"
+    assert client.put("/v1/devices/me", headers=parent, json={"role": "x"}).status_code == 422

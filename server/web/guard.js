@@ -64,6 +64,69 @@ function toggleIntro() {
 
 drawIntroToggle();
 
+/* ---------------- 가족 역할 ---------------- */
+const ROLE_INFO = {
+  mom: { label: '엄마', icon: '👩' }, dad: { label: '아빠', icon: '👨' }, me: { label: '나', icon: '🙂' },
+  child: { label: '자녀', icon: '🧒' }, son: { label: '아들', icon: '👦' }, daughter: { label: '딸', icon: '👧' },
+};
+let pickedRole = '';
+
+function rolePicker(role = '', memo = '') {
+  pickedRole = role;
+  const isChild = ['child', 'son', 'daughter'].includes(role);
+  const main = ['mom', 'dad', 'me', 'child'].map((k) => `<button type="button" class="role-btn ${(k === 'child' ? isChild : role === k) ? 'on' : ''}" data-role="${k}" onclick="pickRole('${k}')"><span>${ROLE_INFO[k].icon}</span>${ROLE_INFO[k].label}</button>`).join('');
+  const sub = ['son', 'daughter'].map((k) => `<button type="button" class="chip role-sub ${role === k ? 'on' : ''}" data-role="${k}" onclick="pickRole('${k}')">${ROLE_INFO[k].icon} ${ROLE_INFO[k].label}</button>`).join('');
+  return `<div class="role-grid">${main}</div>
+    <div class="role-child" id="roleChild" ${isChild ? '' : 'hidden'}>
+      <div class="row" style="gap:8px">${sub}</div>
+      <div class="field" style="margin-top:10px"><label for="roleMemo">메모 (선택)</label><input id="roleMemo" maxlength="20" placeholder="예: 첫째" value="${esc(memo)}"></div>
+    </div>`;
+}
+
+function pickRole(role) {
+  pickedRole = role;
+  const isChild = ['child', 'son', 'daughter'].includes(role);
+  document.querySelectorAll('.role-btn').forEach((b) => b.classList.toggle('on', b.dataset.role === role || (b.dataset.role === 'child' && isChild)));
+  document.querySelectorAll('.role-sub').forEach((b) => b.classList.toggle('on', b.dataset.role === role));
+  $('#roleChild').hidden = !isChild;
+}
+
+function readRole() {
+  const isChild = ['child', 'son', 'daughter'].includes(pickedRole);
+  return { role: pickedRole, memo: isChild ? ($('#roleMemo')?.value.trim() || null) : null };
+}
+
+const roleAvatar = (p) => {
+  const info = ROLE_INFO[p.role];
+  return `<span class="role-av">${info ? info.icon : esc(String(p.name || '?').slice(0, 1))}</span>`;
+};
+
+async function roleSheet() {
+  let me = {};
+  try { me = await api('GET', '/v1/devices/me'); } catch (e) { return toast('불러오지 못했습니다', 'circle-alert'); }
+  openSheet(`<div class="b" style="font-size:18px">가족 안에서의 역할</div>
+    <div style="margin-top:14px">${rolePicker(me.role || '', me.memo || '')}</div>
+    <div class="btn-col"><button class="btn pri block" onclick="saveRole()">저장</button><button class="btn line block" onclick="closeSheet()">취소</button></div>`);
+}
+
+async function saveRole() {
+  const { role, memo } = readRole();
+  if (!role) return toast('역할을 골라 주세요', 'circle-alert');
+  try {
+    await api('PUT', '/v1/devices/me', { role, memo });
+    store.set('role', role);
+    render();
+    toast('저장했습니다');
+  } catch (e) {
+    toast('저장하지 못했습니다', 'circle-alert');
+  }
+}
+
+/* ---------------- 상태 표시줄 (PC 미리보기 전용, 실제 폰에서는 숨김) ---------------- */
+$('.sb-icons').innerHTML = `<svg width="17" height="12" viewBox="0 0 17 12" aria-hidden="true"><rect x="0" y="8" width="3" height="4" rx=".8"/><rect x="4.6" y="5.5" width="3" height="6.5" rx=".8"/><rect x="9.2" y="3" width="3" height="9" rx=".8"/><rect x="13.8" y="0" width="3" height="12" rx=".8"/></svg>
+  <svg width="16" height="12" viewBox="0 0 16 12" aria-hidden="true"><path d="M8 2.4c2.3 0 4.4.9 6 2.4l1.2-1.3A10.4 10.4 0 0 0 8 .6 10.4 10.4 0 0 0 .8 3.5L2 4.8a8.6 8.6 0 0 1 6-2.4Zm0 3.5c1.3 0 2.5.5 3.5 1.4l1.2-1.3A6.9 6.9 0 0 0 8 4.1a6.9 6.9 0 0 0-4.7 1.9l1.2 1.3c1-.9 2.2-1.4 3.5-1.4Zm0 3.4c-.7 0-1.3.3-1.8.7L8 12l1.8-2c-.5-.4-1.1-.7-1.8-.7Z"/></svg>
+  <span class="sb-battery"><i></i></span>`;
+
 /* ---------------- 첫 실행 ---------------- */
 function onboardingPage() {
   if (!accepted()) {
@@ -80,20 +143,24 @@ function onboardingPage() {
   }
   return `<div class="page">
     <div class="brand-hero small"><img src="assets/brand/logo-horizontal.png" alt="Cody Safe"></div>
-    <div class="lead-text">가족에게 보일<br><em>이름</em>을 정해 주세요</div>
-    <div class="card"><div class="field" style="margin-top:0"><label for="regName">이름</label><input id="regName" maxlength="30" placeholder="예: 민수"></div>
+    <div class="lead-text">가족 안에서<br><em>누구</em>신가요?</div>
+    <div class="card">${rolePicker()}
+    <div class="field"><label for="regName">가족에게 보일 이름</label><input id="regName" maxlength="30" placeholder="예: 민수"></div>
     <div class="muted small" style="margin-top:10px">계정이나 비밀번호는 필요 없습니다.</div></div>
     <button class="btn grad block mt" onclick="registerDevice()">시작하기</button>
   </div>`;
 }
 
 async function registerDevice() {
-  const name = $('#regName').value.trim();
+  const { role, memo } = readRole();
+  if (!role) return toast('가족 안에서의 역할을 골라 주세요', 'circle-alert');
+  const name = $('#regName').value.trim() || (role !== 'me' ? ROLE_INFO[role].label : '');
   if (!name) return toast('이름을 입력하세요', 'circle-alert');
   try {
-    const r = await api('POST', '/v1/devices', { name });
+    const r = await api('POST', '/v1/devices', { name, role, memo });
     store.set('token', r.token);
     store.set('name', name);
+    store.set('role', role);
     native?.setToken(r.token);
     render();
   } catch (e) {
@@ -208,7 +275,7 @@ function deleteSheet(id) {
 SCREENS.home = gated(() => `<div class="page">
   <div class="brand-bar"><img src="assets/brand/logo-horizontal.png" alt="Cody Safe">
     <button class="brand-bell" onclick="go('family')" aria-label="가족 경고">${ic('bell')}</button></div>
-  <div class="home-greeting">안녕하세요${store.get('name') ? `, ${esc(store.get('name'))}님` : ''}</div>
+  <div class="home-greeting">${ROLE_INFO[store.get('role')] ? `<span class="role-av big">${ROLE_INFO[store.get('role')].icon}</span>` : ''}안녕하세요${store.get('name') ? `, ${esc(store.get('name'))}님` : ''}</div>
   <div class="home-sub">오늘도 함께 살펴볼게요.</div>
   <div id="data"></div>
 </div>`);
@@ -236,7 +303,8 @@ function homeData({ recordings, recs, family, alerts, lock }) {
       <div class="call-text" style="color:var(--pri);font-weight:700;font-size:13px">추천 훈련 · ${esc(r.training)}</div></div>`).join('')}` : ''}
     ${items.length ? `<div class="sec-title">최근 분석 <button class="more" onclick="go('detect')">전체 보기${ic('chevron-right')}</button></div>
       ${items.slice(0, 3).map(recordingCard).join('')}`
-    : `<button class="home-empty" onclick="go('detect')"><span>${ic('sparkles')}</span><span><b>아직 분석한 통화가 없어요</b><small>예시 통화로 어떻게 동작하는지 먼저 볼 수 있어요.</small></span>${ic('chevron-right')}</button>`}`;
+    : `<button class="home-empty" onclick="go('detect')"><span>${ic('sparkles')}</span><span><b>아직 분석한 통화가 없어요</b><small>예시 통화로 어떻게 동작하는지 먼저 볼 수 있어요.</small></span>${ic('chevron-right')}</button>`}
+    ${trendsBlock()}`;
 }
 
 /* ---------------- 가족 암구호 ---------------- */
@@ -708,7 +776,7 @@ SCREENS.family = gated(() => `<div class="page">
 </div>`);
 
 function familyData({ family, alerts, phrase }) {
-  const person = (p, note, removable) => `<div class="card mt"><div class="row between"><div class="grow"><div class="b">${esc(p.name)}${p.locked ? ` <span class="chip danger">${ic('lock')}금융 앱 잠금 중</span>` : ''}</div><div class="muted small" style="margin-top:2px">${note}</div></div>
+  const person = (p, note, removable) => `<div class="card mt"><div class="row between">${roleAvatar(p)}<div class="grow"><div class="b">${esc(p.name)}${p.memo ? ` <span class="muted small">${esc(p.memo)}</span>` : ''}${p.locked ? ` <span class="chip danger">${ic('lock')}금융 앱 잠금 중</span>` : ''}</div><div class="muted small" style="margin-top:2px">${note}</div></div>
     ${removable ? `<button class="btn line sm" onclick="act('DELETE','/v1/family/guardians/${esc(p.id)}')">해제</button>` : ''}
     ${p.locked ? `<button class="btn danger sm" onclick="unlockSheet('${esc(p.id)}')">잠금 풀기</button>` : ''}</div></div>`;
   return `${phrase.linked ? `<div class="mt">${phraseCard(phrase)}</div><button class="btn ghost block phrase-link" onclick="go('passphrase')">암구호 쓰는 법과 비상 암구호${ic('chevron-right')}</button>` : ''}
@@ -750,6 +818,7 @@ SCREENS.me = gated(() => `<div class="page">
   <div class="lead" style="margin-top:6px">MY</div>
   <div class="card mt">
     <div class="kv"><span>이름</span><span>${esc(store.get('name') || '-')}</span></div>
+    <button class="kv role-kv" onclick="roleSheet()"><span>가족 역할</span><span>${ROLE_INFO[store.get('role')] ? `${ROLE_INFO[store.get('role')].icon} ${ROLE_INFO[store.get('role')].label}` : '선택하기'}${ic('chevron-right')}</span></button>
     <div class="kv"><span>서버</span><span>${esc(location.host)}</span></div>
     <div class="kv"><span>실행 환경</span><span>${native ? '안드로이드 앱' : '브라우저'}</span></div>
   </div>
@@ -773,6 +842,7 @@ function browserNotifyBlock() {
 function signOut() {
   store.del('token');
   store.del('name');
+  store.del('role');
   native?.setToken('');
   go('home');
   render();

@@ -1,5 +1,6 @@
 // 체험 시나리오. 웹 MVP의 대화 화면을 쓰고, 내용과 진행 방식만 바꿉니다.
-// 모든 이름, 번호, 주소는 가상이며 주소는 실제로 열리지 않는 example 도메인을 씁니다.
+// 번호와 주소는 가상이며 주소는 실제로 열리지 않는 example 도메인을 씁니다.
+// 로맨스 스캠의 배우 이름과 사진은 사칭 수법을 보여 주는 예시이고, 실제 배우와 무관합니다.
 
 const simSay = (t, ok, fb) => ({ t, ok, fb });
 const simAct = (t, ok, fb) => ({ t, ok, fb, act: true });
@@ -55,9 +56,9 @@ Object.assign(SCENARIOS, {
   romance: {
     title: '배우라는 사람의 DM', tag: '로맨스 스캠', icon: 'heart', color: '#E5487A', soft: '#FDECF2',
     difficulty: '보통', mins: 2, desc: '유명 배우 사진으로 친밀감을 쌓은 뒤 팬 미팅 비용과 투자를 요구',
-    contact: { name: '배우 강서진 (가상)', sub: 'Instagram DM', av: '강' },
+    contact: { name: '서강준 (사칭 예시)', sub: 'Instagram DM · 실제 배우와 무관', av: '서' },
     steps: [
-      { msgs: ['안녕하세요, 배우 강서진입니다 😊', { photo: '셀카라며 보낸 프로필 사진' }, '회사 몰래 개인 계정으로 연락드려요. 비밀 지켜 주실 거죠?'],
+      { sys: '배우를 사칭하는 수법을 보여 주는 가상 대화예요. 실제 배우와 무관해요', msgs: ['안녕하세요, 배우 서강준입니다 😊', { photo: 'assets/actor.png', caption: '본인이라며 보낸 사진' }, '회사 몰래 개인 계정으로 연락드려요. 비밀 지켜 주실 거죠?'],
         choices: [
           simSay('와 진짜요? 팬이에요!', false, '유명인 사진은 쉽게 도용되고, 공개 사진으로 합성도 할 수 있어요.'),
           simAct('소속사 공식 채널에서 계정을 확인한다', true, '좋아요. 사진이나 목소리보다 공식 채널 확인이 믿을 만해요.'),
@@ -260,7 +261,7 @@ const SIM_TYPING = 280;
 
 function simBubble(m) {
   if (m.photo) {
-    return `<div class="bubble sim-photo"><span class="sim-face">${ic('user-round')}</span><small>${m.photo}</small><em>가상 예시 이미지</em></div>`;
+    return `<div class="bubble sim-photo"><img src="${m.photo}" alt="사칭에 쓰인 사진 예시"><small>${m.caption}</small><em>사칭 예시 · 실제 배우와 무관</em></div>`;
   }
   return `<div class="bubble ${/https?:\/\//.test(m) ? 'link' : ''}">${m}</div>`;
 }

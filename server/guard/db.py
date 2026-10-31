@@ -63,6 +63,10 @@ def init() -> None:
         conn.executescript(SCHEMA)
         if "lock_until" not in {r["name"] for r in conn.execute("PRAGMA table_info(devices)")}:
             conn.execute("ALTER TABLE devices ADD COLUMN lock_until REAL NOT NULL DEFAULT 0")
+        columns = {r["name"] for r in conn.execute("PRAGMA table_info(devices)")}
+        for column in ("role", "memo"):
+            if column not in columns:
+                conn.execute(f"ALTER TABLE devices ADD COLUMN {column} TEXT")
         # 이전 버전 알림에 저장된 요약과 사기 유형을 지웁니다.
         conn.execute(
             "UPDATE alerts SET body = ?, title = (SELECT name FROM devices WHERE id = alerts.protected_id) || '님 보이스피싱 의심 통화'"
