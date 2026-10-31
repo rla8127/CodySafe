@@ -99,7 +99,7 @@ def test_es_down_falls_back_to_local_cases_and_locks(client, on, monkeypatch):
     p, g = linked(client)
     rec = send(client, p, PHISHING, "es-down")
     x = extra(client, p, rec)
-    assert x["reference_source"] == "local" and x["references"][0]["scam_type"] == "prosecutor_impersonation"
+    assert x["reference_source"] == "local" and x["references"][0]["title"] == "검찰·경찰·금감원 사칭"
     assert x["score"] == 95 and x["band"] == "lock" and x["family_alert"] and x["lock"]
     assert x["facts"] and x["training_url"] == "/app/#/sim2?type=prosecutor_impersonation"
     assert len(client.get("/v1/alerts", headers=g).json()["items"]) == 1

@@ -125,7 +125,7 @@ def _references(result: dict, matches: list[dict]) -> tuple[str, list[dict]]:
             refs.append({"title": h.get("title", ""), "scam_type": h.get("scam_type") or "", "source": h.get("source") or h.get("publisher") or "", "url": url})
         return "es", refs
     if matches:
-        return "local", [{"title": m["name"], "scam_type": m["id"], "source": "CodySafe 수법 설명", "url": ""} for m in matches]
+        return "local", [{"title": m["name"], "scam_type": "", "source": "CodySafe 수법 설명", "url": ""} for m in matches]
     return "none", []
 
 
