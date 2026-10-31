@@ -96,10 +96,28 @@ function verdictChip(r, label) {
   return c ? `<span class="chip ${c[0]}">${ic(c[1])}${c[2]}</span>` : `<span class="chip">${ic('circle-help')}판단 어려움</span>`;
 }
 
-// 삼성 녹음 파일명의 전화번호를 화면에 드러내지 않고 통화 시각만 보여 줍니다.
-function callTitle(filename) {
-  const m = /_\d{2}(\d{2})(\d{2})_(\d{2})(\d{2})\d{2}\./.exec(filename);
-  return m ? `${+m[1]}월 ${+m[2]}일 ${m[3]}:${m[4]} 통화` : esc(filename.replace(/\.[^.]+$/, ''));
+// 파일명의 이름과 전화번호를 화면에 드러내지 않고 시각만 보여 줍니다. 파일명에 시각이 없으면 올린 시각을 씁니다.
+function callTitle(r) {
+  const m = /_\d{2}(\d{2})(\d{2})_(\d{2})(\d{2})\d{2}\./.exec(r.filename);
+  if (m) return `${+m[1]}월 ${+m[2]}일 ${m[3]}:${m[4]} 통화`;
+  const d = new Date(r.created_at * 1000);
+  return `${d.getMonth() + 1}월 ${d.getDate()}일 ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')} 올린 통화`;
+}
+
+// AI가 풀어 쓴 요약은 보여 주지 않고, 녹취에서 대조한 발화만 사실로 표시합니다.
+function factBox(r, top) {
+  if (!r.evidence.length) {
+    if (r.status !== 'done') return '';
+    return `<div class="call-text">${(r.review_label || r.label) === 'normal' ? '사기로 볼 만한 말을 찾지 못했습니다.' : '근거가 될 말을 찾지 못해 판단하지 못했습니다.'}</div>`;
+  }
+  return `<div class="fact-box">
+    <span class="fact-stamp" aria-hidden="true">FACT</span>
+    ${top ? `<small>비슷한 수법</small><b>${esc(top.name)}</b>` : '<b>확인된 말</b>'}
+    <div class="fact-head">통화에서 실제로 나온 말</div>
+    <ul class="fact-list">${r.evidence.map((e) => `<li>${ic('check')}<span>“${esc(e)}”</span></li>`).join('')}</ul>
+    <div class="fact-note">녹취에서 그대로 옮겼습니다. 말한 내용이 사실이라는 뜻은 아니며, 음성 변환 오류가 있을 수 있습니다.</div>
+    ${top ? `<div class="fact-advice"><b>이렇게 확인하세요</b><p>${esc(top.advice)}</p></div>` : ''}
+  </div>`;
 }
 
 function recordingCard(r) {
@@ -107,11 +125,9 @@ function recordingCard(r) {
   const top = r.matches[0];
   return `<div class="card mt">
     ${verdictChip(r, label)}
-    <div class="call-title">${callTitle(r.filename)}</div>
-    ${r.summary ? `<div class="call-text">${esc(r.summary)}</div><div class="fact-note">음성을 글자로 바꾼 내용을 AI가 요약했습니다. 상대의 실제 신분은 확인되지 않았습니다.</div>` : ''}
+    <div class="call-title">${callTitle(r)}</div>
     ${r.status === 'failed' ? '<div class="call-text">처리에 실패했습니다. 다시 시도해 주세요.</div>' : ''}
-    ${r.evidence.length ? `<div class="fact-head">통화에서 나온 말</div>${r.evidence.map((e) => `<div class="quote">“${esc(e)}”</div>`).join('')}` : ''}
-    ${top ? `<div class="type-box"><small>비슷한 수법</small><b>${esc(top.name)}</b><p>${esc(top.advice)}</p></div>` : ''}
+    ${factBox(r, top)}
     <div class="link-row">
       ${r.status === 'failed' ? `<button onclick="act('POST','/v1/recordings/${r.id}/complete')">다시 시도</button>` : ''}
       ${r.status === 'done' ? `<button onclick="reviewSheet('${r.id}')">${r.needs_review ? '판정 확인' : '판정 고치기'}</button>` : ''}
