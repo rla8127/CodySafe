@@ -35,15 +35,12 @@ if (store.get('token')) native?.setToken(store.get('token'));
 ['image', 'voice', 'call', 'url', 'verify', 'report', 'generate', 'weakness', 'training', 'copilot', 'checkup'].forEach((k) => delete SCREENS[k]);
 Object.assign(TAB_OF, { home: 'home', sim: 'sim', play: 'sim', detect: 'detect', family: 'family', me: '', lock: 'home', passphrase: 'family', report: 'report' });
 delete PARENT.family;
+// 체험 대화 중에도 아래 메뉴를 그대로 보여 줍니다.
+FULL.splice(FULL.indexOf('play'), 1);
 PARENT.passphrase = 'family';
 
 renderTabs = function (on) {
   const tabs = [['home', 'house', '홈'], ['sim', 'gamepad-2', '체험'], ['detect', 'shield-check', '검사'], ['report', 'messages-square', '커뮤니티'], ['family', 'users', '가족']];
-  // 시작 전에는 아직 쓸 수 없는 탭을 보여 주지 않습니다.
-  if (!signedIn()) {
-    $('#tabbar').classList.add('hidden');
-    view.classList.add('full');
-  }
   $('#tabbar').innerHTML = tabs.map(([k, i, t]) => k === 'detect'
     ? `<button class="tab tab-center ${on === k ? 'on' : ''}" onclick="go('${k}')"><span class="fab">${ic(i)}</span><span>${t}</span></button>`
     : `<button class="tab ${on === k ? 'on' : ''}" onclick="go('${k}')">${ic(i)}<span>${t}</span></button>`).join('');
@@ -69,9 +66,9 @@ drawIntroToggle();
 
 /* ---------------- 가족 역할 ---------------- */
 const ROLE_INFO = {
-  mom: { label: '엄마', icon: '👩' }, dad: { label: '아빠', icon: '👨' }, me: { label: '나', icon: '🙂' },
-  child: { label: '자녀', icon: '🧒' }, son: { label: '아들', icon: '👦' }, daughter: { label: '딸', icon: '👧' },
-  brother: { label: '형', icon: '🧑' }, sister: { label: '언니·누나', icon: '👩' }, uncle: { label: '삼촌', icon: '🧔' }, aunt: { label: '이모·고모', icon: '👩' },
+  mom: { label: '엄마' }, dad: { label: '아빠' }, me: { label: '나' },
+  child: { label: '자녀' }, son: { label: '아들' }, daughter: { label: '딸' },
+  brother: { label: '형' }, sister: { label: '언니·누나' }, uncle: { label: '삼촌' }, aunt: { label: '이모·고모' },
 };
 const DEMO_LABEL = { me: '나', dad: '아빠', mom: '엄마', brother: '형', uncle: '삼촌' };
 let demoMembers = [];
@@ -108,7 +105,7 @@ function demoPicker() {
   return `<div class="page">
     <div class="brand-hero small"><img src="assets/brand/logo-horizontal.png" alt="Cody Safe"></div>
     <div class="lead-text">누구로<br><em>시연</em>할까요?</div>
-    <div class="demo-list">${demoMembers.map((m) => `<button class="demo-person" onclick="demoEnter('${esc(m.id)}')"><span class="role-av">${ROLE_INFO[m.role].icon}</span><span><b>${esc(m.name)}</b><small>${DEMO_LABEL[m.role]}</small></span>${ic('chevron-right')}</button>`).join('')}</div>
+    <div class="demo-list">${demoMembers.map((m) => `<button class="demo-person" onclick="demoEnter('${esc(m.id)}')"><span><b>${esc(m.name)}</b><small>${DEMO_LABEL[m.role]}</small></span>${ic('chevron-right')}</button>`).join('')}</div>
     <div class="card mt soft-warn">시연용 가족입니다. 접속한 사람 모두 같은 기록을 볼 수 있으니 실제 통화는 올리지 마세요.</div>
   </div>`;
 }
@@ -134,8 +131,8 @@ let pickedRole = '';
 function rolePicker(role = '', memo = '') {
   pickedRole = role;
   const isChild = ['child', 'son', 'daughter'].includes(role);
-  const main = ['mom', 'dad', 'me', 'child'].map((k) => `<button type="button" class="role-btn ${(k === 'child' ? isChild : role === k) ? 'on' : ''}" data-role="${k}" onclick="pickRole('${k}')"><span>${ROLE_INFO[k].icon}</span>${ROLE_INFO[k].label}</button>`).join('');
-  const sub = ['son', 'daughter'].map((k) => `<button type="button" class="chip role-sub ${role === k ? 'on' : ''}" data-role="${k}" onclick="pickRole('${k}')">${ROLE_INFO[k].icon} ${ROLE_INFO[k].label}</button>`).join('');
+  const main = ['mom', 'dad', 'me', 'child'].map((k) => `<button type="button" class="role-btn ${(k === 'child' ? isChild : role === k) ? 'on' : ''}" data-role="${k}" onclick="pickRole('${k}')">${ROLE_INFO[k].label}</button>`).join('');
+  const sub = ['son', 'daughter'].map((k) => `<button type="button" class="chip role-sub ${role === k ? 'on' : ''}" data-role="${k}" onclick="pickRole('${k}')">${ROLE_INFO[k].label}</button>`).join('');
   return `<div class="role-grid">${main}</div>
     <div class="role-child" id="roleChild" ${isChild ? '' : 'hidden'}>
       <div class="row" style="gap:8px">${sub}</div>
@@ -155,11 +152,6 @@ function readRole() {
   const isChild = ['child', 'son', 'daughter'].includes(pickedRole);
   return { role: pickedRole, memo: isChild ? ($('#roleMemo')?.value.trim() || null) : null };
 }
-
-const roleAvatar = (p) => {
-  const info = ROLE_INFO[p.role];
-  return `<span class="role-av">${info ? info.icon : esc(String(p.name || '?').slice(0, 1))}</span>`;
-};
 
 async function roleSheet() {
   let me = {};
@@ -336,7 +328,7 @@ function deleteSheet(id) {
 SCREENS.home = gated(() => `<div class="page">
   <div class="brand-bar"><img src="assets/brand/logo-horizontal.png" alt="Cody Safe">
     <span class="brand-actions"><button class="brand-bell" onclick="go('family')" aria-label="가족 경고">${ic('bell')}</button><button class="brand-bell" onclick="go('me')" aria-label="MY">${ic('user-round')}</button></span></div>
-  <div class="home-greeting">${ROLE_INFO[store.get('role')] ? `<span class="role-av big">${ROLE_INFO[store.get('role')].icon}</span>` : ''}안녕하세요${store.get('name') ? `, ${esc(store.get('name'))}님` : ''}</div>
+  <div class="home-greeting">안녕하세요${store.get('name') ? `, ${esc(store.get('name'))}님` : ''}</div>
   <div class="home-sub">오늘도 함께 살펴볼게요.</div>
   <div id="data"></div>
 </div>`);
@@ -938,7 +930,7 @@ SCREENS.family = gated(() => `<div class="page">
 </div>`);
 
 function familyData({ family, alerts, phrase }) {
-  const person = (p, note, removable) => `<div class="card mt"><div class="row between">${roleAvatar(p)}<div class="grow"><div class="b">${esc(p.name)}${p.memo ? ` <span class="muted small">${esc(p.memo)}</span>` : ''}${p.locked ? ` <span class="chip danger">${ic('lock')}금융 앱 잠금 중</span>` : ''}</div><div class="muted small" style="margin-top:2px">${note}</div></div>
+  const person = (p, note, removable) => `<div class="card mt"><div class="row between"><div class="grow"><div class="b">${esc(p.name)}${p.memo ? ` <span class="muted small">${esc(p.memo)}</span>` : ''}${p.locked ? ` <span class="chip danger">${ic('lock')}금융 앱 잠금 중</span>` : ''}</div><div class="muted small" style="margin-top:2px">${note}</div></div>
     ${removable ? `<button class="btn line sm" onclick="act('DELETE','/v1/family/guardians/${esc(p.id)}')">해제</button>` : ''}
     ${p.locked ? `<button class="btn danger sm" onclick="unlockSheet('${esc(p.id)}')">잠금 풀기</button>` : ''}</div></div>`;
   return `${phrase.linked ? `<div class="mt">${phraseCard(phrase)}</div><button class="btn ghost block phrase-link" onclick="go('passphrase')">암구호 쓰는 법과 비상 암구호${ic('chevron-right')}</button>` : ''}
@@ -980,7 +972,7 @@ SCREENS.me = gated(() => `<div class="page">
   <div class="lead" style="margin-top:6px">MY</div>
   <div class="card mt">
     <div class="kv"><span>이름</span><span>${esc(store.get('name') || '-')}</span></div>
-    <button class="kv role-kv" onclick="roleSheet()"><span>가족 역할</span><span>${ROLE_INFO[store.get('role')] ? `${ROLE_INFO[store.get('role')].icon} ${ROLE_INFO[store.get('role')].label}` : '선택하기'}${ic('chevron-right')}</span></button>
+    <button class="kv role-kv" onclick="roleSheet()"><span>가족 역할</span><span>${ROLE_INFO[store.get('role')]?.label || '선택하기'}${ic('chevron-right')}</span></button>
     <div class="kv"><span>서버</span><span>${esc(location.host)}</span></div>
     <div class="kv"><span>실행 환경</span><span>${native ? '안드로이드 앱' : '브라우저'}</span></div>
   </div>

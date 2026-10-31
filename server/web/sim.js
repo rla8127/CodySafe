@@ -43,7 +43,7 @@ Object.assign(SCENARIOS, {
   family: {
     title: '"엄마, 나 폰 깨졌어"', tag: '가족 사칭', icon: 'users', color: '#F79009', soft: '#FFF4E5',
     difficulty: '쉬움', mins: 3, desc: '자녀를 사칭해 새 번호로 연락하고 인증과 상품권을 요구하는 메시지',
-    contact: { name: '딸 💕', sub: '새 번호 010-5821-****', av: '딸' },
+    contact: { name: '딸', sub: '새 번호 010-5821-****', av: '딸' },
     steps: [
       { msgs: ['엄마 나 폰 액정 깨져서 수리 맡겼어ㅠㅠ', '이거 임시 번호야 저장해 줘!'],
         choices: [
