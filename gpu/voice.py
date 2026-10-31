@@ -46,6 +46,8 @@ app = modal.App(APP_NAME)
 
 # Pace is not reliable through the instruct alone (08:3x test), so _synth trims silence and time-stretches
 # (pitch kept, ffmpeg atempo) to a target syllables-per-second per tone.
+# Stretching more than ~1.15x sounds like fast playback (호연 08:5x), so urgent/threat stay near natural.
+MAX_STRETCH = {"urgent": 1.15, "threat": 1.15}
 RATE = {"": 6.2, "calm": 5.6, "official": 5.8, "urgent": 7.2, "threat": 6.4, "tremble": 6.6, "sob": 5.2,
         "friendly": 6.4}
 VOICES = {
@@ -60,8 +62,11 @@ SEEDS = {"caller_male": 1101, "caller_female": 2202, "family": 3303}  # fixed se
 TONES = {  # O-1 TONE_GUIDE keys -> English style words for the instruct (pace stays natural unless noted)
     "calm": "calm and clear, but at a normal conversational pace",
     "official": "stiff, formal and bureaucratic, slightly low pitch, brisk",
-    "urgent": "urgent and fast, pressing the listener to hurry, quicker than normal",
-    "threat": "intimidating, stern and low, scolding, clipped",
+    # urgent/threat: pace comes from the instruct itself (tested 08:5x: 6.8 syl/s without stretching)
+    "urgent": ("a fast-talking, impatient investigator who scolds and rushes the listener, sharp and forceful "
+               "tone, rapid speech. 화난 듯 다그치며 빠르게 몰아붙이듯"),
+    "threat": ("an intimidating, stern man who scolds the listener in a low, forceful voice, clipped and fast. "
+               "위압적으로 다그치듯 단호하게"),
     "tremble": "anxious and trembling, short of breath, hurried",
     "sob": "tearful, sobbing, the ends of sentences shaking",
     "friendly": "friendly, warm and bright, lively pace",
@@ -120,6 +125,8 @@ class Voice:
         import soundfile as sf
         import torch
 
+        if emotion in MAX_STRETCH:  # "!" endings make the model press harder and faster (08:5x test)
+            text = re.sub(r"[.。](\s|$)", r"!\1", text)
         instruct = VOICES[voice] + (f" Speaking style: {style}." if style else "")
         with self.lock:
             torch.manual_seed(SEEDS[voice])
@@ -133,7 +140,7 @@ class Voice:
         dur = len(wav) / sr
         speed = 1.0
         if syllables and dur:
-            speed = min(1.6, max(1.0, RATE.get(emotion, RATE[""]) * dur / syllables))
+            speed = min(MAX_STRETCH.get(emotion, 1.6), max(1.0, RATE.get(emotion, RATE[""]) * dur / syllables))
         if speed > 1.02:  # raw float in/out so the WAV header written below has the right length
             out = subprocess.run(["ffmpeg", "-nostdin", "-loglevel", "error", "-f", "f32le", "-ar", str(sr),
                                   "-ac", "1", "-i", "-", "-filter:a", f"atempo={speed:.3f}", "-f", "f32le", "-"],
