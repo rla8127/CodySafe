@@ -33,6 +33,13 @@ async def lifespan(_: FastAPI):
     yield
 
 
+# uvicorn 기본 설정에서는 guard 로그의 INFO가 보이지 않습니다.
+_handler = logging.StreamHandler()
+_handler.setFormatter(logging.Formatter("%(asctime)s %(levelname)s %(name)s: %(message)s"))
+logging.getLogger("guard").addHandler(_handler)
+logging.getLogger("guard").setLevel(logging.INFO)
+logging.getLogger("guard").propagate = False
+
 app = FastAPI(title="CodySafe Family Guard", lifespan=lifespan)
 
 

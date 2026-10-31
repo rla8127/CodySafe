@@ -221,3 +221,138 @@ a.btn { text-decoration: none; }
 .lock-banner svg.lucide { width: 22px; height: 22px; color: var(--danger); flex: none; }
 /* 모바일에서 대화 첫 줄이 진행 막대에 가리지 않게 합니다. */
 @media (max-width: 500px) { #playWrap .chat { padding-top: 84px; } }
+
+/* ---------- 디자인 시스템: 코발트 + 라임, 그림자를 줄인 평면 카드 ---------- */
+:root {
+  --bg: #F4F6F9;
+  --card: #FFFFFF;
+  --ink: #111827;
+  --ink2: #374151;
+  --sub: #6B7280;
+  --mute: #9CA3AF;
+  --line: #E8EBF0;
+  --pri: #0047AB;
+  --pri2: #0047AB;
+  --pri-soft: #E9F0FB;
+  --navy: #0B1F45;
+  --lime: #C9F24B;
+  --radius: 20px;
+  --grad: #0047AB;
+  --shadow: none;
+}
+body { background: #ECEFF4; }
+button, a { -webkit-tap-highlight-color: transparent; }
+button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible { outline: 2px solid var(--pri); outline-offset: 2px; }
+
+/* 글자 */
+.lead { font-size: 26px; font-weight: 800; letter-spacing: -0.035em; }
+.lead-sub { font-size: 14px; line-height: 1.55; color: var(--sub); }
+.lead-text { font-size: 30px; line-height: 1.25; letter-spacing: -0.04em; margin: 4px 2px 18px; }
+.lead-text em { background: none; -webkit-text-fill-color: currentColor; color: var(--pri); }
+.sec-title { margin: 30px 2px 12px; font-size: 18px; letter-spacing: -0.03em; }
+.home-greeting { font-size: 27px; letter-spacing: -0.04em; }
+
+/* 공통 부품 */
+.card { padding: 18px; box-shadow: none; }
+.btn { height: 54px; border-radius: 16px; font-size: 16px; letter-spacing: -0.02em; transition: transform .12s ease, background-color .15s ease; }
+.btn:active, .quick-grid button:active, .sample-card:active, .scn:active, .demo-person:active, .home-empty:active { transform: scale(.975); }
+.btn.pri, .btn.grad { background: var(--pri); box-shadow: none; }
+.btn.ghost { background: var(--pri-soft); }
+.btn.line { background: var(--card); border: 1.5px solid var(--line); }
+.btn.sm { height: 40px; border-radius: 12px; }
+.chip { height: 27px; font-weight: 700; background: #EEF0F4; }
+.field input, .field textarea, .field select { background: var(--bg); border: 1.5px solid transparent; border-radius: 14px; }
+.field input:focus, .field textarea:focus, .field select:focus { border-color: var(--pri); background: #fff; }
+.sheet-body { border-radius: 26px 26px 0 0; padding: 10px 20px 26px; }
+
+/* 아래 메뉴 */
+#tabbar { background: rgba(255, 255, 255, .96); border-top: 1px solid var(--line); backdrop-filter: none; }
+.tab { font-weight: 600; color: var(--mute); }
+.tab.on { color: var(--ink); font-weight: 800; }
+.tab-center { top: -14px; }
+.tab-center .fab { width: 54px; height: 54px; border-radius: 50%; background: var(--pri); box-shadow: 0 0 0 5px #fff; color: var(--lime); }
+.tab-center .fab svg.lucide { width: 26px; height: 26px; }
+.tab-center.on { color: var(--pri); }
+
+/* 홈 */
+.brand-bar { margin: -4px -2px 22px; }
+.brand-bell { width: 42px; height: 42px; border-radius: 50%; }
+.hero { padding: 22px; border-radius: 24px; background: var(--navy); box-shadow: none; }
+.hero::before, .hero::after { display: none; }
+.hero-label { opacity: .72; }
+.hero-score { margin-top: 6px; font-size: 52px; color: var(--lime); letter-spacing: -0.05em; }
+.hero-score small { font-size: 19px; color: #fff; opacity: .85; margin-left: 3px; }
+.hero-meta { margin-top: 8px; opacity: .78; }
+.hero-meta b { color: #fff; }
+.quick-grid { gap: 10px; }
+.quick-grid button { padding: 15px 2px 13px; border-radius: 20px; box-shadow: none; transition: transform .12s ease; }
+.quick-grid span { width: 42px; height: 42px; border-radius: 50%; }
+.home-empty { padding: 18px; box-shadow: none; transition: transform .12s ease; }
+.home-empty > span:first-child { border-radius: 50%; background: var(--lime); color: var(--navy); }
+.lock-banner { border-radius: 20px; }
+
+/* 사기 동향 */
+.trend-stat { padding: 20px; border-radius: 24px; background: var(--pri); }
+.trend-stat > b { font-size: 31px; color: var(--lime); }
+.trend-list { padding: 4px 18px; }
+
+/* 통화 검사 */
+.detect-flow { padding: 12px 14px; background: var(--card); color: var(--ink2); }
+.detect-flow svg.lucide { color: var(--pri); opacity: 1; }
+.sample-card { padding: 17px 18px; border-radius: 18px; box-shadow: none; transition: transform .12s ease; }
+.fact-box { border-radius: 18px; background: var(--bg); }
+.fact-head { color: var(--pri); }
+.fact-list svg.lucide { color: var(--pri); }
+.fact-advice { border-top-color: var(--line); }
+.confidence-track { height: 8px; background: #EEF0F4; }
+
+/* 가족 암구호 */
+.phrase-card { padding: 20px; border-radius: 24px; background: var(--navy); box-shadow: none; }
+.phrase-card::before { display: none; }
+.phrase-words { background: rgba(255, 255, 255, .08); border-radius: 18px; }
+.phrase-text { color: var(--lime); letter-spacing: -0.04em; }
+.step-no { border-radius: 50%; }
+
+/* 커뮤니티 */
+.report-card.top { box-shadow: none; }
+.rank-badge { border-radius: 50%; background: var(--navy); color: var(--lime); }
+.vote.on { background: var(--navy); color: var(--lime); }
+
+/* 시작 화면 */
+.brand-hero { margin: 16px 0 26px; }
+.demo-person { padding: 16px 18px; box-shadow: none; transition: transform .12s ease; }
+.demo-person b { font-size: 17px; letter-spacing: -0.02em; }
+.role-btn { border-radius: 16px; background: var(--bg); border-color: transparent; }
+.role-btn.on { background: var(--navy); border-color: var(--navy); color: var(--lime); }
+.role-sub.on { background: var(--navy); color: var(--lime); }
+
+/* 체험 */
+#view .hero[onclick] { background: var(--navy) !important; }
+.scn { padding: 16px; box-shadow: none; transition: transform .12s ease; }
+.scn .icon-box { width: 50px; height: 50px; border-radius: 50%; }
+.chat-wrap { background: #E9EDF3; }
+.chat-head, .sim-progress { background: rgba(233, 237, 243, .97); backdrop-filter: none; }
+.statusbar:has(~ #view .chat-wrap) { background: #E9EDF3; }
+.msg .av { border-radius: 50%; }
+.msg .bubble { border-radius: 6px 18px 18px 18px; box-shadow: none; }
+.msg.me .bubble { background: var(--pri); color: #fff; border-radius: 18px 6px 18px 18px; }
+.sysmsg { background: rgba(17, 24, 39, .08); color: var(--ink2); }
+.sim-act { background: var(--pri-soft); color: var(--pri); }
+.sim-progress i { background: #D5DAE3; }
+.sim-progress i.on { background: var(--navy); }
+.choices { border-radius: 24px 24px 0 0; box-shadow: none; }
+.choice { border-radius: 16px; background: var(--bg); border-color: transparent; }
+.choice:hover { background: var(--pri-soft); border-color: transparent; }
+.choice-act { background: var(--navy); color: var(--lime); }
+
+/* PC 소개 */
+.guard-intro li { background: transparent; border: 0; border-top: 1px solid #D9DEE7; border-radius: 0; padding: 14px 0; }
+.intro-toggle { box-shadow: none; }
+.phone { box-shadow: 0 24px 50px rgba(17, 24, 39, .16); }
+
+@media (prefers-reduced-motion: reduce) { .btn, .quick-grid button, .sample-card, .scn, .demo-person, .home-empty { transition: none; } .btn:active { transform: none; } }
+
+/* 이름 줄과 체험 대화 간격 */
+.demo-person > span:first-child { flex: 1; min-width: 0; }
+#playWrap .chat { padding-top: 12px; }
+@media (max-width: 500px) { #playWrap .chat { padding-top: 12px; } .sim-progress { top: 62px; } }

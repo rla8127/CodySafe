@@ -2,9 +2,10 @@
 import json
 from types import SimpleNamespace as NS
 
+import httpx
 import pytest
 
-from guard import config, llm
+from guard import config, llm, remote_rag
 
 RESULT = {"label": "normal", "confidence": 0.9, "scam_type": "none", "summary": "일상", "evidence": []}
 
@@ -102,3 +103,34 @@ def test_generated_scenario_is_validated_and_cleaned():
     two_safe["steps"][0]["choices"][1]["safe"] = True
     with pytest.raises(ValueError):
         reports.validate(two_safe)
+
+
+def _capture_llm(monkeypatch):
+    seen = {}
+
+    def ask(system, user, schema):
+        seen["user"] = user
+        return {"label": "normal", "confidence": 0.9, "scam_type": "none", "summary": "요약", "evidence": []}
+
+    monkeypatch.setattr(config, "LLM", "anthropic")
+    monkeypatch.setattr(llm, "_ask_json", ask)
+    return seen
+
+
+def test_rag_hits_are_passed_to_llm(monkeypatch):
+    seen = _capture_llm(monkeypatch)
+    monkeypatch.setattr(remote_rag, "search", lambda q: [{"title": "대환대출 사기", "scam_type": "대출빙자", "summary": "선납 이자 요구"}])
+    assert llm.analyze("안녕")["label"] == "normal"
+    assert "<reference>" in seen["user"] and "대환대출 사기" in seen["user"]
+
+
+def test_rag_failure_falls_back_to_llm_only(monkeypatch):
+    seen = _capture_llm(monkeypatch)
+    monkeypatch.setattr(config, "RAG_URL", "http://rag.invalid")
+
+    def boom(*args, **kwargs):
+        raise httpx.ConnectError("down")
+
+    monkeypatch.setattr(remote_rag.httpx, "post", boom)
+    assert llm.analyze("안녕")["label"] == "normal"
+    assert "<reference>" not in seen["user"]

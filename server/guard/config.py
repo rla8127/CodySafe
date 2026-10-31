@@ -36,6 +36,12 @@ OPENAI_STT_MODEL = os.getenv("GUARD_OPENAI_STT_MODEL", "whisper-1")
 LLM = os.getenv("GUARD_LLM", "rule")  # rule | anthropic | openai | bedrock
 EMBED = os.getenv("GUARD_EMBED", "hash")  # hash | openai | titan
 
+# ES 서버의 사기 수법 검색 API. 비우면 RAG 없이 LLM만 호출합니다.
+RAG_URL = os.getenv("GUARD_RAG_URL", "").rstrip("/")
+RAG_API_KEY = os.getenv("GUARD_RAG_API_KEY", "")
+RAG_TOP = int(os.getenv("GUARD_RAG_TOP", "3"))
+RAG_TIMEOUT = float(os.getenv("GUARD_RAG_TIMEOUT", "8"))
+
 ANTHROPIC_MODEL = os.getenv("GUARD_ANTHROPIC_MODEL", "claude-opus-5-5")
 OPENAI_MODEL = os.getenv("GUARD_OPENAI_MODEL", "")  # GUARD_LLM=openai일 때 필수
 OPENAI_EMBED_MODEL = os.getenv("GUARD_OPENAI_EMBED_MODEL", "text-embedding-3-small")
