@@ -46,7 +46,7 @@ class SessionIn(BaseModel):
 class TurnIn(BaseModel):
     choice_id: str | None = Field(default=None, max_length=20)
     text: str | None = Field(default=None, max_length=300)
-    input_type: Literal["choice", "text", "voice"] = "choice"
+    input_type: Literal["choice", "text", "voice", "hangup"] = "choice"  # hangup: 전화 화면의 끊기 버튼
     stt_ms: int | None = Field(default=None, ge=0, le=120000)
 
 
