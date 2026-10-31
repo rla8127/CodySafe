@@ -177,8 +177,11 @@ def _timeout(name: str, default: float) -> float:
 
 
 def _tts_path(text: str, tone: str | None = None):
-    voice = os.getenv("SIM_TTS_VOICE", "")
-    return TTS_CACHE / (hashlib.sha256(f"{voice}|{tone or ''}|{text}".encode()).hexdigest()[:32] + ".audio")
+    # 서버 주소·모델·목소리가 바뀌면 다른 캐시를 쓴다(옛 목소리가 다시 나오지 않게).
+    url = os.getenv("SIM_TTS_URL", "").strip()
+    model = os.getenv("SIM_TTS_MODEL", "tts")
+    voice = os.getenv("SIM_TTS_VOICE", "default")
+    return TTS_CACHE / (hashlib.sha256(f"{url}|{model}|{voice}|{tone or ''}|{text}".encode()).hexdigest()[:32] + ".audio")
 
 
 def call_tts(text: str, tone: str | None = None) -> tuple[bytes, str]:

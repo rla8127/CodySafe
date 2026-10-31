@@ -11,7 +11,9 @@
     "smishing",
     "스미싱",
     "card_delivery",
-    "delivery"
+    "delivery",
+    "secondhand_fraud",
+    "중고거래사기"
   ],
   "source_refs": [
     {

@@ -12,7 +12,9 @@
     "bank_security",
     "government_benefit",
     "기관사칭",
-    "agency"
+    "agency",
+    "loan_refinance",
+    "대출빙자"
   ],
   "source_refs": [
     {

@@ -109,7 +109,10 @@ async function s2LoadHome(arg) {
 function s2resolve(want) {
   if (!want || !S2.list) return null;
   const hit = S2.list.find((i) => i.id === want || i.scam_type === want || (i.aliases || []).includes(want));
-  return hit ? hit.id : S2.list[0].id; // 모르는 수법이면 기본 선택(기관 사칭)
+  if (hit) return hit.id;
+  // 모르는 수법이면 조용히 기관 사칭으로 떨어뜨리지 않고 목록에서 고르게 한다.
+  toast('이 수법의 훈련은 아직 없어요. 목록에서 골라 주세요', 'info');
+  return null;
 }
 
 function s2same(a, b) {
@@ -506,7 +509,9 @@ function s2Pickup() {
   S2.clock = setInterval(() => {
     if (!$('#c2St')) return clearInterval(S2.clock);
     const s = Math.floor((Date.now() - S2.callStart) / 1000);
-    $('#c2Name').textContent = `통화 중 ${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+    // 받은 뒤에는 상대가 밝힌 이름(대본 persona, 가상 인물)과 통화 시간을 함께 보인다.
+    const who = (S2.session && S2.session.persona && S2.session.persona.name) || '모르는 번호';
+    $('#c2Name').textContent = `${who} · ${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
   }, 1000);
   const acts = $('#c2Acts');
   acts.textContent = '';

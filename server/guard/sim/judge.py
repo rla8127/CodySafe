@@ -249,9 +249,29 @@ def _parse(content: str) -> dict:
 
 def _timeout() -> float:
     try:
-        return float(os.getenv("SIM_LLM_TIMEOUT", "6"))
+        return float(os.getenv("SIM_LLM_TIMEOUT", "4"))
     except ValueError:
-        return 6.0
+        return 4.0
+
+
+def _budget() -> float:
+    """자유 입력 한 차례의 판정 전체 상한(초). 넘으면 남은 경로를 건너뛰고 기본 중답으로 간다."""
+    try:
+        return float(os.getenv("SIM_JUDGE_BUDGET", "8"))
+    except ValueError:
+        return 8.0
+
+
+_MODEL_CACHE: dict[str, str] = {}  # SIM_LLM_MODEL이 비었을 때 주소별로 /models를 한 번만 묻는다
+
+
+def _model_for(client, base_url: str) -> str:
+    model = os.getenv("SIM_LLM_MODEL", "").strip()
+    if model:
+        return model
+    if base_url not in _MODEL_CACHE:
+        _MODEL_CACHE[base_url] = client.models.list().data[0].id
+    return _MODEL_CACHE[base_url]
 
 
 def _ask_gpu(text: str, ctx: dict) -> dict:
@@ -259,7 +279,7 @@ def _ask_gpu(text: str, ctx: dict) -> dict:
 
     base_url = os.getenv("SIM_LLM_BASE_URL", "").strip()
     client = OpenAI(base_url=base_url, api_key=os.getenv("SIM_LLM_API_KEY") or "EMPTY", timeout=_timeout(), max_retries=0)
-    model = os.getenv("SIM_LLM_MODEL", "").strip() or client.models.list().data[0].id
+    model = _model_for(client, base_url)
     response = client.chat.completions.create(
         model=model,
         messages=[{"role": "system", "content": JUDGE_SYSTEM}, {"role": "user", "content": _user_prompt(text, ctx)}],
@@ -314,6 +334,9 @@ def judge(text: str, ctx: dict) -> dict:
         if fallback in ("openai", "anthropic"):
             attempts.append(("fallback", lambda: _ask_fallback(fallback, text, ctx)))
         for name, ask in attempts:
+            if time.perf_counter() - started > _budget() - _timeout():
+                log.warning("sim 판정 %s 건너뜀: 시간 상한", name)
+                continue
             try:
                 answer = ask()
             except Exception as exc:  # 어떤 실패든 다음 경로로 넘어간다

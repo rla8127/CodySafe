@@ -68,16 +68,22 @@ def get_graph(scenario_id: str) -> Graph:
     raise KeyError(scenario_id)
 
 
-def resolve_type(kind: str | None) -> str:
-    """'같은 수법 훈련하기' 링크의 type 값을 그래프 ID로 바꾼다. 모르면 기관 사칭(기본 선택)."""
+def known_type(kind: str | None) -> str | None:
+    """type 값(그래프 ID·scam_kb id·분류 이름·aliases)에 맞는 그래프 ID. 모르면 None(화면은 목록으로 보낸다)."""
     if not kind:
-        return DEFAULT_GRAPH
+        return None
     if kind in graphs():
         return kind
     for graph in graphs().values():
-        if kind in graph.aliases:
+        if kind in graph.aliases or kind == graph.scam_type:
             return graph.id
-    return TYPE_TO_GRAPH.get(kind, DEFAULT_GRAPH)
+    mapped = TYPE_TO_GRAPH.get(kind)
+    return mapped if mapped in graphs() else None
+
+
+def resolve_type(kind: str | None) -> str:
+    """세션을 시작할 때 쓰는 그래프 ID. 모르면 기관 사칭(기본 선택). 화면은 known_type으로 먼저 거른다."""
+    return known_type(kind) or DEFAULT_GRAPH
 
 
 def slot_values(profile: SimProfile, otp: str) -> dict[str, str]:
