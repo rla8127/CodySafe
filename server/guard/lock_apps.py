@@ -28,6 +28,16 @@ LOCK_APPS = [
     "com.kjbank.asb.pbanking",  # 광주 와뱅크
     "kr.co.jbbank.privatebank",  # 전북은행 쏙뱅크
     "com.jejubank.smartnew",  # 제주은행
+    "nh.smart.nhcok",  # NH콕뱅크
+    # 카드
+    "com.wooricard.smartapp",  # 우리WON카드
+    "com.shcard.smartpay",  # 신한 SOL페이
+    "com.kbcard.cxh.appcard",  # KB Pay
+    "net.ib.android.smcard",  # 모니모(삼성카드)
+    "com.hyundaicard.appcard",  # 현대카드
+    "com.lcacApp",  # 디지로카(롯데카드)
+    "com.hanaskcard.paycla",  # 하나Pay
+    "kvp.jjy.MispAndroid320",  # 페이북/ISP(BC카드)
     # 간편결제·송금
     "viva.republica.toss",  # 토스
     "com.kakaopay.app",  # 카카오페이
