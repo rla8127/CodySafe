@@ -47,7 +47,7 @@ flowchart LR
 | 사용자별 S3 저장 | 구현, 실제 버킷에 시험 파일로 확인 |
 | 폴더 연결, 분석 후 경고, 금융 앱 차단 (Android) | 구현, 실제 폰 1대에서 녹화로 확인 ([영상](server/web/media/demo.mp4)) |
 | 15초 감지 주기, 앱이 꺼진 뒤 주기 실행 (Android) | 구현, 주기와 지연은 미측정 |
-| 사례 검색 (RAG) | 별도 Elasticsearch 검색 서버를 `GUARD_RAG_URL`로 연결하면 판정 전에 참고 자료로 넣음. 서버 인프라는 [infra/es-server](infra/es-server/)에 있고 검색 API 코드는 저장소에 없음. 없어도 LLM만으로 동작. 내장 검색은 판정 뒤 유형 표시에 쓰며 벡터는 해시 임베딩. 효과 미측정 |
+| 사례 검색 (RAG) | 별도 Elasticsearch 검색 서버를 `GUARD_RAG_URL`로 연결하면 판정 전에 참고 자료로 넣음. 코드와 실행 방법은 [infra/es-server](infra/es-server/codysafe-rag/README.md)에 있음. 원본 데이터는 올리지 않아 재현에 데이터 폴더가 필요. 서버가 없어도 LLM만으로 동작. 내장 검색은 판정 뒤 유형 표시에 쓰며 벡터는 해시 임베딩. 효과 미측정 |
 | 피드백, 사용자 대시보드 | 구현, 자동 테스트와 브라우저로 확인 |
 | 재학습, 검색 색인 갱신 | 추후 과제 |
 | L4 GPU 자체 STT | 미구현 |
@@ -98,7 +98,7 @@ server/guard/    API, 판정 파이프라인, RAG, 제보, 암구호
 server/web/      웹 화면
 server/tests/    자동 테스트
 android/         WebView 앱, 폴더 감시, 금융 앱 차단
-infra/es-server/ 사례 검색 서버 Terraform
+infra/es-server/ 사례 검색 서버 (Terraform, Elasticsearch, 검색 API, 색인 스크립트)
 index.html, css/, js/, assets/   공용 화면 자원과 초기 웹 MVP
 docs/family-guard-plan.md        기획서
 docs/project-plan.md             초기 QR 판독 기획 (이번 제출 범위 아님)
@@ -124,7 +124,10 @@ docs/project-plan.md             초기 QR 판독 기획 (이번 제출 범위 �
 | Amazon S3 | 음성 저장 |
 | Langfuse Cloud | 처리 시간, 토큰, 비용 관측. 통화 내용은 보내지 않음 |
 | OpenAI `gpt-image-2` | 체험의 가상 인물 사진 3장 생성 |
-| Elasticsearch | 사기 사례 검색 서버 (선택) |
+| Elasticsearch 8.17.0, analysis-nori | 사기 사례 검색 서버 (선택) |
+| BAAI/bge-m3, sentence-transformers, PyTorch | 검색 임베딩 |
+| Anthropic `claude-haiku-5-5` | 검색 문서 분류와 구조화 |
+| 금융당국 보도자료, KISA 118 상담 기반 합성 데이터, 금감원 공개 녹음 전사(KorCCVi, 내부 학습용으로 검색 결과에서 제외) | 검색 문서 원천 |
 | Terraform, Docker | 검색 서버 구성 |
 | FastAPI, SQLite | 서버 |
 | AndroidX WorkManager, DocumentFile | 앱 |

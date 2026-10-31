@@ -8,4 +8,4 @@ terraform apply -var key_name=<키페어> \
   -var 'ssh_allowed_cidrs=["<IP>/32"]' -var 'es_allowed_cidrs=["<IP>/32"]' -var 'rag_allowed_cidrs=["<앱 서버 IP>/32"]'
 ```
 
-Elasticsearch 실행 설정과 검색 API 코드는 이 폴더에 없습니다.
+Elasticsearch 실행 설정, 검색 API, 색인 스크립트는 [codysafe-rag](codysafe-rag/README.md)에 있습니다.

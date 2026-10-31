@@ -4,7 +4,7 @@ import os, sys
 from dotenv import load_dotenv
 from elasticsearch import Elasticsearch, NotFoundError
 
-load_dotenv(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".env"))
+load_dotenv(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", ".env"))
 es = Elasticsearch(os.environ["ES_URL"], basic_auth=("elastic", os.environ["ELASTIC_PASSWORD"]))
 INDEX, ALIAS = "scam_knowledge_v1", "scam_knowledge"
 ko = lambda: {"type": "text", "analyzer": "ko"}

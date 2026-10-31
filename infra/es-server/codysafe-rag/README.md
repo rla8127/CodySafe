@@ -1,4 +1,4 @@
-# server/rag : 사기 수법 RAG (Elasticsearch + 검색 API)
+# 사기 수법 RAG (Elasticsearch + 검색 API)
 
 ```
 docker-compose.yml, Dockerfile.es   Elasticsearch 8.17.0 단일 노드 (nori 플러그인 포함), 127.0.0.1:9200, 보안 켬
@@ -18,7 +18,7 @@ pip install --index-url https://download.pytorch.org/whl/cpu torch && pip instal
 python scripts/create_index.py            # 인덱스, 별칭, scam_rag_app 계정
 python scripts/ingest.py --dry-run --max 7 --pdf 2   # 검토 후
 python scripts/ingest.py --max 100        # 적재
-uvicorn app.rag_api:app --host 127.0.0.1 --port 8200
+uvicorn app.rag_api:app --env-file .env --host 127.0.0.1 --port 8200
 ```
 
 `ingest.py`는 이미 적재된 `source_url`을 LLM 호출 전에 건너뛰므로 재실행해도 문서가 늘지 않는다.
