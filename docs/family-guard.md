@@ -93,7 +93,7 @@ GUARD_STT=openai
 
 ## 트레이싱
 
-`server/.env`에 `LANGFUSE_PUBLIC_KEY`, `LANGFUSE_SECRET_KEY`, `LANGFUSE_BASE_URL`이 있으면 Langfuse로 음성 변환, 사례 검색, 판정, 재순위, 시나리오 생성의 시간과 토큰, 판정 라벨을 보냅니다. 입력과 출력, 통화 내용은 보내지 않습니다. 키가 없거나 전송에 실패해도 분석은 그대로 진행합니다. 변경 요청(POST, PUT, DELETE) 하나가 트레이스 하나이며, 5초마다 도는 조회는 기록하지 않습니다.
+`server/.env`에 `LANGFUSE_PUBLIC_KEY`, `LANGFUSE_SECRET_KEY`, `LANGFUSE_BASE_URL`이 있으면 Langfuse로 음성 변환, 사례 검색, 판정, 재순위, 시나리오 생성의 시간과 토큰, 판정 라벨을 보냅니다. 입력과 출력, 통화 내용은 보내지 않습니다. 키가 없거나 전송에 실패해도 분석은 그대로 진행합니다. 통화 분석, 예시 통화 분석, 시나리오 생성 한 번이 트레이스 하나이고, 그 안에 단계별 스팬이 들어갑니다. 다른 API 요청은 기록하지 않습니다.
 
 ## 웹 시연 가족
 

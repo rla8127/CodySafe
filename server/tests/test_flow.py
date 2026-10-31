@@ -516,7 +516,7 @@ def test_ops_finds_surge_masks_numbers_and_excludes_normal_calls(client):
     assert dashboard._number("통화 010-1234-5678_260101_120000.m4a") == "01012345678"
 
 
-def test_each_change_request_is_one_trace_without_ids_or_polling(client, monkeypatch):
+def test_one_analysis_is_one_trace_and_other_requests_add_none(client, monkeypatch):
     from contextlib import contextmanager
     from types import SimpleNamespace as NS
 
@@ -532,9 +532,88 @@ def test_each_change_request_is_one_trace_without_ids_or_polling(client, monkeyp
     monkeypatch.setattr(tracing, "trace", trace)
     h = device(client, "요청")
     client.get("/v1/lock", headers=h)
-    r = client.post("/v1/recordings", headers=h, json={"filename": "t.txt", "client_key": "trace"}).json()
-    u = urlsplit(r["upload_url"])
-    client.put(f"{u.path}?{u.query}", content=NORMAL.encode())
-    client.post(f"/v1/recordings/{r['id']}/complete", headers=h)
-    assert names == ["POST /v1/devices", "POST /v1/recordings", "PUT /v1/local-upload/{id}", "POST /v1/recordings/{id}/complete"]
-    assert not any(r["id"] in n or "token" in n for n in names)
+    send(client, h, NORMAL, "trace")
+    assert names == ["통화 분석"]
+
+
+def _quiz_answers(client, headers, right=True):
+    from guard.quiz_cards import BY_ID
+
+    gained = 0
+    for card in client.get("/v1/quiz", headers=headers).json()["cards"]:
+        is_scam = BY_ID[card["id"]]["is_scam"] == right
+        gained += client.post(f"/v1/quiz/{card['id']}/answer", headers=headers, json={"is_scam": is_scam}).json()["gained"]
+    return gained
+
+
+def test_pet_grows_from_training_with_daily_limit_and_new_scenario_bonus(client):
+    p, g = linked(client)
+    start = client.get("/v1/pet", headers=p).json()
+    assert start["xp"] == 0 and start["stage_name"] == "아기 코디" and start["mood"]["key"] == "green"
+    assert device(client, "혼자") and client.get("/v1/pet", headers=device(client, "혼자")).json()["stage_name"] == "알"
+    first = client.post("/v1/training", headers=p, json={"scenario": "agency", "tag": "기관 사칭", "score": 0}).json()["pet"]
+    assert first["gained"] == 30
+    assert client.post("/v1/training", headers=p, json={"scenario": "agency", "tag": "기관 사칭", "score": 100}).json()["pet"]["gained"] == 0
+    assert client.post("/v1/training", headers=p, json={"scenario": "loan", "tag": "대출 사기", "score": 100}).json()["pet"]["gained"] == 10
+    # 가족이 한 마리를 함께 키웁니다.
+    assert client.get("/v1/pet", headers=g).json()["xp"] == 40
+
+
+def test_pet_mood_shows_only_suspicion_to_family_and_turns_blue_after_check(client):
+    p, g = linked(client)
+    with db.connect() as conn:
+        protected_id, guardian_id = (
+            conn.execute("SELECT id FROM devices WHERE token = ?", (h["Authorization"].removeprefix("Bearer "),)).fetchone()["id"] for h in (p, g)
+        )
+        conn.execute(
+            "INSERT INTO recordings (id, device_id, client_key, filename, s3_key, upload_token, status, needs_review, created_at)"
+            " VALUES ('uncertain', ?, 'k', 'f', 's', 't', 'done', 1, ?)",
+            (protected_id, db.now()),
+        )
+    # 애매한 통화는 본인만 노랑으로 보고 가족에게는 드러나지 않습니다.
+    assert client.get("/v1/pet", headers=p).json()["mood"]["key"] == "yellow"
+    assert client.get("/v1/pet", headers=g).json()["mood"]["key"] == "green"
+    with db.connect() as conn:
+        alert = conn.execute(
+            "INSERT INTO alerts (guardian_id, protected_id, recording_id, title, body, created_at) VALUES (?, ?, 'r1', 't', 'b', ?)",
+            (guardian_id, protected_id, db.now()),
+        ).lastrowid
+    seen = client.get("/v1/pet", headers=g).json()
+    assert seen["mood"]["key"] == "red" and "r1" not in str(seen)
+    assert client.post(f"/v1/alerts/{alert}/ack", headers=g).status_code == 200
+    after = client.get("/v1/pet", headers=g).json()
+    assert after["mood"]["key"] == "blue" and after["xp"] == 30
+
+
+def test_quiz_hides_answers_until_answered_and_reveals_when_family_done(client):
+    p, g = linked(client)
+    view = client.get("/v1/quiz", headers=p).json()
+    assert len(view["cards"]) == 3 and all("is_scam" not in c and "why" not in c for c in view["cards"])
+    assert client.post("/v1/quiz/none/answer", headers=p, json={"is_scam": True}).status_code == 404
+    assert _quiz_answers(client, p) == 25
+    waiting = client.get("/v1/quiz", headers=p).json()
+    assert waiting["finished"] and not waiting["reveal"] and waiting["dishes"] is None
+    assert [m["score"] for m in waiting["members"] if not m["me"]] == [None]
+    # 다시 답해도 점수와 정답 기록은 바뀌지 않습니다.
+    assert _quiz_answers(client, p, right=False) == 0
+    assert _quiz_answers(client, g, right=False) == 40
+    done = client.get("/v1/quiz", headers=g).json()
+    assert done["reveal"] and done["dishes"] == "자녀"
+    assert client.get("/v1/pet", headers=g).json()["xp"] == 65
+
+
+def test_weekly_quiz_always_mixes_scam_and_normal():
+    from guard import pet
+
+    for week in range(1, 53):
+        cards = pet.week_cards(f"2026-W{week:02d}")
+        kinds = {c["is_scam"] for c in cards}
+        assert len({c["id"] for c in cards}) == 3 and kinds == {True, False}
+
+
+def test_quiz_cards_clue_appears_in_text():
+    from guard.quiz_cards import CARDS
+
+    assert len(CARDS) == 15
+    for card in CARDS:
+        assert card["clue"] in card["text"] or card["clue"] == card["sender"], card["id"]
