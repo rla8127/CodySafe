@@ -1,0 +1,8 @@
+{
+  "dataset_hashes": "20/20 passed",
+  "evaluation_samples": "20/20 × 5 models passed",
+  "real_recording": "5/5 completed; unscored",
+  "api_restored": true,
+  "api_regression": "passed",
+  "models_with_complete_scores": 5
+}
