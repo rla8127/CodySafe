@@ -316,6 +316,22 @@ def test_samples_show_result_without_touching_records_alerts_or_lock(client):
     assert client.get("/v1/lock", headers=p).json()["locked"] is False
 
 
+def test_recorded_sample_shows_as_example_without_side_effects(client):
+    p, g = linked(client)
+    first = client.post("/v1/samples/prosecutor/analyze?record=1", headers=p).json()
+    client.post("/v1/samples/prosecutor/analyze?record=1", headers=p)
+    items = client.get("/v1/recordings", headers=p).json()["items"]
+    assert len(items) == 1 and items[0]["sample"] is True
+    assert items[0]["label"] == first["label"] and items[0]["evidence"] == first["evidence"] and items[0]["matches"] == first["matches"]
+    assert client.post(f"/v1/recordings/{items[0]['id']}/review", headers=p, json={"label": "normal"}).status_code == 409
+    assert client.get("/v1/alerts", headers=g).json()["items"] == []
+    assert client.get("/v1/lock", headers=p).json()["locked"] is False
+    assert client.get("/v1/recommendations", headers=p).json()["analyzed"] == 0
+    assert client.get("/v1/dashboard/me", headers=p).json()["calls"]["total"] == 0
+    assert client.delete(f"/v1/recordings/{items[0]['id']}", headers=p).status_code == 200
+    assert client.get("/v1/recordings", headers=p).json()["items"] == []
+
+
 def test_s3_mode_keeps_voice_per_device_and_deletes_after_analysis(client, monkeypatch):
     from guard import providers
 

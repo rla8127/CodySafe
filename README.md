@@ -125,7 +125,8 @@ docs/project-plan.md             초기 QR 판독 기획 (이번 제출 범위 �
 | Anthropic Claude (`claude-opus-5-5`) | 사기 판정, 재순위, 시나리오 생성 |
 | faster-whisper, Whisper large-v3-turbo | 자체 STT 서버 |
 | OpenAI `whisper-1` | 음성 변환 대체 경로 |
-| Amazon Polly | STT 평가용 한국어 음성 생성 |
+| Amazon Polly | STT 평가용 한국어 음성 데이터셋 생성 |
+| ElevenLabs | 자연스러운 음성 생성 |
 | Amazon S3 | 음성 저장 |
 | [Langfuse Cloud](https://us.cloud.langfuse.com/project/cmvwspomu005fad0e5vr8sgrq/traces) | 처리 시간, 토큰, 비용 관측. 통화 내용은 보내지 않음. 프로젝트 권한이 있어야 열림 |
 | OpenAI `gpt-image-2` | 체험의 가상 인물 사진 3장 생성 |

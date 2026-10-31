@@ -7,6 +7,9 @@ from pathlib import Path
 
 from . import config
 
+# 검사 결과에 예시로 남긴 가상 통화의 client_key 접두사입니다.
+SAMPLE_KEY_PREFIX = "sample:"
+
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS devices (
   id TEXT PRIMARY KEY, token TEXT UNIQUE NOT NULL, name TEXT NOT NULL, created_at REAL NOT NULL
@@ -166,6 +169,7 @@ def public_recording(row: sqlite3.Row) -> dict:
     return {
         "id": row["id"],
         "filename": row["filename"],
+        "sample": row["client_key"].startswith(SAMPLE_KEY_PREFIX),
         "status": row["status"],
         "error": row["error"],
         "label": row["label"],

@@ -366,6 +366,7 @@ def _analyze_sample(sample_id: str) -> dict:
                     "status": "done",
                     "label": result["label"],
                     "confidence": result["confidence"],
+                    "scam_type": result["scam_type"],
                     "review_label": None,
                     "evidence": result["evidence"],
                     "matches": pipeline.public_matches(pipeline.find_matches(result, text)),
@@ -379,9 +380,27 @@ def list_samples(_: str = Depends(current_device)):
     return {"items": samples.SAMPLES}
 
 
+def _record_sample(device: str, sample_id: str, result: dict) -> None:
+    """검사 결과 목록에 예시로 남깁니다. 가족 알림, 잠금, 통계, 데이터셋에는 영향을 주지 않습니다."""
+    with db.connect() as conn:
+        conn.execute(
+            "INSERT INTO recordings (id, device_id, client_key, filename, s3_key, upload_token, status, label, confidence, scam_type, evidence, matches, created_at)"
+            " VALUES (?, ?, ?, ?, '', '', 'done', ?, ?, ?, ?, ?, ?)"
+            " ON CONFLICT (device_id, client_key) DO UPDATE SET created_at = excluded.created_at",
+            (
+                uuid.uuid4().hex, device, f"{db.SAMPLE_KEY_PREFIX}{sample_id}", samples.BY_ID[sample_id]["title"],
+                result["label"], result["confidence"], result["scam_type"],
+                json.dumps(result["evidence"], ensure_ascii=False), json.dumps(result["matches"], ensure_ascii=False), db.now(),
+            ),
+        )
+
+
 @app.post("/v1/samples/{sample_id}/analyze")
-def analyze_sample(sample_id: str, _: str = Depends(current_device)):
-    return _analyze_sample(sample_id)
+def analyze_sample(sample_id: str, record: bool = False, device: str = Depends(current_device)):
+    result = _analyze_sample(sample_id)
+    if record:
+        _record_sample(device, sample_id, result)
+    return result
 
 
 @app.get("/v1/demo/samples")
@@ -585,7 +604,9 @@ def delete_recording(rec_id: str, device: str = Depends(current_device)):
         conn.execute("DELETE FROM alerts WHERE recording_id = ?", (rec_id,))
         conn.execute("DELETE FROM recording_feedback WHERE recording_id = ?", (rec_id,))
         conn.execute("DELETE FROM review_dataset WHERE recording_id = ?", (rec_id,))
-    providers.delete_audio(row["s3_key"])
+    # 예시 통화는 음성 파일이 없습니다.
+    if row["s3_key"]:
+        providers.delete_audio(row["s3_key"])
     return {"ok": True}
 
 
@@ -625,6 +646,8 @@ def review(rec_id: str, body: ReviewIn, device: str = Depends(current_device)):
             raise HTTPException(404)
         if row["status"] != "done":
             raise HTTPException(409, "not analyzed")
+        if row["client_key"].startswith(db.SAMPLE_KEY_PREFIX):
+            raise HTTPException(409, "sample")
         scam_type = body.scam_type or row["scam_type"]
         # 사람이 확인한 라벨입니다. 글자 기록은 넣지 않아 정상 통화 내용 없이도 오탐률을 잴 수 있습니다.
         conn.execute(

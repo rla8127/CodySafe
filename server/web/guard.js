@@ -262,6 +262,7 @@ function verdictChip(r, label) {
 
 // 파일명의 이름과 전화번호를 화면에 드러내지 않고 시각만 보여 줍니다. 파일명에 시각이 없으면 올린 시각을 씁니다.
 function callTitle(r) {
+  if (r.sample) return esc(r.filename);
   const m = /_\d{2}(\d{2})(\d{2})_(\d{2})(\d{2})\d{2}\./.exec(r.filename);
   if (m) return `${+m[1]}월 ${+m[2]}일 ${m[3]}:${m[4]} 통화`;
   const d = new Date(r.created_at * 1000);
@@ -298,7 +299,7 @@ function recordingCard(r) {
   const label = r.review_label || r.label;
   const top = r.matches[0];
   return `<div class="card mt">
-    ${verdictChip(r, label)}
+    ${r.sample ? '<span class="chip">예시 통화</span> ' : ''}${verdictChip(r, label)}
     <div class="call-title">${callTitle(r)}</div>
     ${confidenceBar(r)}
     ${r.status === 'failed' ? '<div class="call-text">처리에 실패했습니다. 다시 시도해 주세요.</div>' : ''}
@@ -337,7 +338,7 @@ async function act(method, path, body) {
 
 // 사람의 확인을 오탐률과 다음 개선의 근거로 모읍니다.
 function feedbackActions(r) {
-  if (r.status !== 'done') return '';
+  if (r.status !== 'done' || r.sample) return '';
   if (r.review_label) return `<span class="feedback-done">${ic('circle-check')}확인 완료</span><button class="quiet" onclick="reviewSheet('${r.id}')">고치기</button>`;
   const known = ['voice_phishing', 'other_scam', 'normal'].includes(r.label);
   if (!known) return `<button onclick="reviewSheet('${r.id}')">판정 확인</button>`;
@@ -369,7 +370,8 @@ SCREENS.home = gated(() => `<div class="page">
 </div>`);
 
 function homeData({ recordings, recs, family, alerts, lock, reports, pet }) {
-  const items = recordings.items;
+  // 예시 통화는 홈의 통화 수와 의심 건수에 넣지 않습니다.
+  const items = recordings.items.filter((r) => !r.sample);
   const flagged = items.filter((r) => ['voice_phishing', 'other_scam'].includes(r.review_label || r.label)).length;
   const reviews = items.filter((r) => r.needs_review).length;
   const unread = alerts.items.filter((a) => !a.acked);
@@ -785,7 +787,7 @@ SCREENS.detect = gated(() => `<div class="page">
   <div class="card mt">${folderBlock()}<button class="guide-link" onclick="folderGuide()">${ic('circle-help')}녹음 폴더 설정 가이드${ic('chevron-right')}</button></div>
   <button class="btn grad block mt" onclick="$('#filePick').click()">${ic('upload')}파일 직접 올려 검사</button>
   <div class="sec-title">예시로 체험하기</div>
-  <div class="muted small sample-intro">가상의 통화 대본으로 분석 결과를 미리 봅니다. 기록에 남지 않고 가족 알림과 잠금도 일어나지 않습니다.</div>
+  <div class="muted small sample-intro">가상의 통화 대본으로 분석 결과를 미리 봅니다. ${native ? '기록에 남지 않고' : '아래 분석 결과에 예시로 표시되며,'} 가족 알림과 잠금은 일어나지 않습니다.</div>
   <div id="samples"></div>
   <div class="sec-title">분석 결과</div>
   <div id="data"></div>
@@ -837,8 +839,9 @@ async function openSample(id) {
     <button class="btn line block mt" onclick="closeSheet()">닫기</button></div>`);
   icons();
   try {
-    const r = await api('POST', `/v1/samples/${id}/analyze`);
+    const r = await api('POST', `/v1/samples/${id}/analyze?record=${native ? 0 : 1}`);
     if ($('#sampleResult')) $('#sampleResult').innerHTML = sampleResultHtml(r);
+    if (!native) { lastData = ''; refresh(); }
   } catch (e) {
     if ($('#sampleResult')) $('#sampleResult').innerHTML = '<div class="sample-wait">분석에 실패했습니다. 잠시 뒤 다시 시도해 주세요.</div>';
   }

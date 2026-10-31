@@ -1,6 +1,8 @@
 """사용자 본인의 대시보드 집계입니다."""
 import sqlite3
 
+from . import db
+
 
 
 def user(conn: sqlite3.Connection, device: str) -> dict:
@@ -10,8 +12,8 @@ def user(conn: sqlite3.Connection, device: str) -> dict:
     weak = sorted((r for r in latest.values() if r["score"] < 100), key=lambda r: r["score"])[:3]
     calls = conn.execute(
         "SELECT COUNT(*) AS total, SUM(COALESCE(review_label, label) IN ('voice_phishing', 'other_scam')) AS flagged FROM recordings"
-        " WHERE device_id = ? AND status = 'done'",
-        (device,),
+        " WHERE device_id = ? AND status = 'done' AND client_key NOT LIKE ?",
+        (device, f"{db.SAMPLE_KEY_PREFIX}%"),
     ).fetchone()
     confirmed = conn.execute("SELECT COUNT(*) FROM recording_feedback WHERE device_id = ?", (device,)).fetchone()[0]
     return {

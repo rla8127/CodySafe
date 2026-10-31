@@ -104,7 +104,8 @@ def recommendations(device_id: str) -> dict:
     """본인 기록에서 자주 나온 유형을 먼저, 사람이 고친 라벨을 우선해 추천합니다."""
     with db.connect() as conn:
         rows = conn.execute(
-            "SELECT scam_type, label, review_label FROM recordings WHERE device_id = ? AND status = 'done'", (device_id,)
+            "SELECT scam_type, label, review_label FROM recordings WHERE device_id = ? AND status = 'done' AND client_key NOT LIKE ?",
+            (device_id, f"{db.SAMPLE_KEY_PREFIX}%"),
         ).fetchall()
     counts: dict[str, int] = {}
     for r in rows:
