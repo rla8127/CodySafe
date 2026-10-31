@@ -127,7 +127,7 @@ docs/project-plan.md             초기 QR 판독 기획 (이번 제출 범위 �
 | OpenAI `whisper-1` | 음성 변환 대체 경로 |
 | Amazon Polly | STT 평가용 한국어 음성 생성 |
 | Amazon S3 | 음성 저장 |
-| Langfuse Cloud | 처리 시간, 토큰, 비용 관측. 통화 내용은 보내지 않음 |
+| [Langfuse Cloud](https://us.cloud.langfuse.com/project/cmvwspomu005fad0e5vr8sgrq/traces) | 처리 시간, 토큰, 비용 관측. 통화 내용은 보내지 않음. 프로젝트 권한이 있어야 열림 |
 | OpenAI `gpt-image-2` | 체험의 가상 인물 사진 3장 생성 |
 | Elasticsearch 8.17.0, analysis-nori | 사기 사례 검색 서버 (선택) |
 | BAAI/bge-m3, sentence-transformers, PyTorch | 검색 임베딩 |
