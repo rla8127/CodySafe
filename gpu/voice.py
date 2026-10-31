@@ -44,7 +44,7 @@ hf_cache = modal.Volume.from_name("codysafe-hf-cache", create_if_missing=True)
 VOLUMES = {"/root/.cache/huggingface": hf_cache}
 app = modal.App(APP_NAME)
 
-# Pace is not reliable through the instruct alone (08:4x test), so _synth trims silence and time-stretches
+# Pace is not reliable through the instruct alone (08:3x test), so _synth trims silence and time-stretches
 # (pitch kept, ffmpeg atempo) to a target syllables-per-second per tone.
 RATE = {"": 6.2, "calm": 5.6, "official": 5.8, "urgent": 7.2, "threat": 6.4, "tremble": 6.6, "sob": 5.2,
         "friendly": 6.4}
