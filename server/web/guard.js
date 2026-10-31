@@ -669,7 +669,8 @@ async function unlockSheet(id) {
 /* ---------------- 검사 ---------------- */
 SCREENS.detect = gated(() => `<div class="page">
   <div class="lead" style="margin-top:6px">통화 검사</div>
-  <div class="lead-sub" style="margin-top:6px">저장된 통화 녹음을 AI가 분석합니다. 결과는 본인만 볼 수 있습니다.</div>
+  <div class="lead-sub" style="margin-top:6px">${native ? '통화가 끝나면 새 녹음 파일을 자동으로 STT로 분석한 뒤 진단 결과를 알려 드립니다.' : '녹음 파일을 올리면 STT로 분석한 뒤 진단 결과를 알려 드립니다. 통화 후 자동 분석은 안드로이드 앱에서 동작합니다.'} 결과는 본인만 볼 수 있습니다.</div>
+  <div class="detect-flow">${[native ? '통화 종료' : '파일 올리기', 'STT 변환', 'AI 진단', '결과 확인'].map((t, i) => `${i ? ic('chevron-right') : ''}<span>${t}</span>`).join('')}</div>
   <div class="card mt">${folderBlock()}<button class="guide-link" onclick="folderGuide()">${ic('circle-help')}녹음 폴더 설정 가이드${ic('chevron-right')}</button></div>
   <button class="btn grad block mt" onclick="$('#filePick').click()">${ic('upload')}파일 직접 올려 검사</button>
   <div class="sec-title">예시로 체험하기</div>
