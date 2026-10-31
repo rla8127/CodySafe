@@ -6,6 +6,7 @@ const S2 = {
   list: null, profile: null, presets: [], caps: {}, pick: null,
   session: null, scene: null, result: null, busy: false,
   speakToken: 0, audioCtx: null, source: null, rec: null, recog: null, sttNotice: false, clock: null, callStart: 0,
+  sttGen: 0, sttAbort: null,
 };
 const S2_AGE = [['60s', '60대'], ['70s', '70대'], ['80plus', '80대 이상']];
 const S2_REGIONS = ['서울', '부산', '대구', '인천', '광주', '대전', '울산', '세종', '경기', '강원', '충북', '충남', '전북', '전남', '경북', '경남', '제주'];
@@ -265,6 +266,7 @@ function s2RenderScore(score) {
 
 async function s2Start(mode) {
   if (S2.busy) return;
+  s2CancelStt();
   S2.busy = true;
   try {
     const r = await api('POST', '/v1/sim/sessions', { scenario_id: S2.pick, mode });
@@ -304,6 +306,7 @@ function s2Quit() {
 function s2StopNow() {
   closeSheet();
   s2StopAudio();
+  s2CancelStt();
   S2.session = null;
   location.hash = '#/sim2';
 }
@@ -420,8 +423,24 @@ function s2ChatChoices(scene, reask, locked) {
   if (!locked && !reask) input.focus({ preventScroll: true });
 }
 
+// 음성 인식 표: 녹음을 시작한 세션·장면·차례를 적어 두고, 결과가 늦게 오면 지금과 같은지 본다.
+// 답을 내거나(선택지 포함) 그만두거나 새 훈련을 시작하면 세대값을 올려 옛 결과를 버린다(GAF 검토 11-01).
+function s2Ticket() {
+  return { gen: S2.sttGen, sid: S2.session && S2.session.session_id, node: S2.scene && S2.scene.node_id, turn: S2.scene && S2.scene.turn };
+}
+function s2Fresh(t) {
+  return !!t && t.gen === S2.sttGen && !S2.busy && !!S2.session && S2.session.session_id === t.sid
+    && !!S2.scene && S2.scene.node_id === t.node && S2.scene.turn === t.turn && !!$('#c2Tr');
+}
+function s2CancelStt() {
+  S2.sttGen++;
+  if (S2.sttAbort) { try { S2.sttAbort.abort(); } catch (e) { } }
+  S2.sttAbort = null;
+}
+
 async function s2Answer(payload, shown) {
   if (S2.busy || !S2.session) return;
+  s2CancelStt();
   S2.busy = true;
   const isCall = !!$('#c2Tr');
   if (isCall) s2CallLine('me', shown); else s2Bubble('me', shown);
@@ -584,6 +603,7 @@ function s2Listen() {
 
 // 임대 GPU STT: 녹음해 서버로 보낸다. 실패하면 브라우저 인식, 그다음 선택지.
 async function s2RecordGpu() {
+  const ticket = s2Ticket();
   let stream;
   try {
     stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -597,22 +617,29 @@ async function s2RecordGpu() {
   rec.onstop = async () => {
     stream.getTracks().forEach((t) => t.stop());
     S2.rec = null;
-    if (rec.s2cancel) return s2Mic('idle');
+    if (rec.s2cancel || !s2Fresh(ticket)) return s2Mic('idle');
     s2Mic('idle', '알아듣는 중…');
     const blob = new Blob(chunks, { type: rec.mimeType || 'audio/webm' });
     const t0 = performance.now();
+    const ctrl = window.AbortController ? new AbortController() : null;
+    S2.sttAbort = ctrl;
     try {
-      const res = await fetch('/v1/sim/stt', { method: 'POST', headers: { Authorization: 'Bearer ' + store.get('token'), 'Content-Type': blob.type || 'audio/webm' }, body: blob });
+      const res = await fetch('/v1/sim/stt', { method: 'POST', headers: { Authorization: 'Bearer ' + store.get('token'), 'Content-Type': blob.type || 'audio/webm' }, body: blob, signal: ctrl ? ctrl.signal : undefined });
       if (!res.ok) throw new Error(res.status);
       const { text } = await res.json();
+      if (!s2Fresh(ticket)) return; // 그사이 선택지로 답했거나 장면·세션이 바뀌었으면 버린다
+      if (S2.sttAbort === ctrl) S2.sttAbort = null;
       const ms = Math.round(performance.now() - t0);
       s2Mic('idle');
       if (!text) return s2Hint('잘 들리지 않았어요. 다시 말하거나 아래에서 골라 주세요');
       s2Answer({ text, input_type: 'voice', stt_ms: ms }, text);
     } catch (e) {
+      if (!s2Fresh(ticket)) return; // 취소된 요청
+      if (S2.sttAbort === ctrl) S2.sttAbort = null;
       S2.caps.stt = false; // 다음부터는 브라우저 인식으로
+      S2.sttNotice = true; // Google 전송 안내를 지금 함께 보여 주므로 다음 한 번 누르면 바로 인식한다
       s2Mic('idle');
-      s2Hint('음성 인식 서버를 쓸 수 없어요. 다시 누르면 브라우저 인식을 쓰고, 아니면 아래에서 골라 주세요');
+      s2Hint('음성 인식 서버를 쓸 수 없어요. 다시 누르면 브라우저 인식을 써요(Chrome은 말소리를 Google 서버로 보내 글자로 바꿔요). 원하지 않으면 아래에서 골라 주세요');
     }
   };
   rec.start();
@@ -631,6 +658,7 @@ function s2RecognizeBrowser() {
     return;
   }
   s2Hint('');
+  const ticket = s2Ticket();
   const r = new SR();
   r.lang = 'ko-KR';
   r.interimResults = false;
@@ -644,6 +672,7 @@ function s2RecognizeBrowser() {
     const ms = t0 ? Math.round(performance.now() - t0) : null;
     S2.recog = null;
     s2Mic('idle');
+    if (!s2Fresh(ticket)) return;
     s2Answer({ text, input_type: 'voice', stt_ms: ms }, text);
   };
   r.onerror = () => { s2Hint('알아듣지 못했어요. 다시 말하거나 아래에서 골라 주세요'); };
@@ -658,6 +687,7 @@ function s2RecognizeBrowser() {
 }
 
 function s2StopRec(submit) {
+  if (!submit) s2CancelStt();
   if (S2.rec) { if (!submit) S2.rec.s2cancel = true; try { S2.rec.stop(); } catch (e) { } }
   if (S2.recog) { try { submit ? S2.recog.stop() : S2.recog.abort(); } catch (e) { } if (!submit) S2.recog = null; }
 }

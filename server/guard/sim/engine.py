@@ -227,6 +227,9 @@ def turn(graph: Graph, state: dict, *, choice_id: str | None = None, text: str |
         target, pressure = _quit_terminal(graph), None  # 안전망: 8차례를 채우면 상대가 끊은 것으로 끝낸다
 
     response = {"judge": {k: verdict[k] for k in ("grade", "intent", "source", "reask")}, "status": "active"}
+    if target is not None:
+        # 다음 장면·종료로 넘어갔으면 '못 알아들었어요' 배너를 새 장면에 띄우지 않는다(되묻기는 같은 장면에 머물 때만).
+        response["judge"]["reask"] = False
     if target is None:
         response["scene"] = scene(graph, state, pressure=pressure)
     elif target in graph.terminals:

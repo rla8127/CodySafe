@@ -148,8 +148,24 @@ def _streak(days: set) -> int:
 
 
 # ---------- 임대 GPU 음성 ----------
-def _gpu_headers() -> dict:
-    key = os.getenv("SIM_TTS_API_KEY") or os.getenv("SIM_LLM_API_KEY") or ""
+def _host(url: str) -> str:
+    from urllib.parse import urlsplit
+
+    try:
+        return (urlsplit(url.strip()).hostname or "").lower()
+    except ValueError:
+        return ""
+
+
+def _gpu_headers(kind: str = "tts") -> dict:
+    """TTS·STT 요청 머리. 저마다의 키(SIM_TTS_API_KEY·SIM_STT_API_KEY)를 쓰고, 없을 때는 주소의 호스트가
+    LLM 주소와 같을 때만 SIM_LLM_API_KEY를 빌린다(다른 제공자에게 LLM 토큰이 가지 않게, GAF 검토 11-01)."""
+    url = os.getenv("SIM_TTS_URL" if kind == "tts" else "SIM_STT_URL", "")
+    key = os.getenv("SIM_TTS_API_KEY" if kind == "tts" else "SIM_STT_API_KEY", "")
+    if not key:
+        llm_host = _host(os.getenv("SIM_LLM_BASE_URL", ""))
+        if llm_host and _host(url) == llm_host:
+            key = os.getenv("SIM_LLM_API_KEY", "")
     return {"Authorization": f"Bearer {key}"} if key else {}
 
 
@@ -173,7 +189,7 @@ def call_tts(text: str, tone: str | None = None) -> tuple[bytes, str]:
                "voice": os.getenv("SIM_TTS_VOICE", "default"), "response_format": "wav", "language": "ko"}
     if tone:
         payload.update(emotion=tone, instruct=TONE_GUIDE.get(tone, ""))  # 감정을 모르는 서버는 이 두 칸을 무시하면 된다
-    r = httpx.post(url, json=payload, headers=_gpu_headers(), timeout=_timeout("SIM_TTS_TIMEOUT", 10))
+    r = httpx.post(url, json=payload, headers=_gpu_headers("tts"), timeout=_timeout("SIM_TTS_TIMEOUT", 10))
     r.raise_for_status()
     kind = r.headers.get("content-type", "")
     if kind.startswith("audio/"):
@@ -251,7 +267,7 @@ def call_stt(audio: bytes, content_type: str) -> str:
     ext = {"audio/webm": "webm", "audio/ogg": "ogg", "audio/wav": "wav", "audio/mp4": "m4a", "audio/mpeg": "mp3"}.get(content_type.split(";")[0], "webm")
     r = httpx.post(url, files={"file": (f"speech.{ext}", audio, content_type)},
                    data={"model": os.getenv("SIM_STT_MODEL", "whisper-1"), "language": "ko"},
-                   headers=_gpu_headers(), timeout=_timeout("SIM_STT_TIMEOUT", 15))
+                   headers=_gpu_headers("stt"), timeout=_timeout("SIM_STT_TIMEOUT", 15))
     r.raise_for_status()
     return str(r.json().get("text", "")).strip()
 

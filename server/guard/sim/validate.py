@@ -18,14 +18,29 @@ _REP_NUMBER = re.compile(r"(?<!\d)1[5-9]\d{2}-?\d{4}(?!\d)")  # 1588-xxxx 같은
 _RRN = re.compile(r"(?<!\d)\d{6}\s*-\s*[1-4]\d{6}(?!\d)")
 _ACCOUNT = re.compile(r"(?<!\d)\d{2,6}-\d{2,6}-\d{2,8}(?!\d)")
 _LONG_DIGITS = re.compile(r"\d{9,}")
-_SAFE_HOST = re.compile(r"(^|\.)(example|test|invalid)(\.[a-z]+)?$|(^|\.)example\.(com|org|net)$", re.I)
+# 스킴 없이 쓴 도메인(예: test.com/app). 한국어 대사 안에서 흔한 끝 이름만 본다.
+_BARE_HOST = re.compile(r"(?<![\w.@/-])((?:[a-z0-9-]+\.)+(?:com|net|org|kr|io|me|app|xyz|top|shop|site|info|biz|ly|cc|co|example|test|invalid))(?![\w-])", re.I)
+_RESERVED_TLD = {"example", "test", "invalid"}  # RFC 2606·6761 예약 이름
+_RESERVED_SLD = {("example", "com"), ("example", "org"), ("example", "net")}
+
+
+def _is_safe_host(host: str) -> bool:
+    """예약된 가상 도메인(.example·.test·.invalid 끝, example.com/org/net과 그 하위)만 참."""
+    h = host.lower().strip().rstrip(".,)]}>").split("@")[-1].split(":")[0].rstrip(".")
+    labels = [x for x in h.split(".") if x]
+    if not labels:
+        return False
+    if labels[-1] in _RESERVED_TLD:
+        return True
+    return len(labels) >= 2 and (labels[-2], labels[-1]) in _RESERVED_SLD
 
 
 def scan_unsafe(text: str) -> list[str]:
     """진짜처럼 보이는 번호·계좌·주소를 찾는다. 010-0000-XXXX 꼴과 example 도메인만 허용한다."""
     problems = []
-    for host in _URL.findall(text):
-        if not _SAFE_HOST.search(host.rstrip(".,)")):
+    hosts = list(dict.fromkeys(_URL.findall(text) + _BARE_HOST.findall(_URL.sub(" ", text))))
+    for host in hosts:
+        if not _is_safe_host(host):
             problems.append(f"example 도메인이 아닌 주소: {host}")
     for match in _PHONE.finditer(text):
         if match.group(2) != "0000":
@@ -39,9 +54,18 @@ def scan_unsafe(text: str) -> list[str]:
 
 
 def _texts(graph: Graph):
-    """검사할 모든 글(대사, 선택지, 해설, 종료 문구, 마무리 질문)을 위치와 함께 돌려준다."""
+    """화면에 나오는 모든 글(제목·요약·상대 이름과 역할, 대사, 위험 신호, 선택지, 해설, 종료 문구, 마무리 질문)을 위치와 함께 돌려준다.
+    출처(source_refs)의 공식 주소는 대본의 유인 주소가 아니므로 검사하지 않는다."""
     yield "title", graph.title
+    yield "summary", graph.summary
+    yield "impersonated", graph.impersonated
+    yield "persona.name", graph.persona.name
+    yield "persona.role", graph.persona.role
+    yield "persona.tone", graph.persona.tone
     for nid, node in graph.nodes.items():
+        yield f"{nid}.goal", node.goal
+        for i, flag in enumerate(node.red_flags):
+            yield f"{nid}.red_flags[{i}]", flag
         for i, line in enumerate(node.lines):
             yield f"{nid}.lines[{i}]", line
         for i, line in enumerate(node.pressure):

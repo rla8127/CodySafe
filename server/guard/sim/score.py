@@ -2,10 +2,11 @@
 
 알아차림 30 = round(30·(N−k+1)/N): N은 거친 장면 수, k는 처음으로 끊기·거절·공식번호확인·가족확인·신고를 한 장면.
 정보지킴 30 = max(0, 30 − 15·새어 나간 정보 종류 수). 송금·앱 설치로 끝나면 0.
-확인행동 25 = 마무리 질문에서 고른 행동의 점수 합(공식번호확인 10, 가족확인 10, 신고 5, 잘못된 행동은 감점), 0–25.
+확인행동 25 = min(25, 10·공식번호확인 + 10·가족확인 + 5·신고). 마무리 질문에서 고른 행동의 종류로만 센다.
+           '기타'(잘못된 행동)는 감점하지 않고 결과 화면 해설로만 알린다(설계식 그대로, GAF 검토 11-01).
 대응속도 15 = 첫 위험 신호가 나온 차례부터 내가 끊은 차례까지 t차례: t≤1 15, 2 10, 3 5, 그 밖 0. 피해로 끝나거나 상대가 먼저 끊으면 0.
 """
-from .schema import SAFE_INTENTS, Graph
+from .schema import CLOSING_POINTS, SAFE_INTENTS, Graph
 
 WEIGHTS = {"알아차림": 30, "정보지킴": 30, "확인행동": 25, "대응속도": 15}
 
@@ -35,8 +36,8 @@ def compute(graph: Graph, state: dict) -> dict:
         protect = max(0, 30 - 15 * len(set(state["leaks"])))
 
     chosen = set(state.get("closing") or [])
-    points = sum(o.points for o in graph.closing.options if o.id in chosen)
-    verify = max(0, min(25, points))
+    kinds = {o.kind for o in graph.closing.options if o.id in chosen}
+    verify = min(25, sum(CLOSING_POINTS.get(kind, 0) for kind in kinds))
 
     speed = 0
     if term is not None and term.type == "safe" and term.by == "user" and turns:

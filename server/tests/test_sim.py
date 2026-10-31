@@ -24,7 +24,8 @@ BROKEN_LLM = "http://127.0.0.1:9/v1"  # 일부러 틀린 주소(아무도 듣지
 @pytest.fixture(autouse=True)
 def no_llm(monkeypatch):
     """기본은 LLM 없이 규칙만. 유료 API를 부르지 않는다."""
-    for key in ("SIM_LLM_BASE_URL", "SIM_LLM_API_KEY", "SIM_LLM_MODEL", "SIM_FALLBACK", "SIM_TTS_URL", "SIM_STT_URL"):
+    for key in ("SIM_LLM_BASE_URL", "SIM_LLM_API_KEY", "SIM_LLM_MODEL", "SIM_FALLBACK", "SIM_TTS_URL", "SIM_STT_URL",
+                "SIM_TTS_API_KEY", "SIM_STT_API_KEY"):
         monkeypatch.delenv(key, raising=False)
 
 
@@ -360,3 +361,190 @@ def test_scene_carries_tone_and_tts_sends_emotion(client, monkeypatch, tmp_path)
     client.post("/v1/sim/tts", headers=h, json={"text": "지금 끊으면 구속됩니다", "tone": "tremble"})
     assert len(sent) == 2 and sent[-1]["emotion"] == "tremble"  # 말투가 다르면 다시 합성
     assert client.post("/v1/sim/tts", headers=h, json={"text": "x", "tone": "angry"}).status_code == 422
+
+
+# ---------- GAF 검토(11-01) 필수 수정 회귀 시험 ----------
+# 1번: 위험한 답이 안전 낱말 때문에 정답으로 판정되던 예문. 보류셋(judge_holdout.csv)과 따로 둔다.
+@pytest.mark.parametrize("text, expected", [
+    ("네 가족한테 말하지 않을게요", "오답"),
+    ("큰아들한테 전화 안 할게요", "오답"),
+    ("아들한테 절대 안 알릴게요", "오답"),
+    ("가족한테는 얘기 안 할게요", "오답"),
+    ("네 지금 주소 확인할게요", None),
+    ("링크에서 확인할게요", None),
+    ("문자 왔나 확인할게요", None),
+    ("인증번호 문자 온 거 확인해 보고 불러 드릴게요", "오답"),
+    ("계좌번호 집에 가서 확인해 보고 말씀드릴게요", "오답"),
+    ("암구호는 모르겠고 입금했습니다", "오답"),
+    ("이미 보냈어요", "오답"),
+    ("앱 설치했어요", "오답"),
+    ("112는 안 부를게요", None),
+    ("신고 안 해요", None),
+    ("신고할 필요 없어요", None),
+    ("사기 아니면 돈 보내요", None),
+    ("제가 사기에 연루됐다고요? 어떡해요", None),
+    ("사기 계좌라니 빨리 옮겨야겠네요", None),
+    ("이거 사기 아니에요?", None),
+])
+def test_dangerous_answers_are_never_judged_safe(text, expected):
+    verdict = judge.judge(text, {**ctx_for(), "family_terms": ["큰아들"]})
+    assert verdict["grade"] != "정답", verdict
+    if expected:
+        assert verdict["grade"] == expected and verdict["source"] == "rule", verdict
+
+
+@pytest.mark.parametrize("text, intent", [
+    ("인증번호는 절대 안 알려드릴게요", "거절"),
+    ("이거 사기죠 안 보내요", "거절"),
+    ("은행에 직접 전화해서 확인할게요", "공식번호확인"),
+    ("1332에 확인해 볼게요", "공식번호확인"),
+    ("택배앱에서 운송장 확인할게요", "공식번호확인"),
+    ("암구호 물어볼게요", "가족확인"),
+    ("딸한테 먼저 연락해 볼게요", "가족확인"),
+    ("경찰서에 가서 물어볼게요", "신고"),
+    ("전화 안 받을래요 끊을게요", "끊기"),
+])
+def test_clear_safe_answers_stay_safe_after_the_fix(text, intent):
+    verdict = judge.judge(text, ctx_for())
+    assert verdict["grade"] == "정답" and verdict["intent"] == intent, verdict
+
+
+def test_done_transfer_ends_in_money_loss_even_with_a_safe_word():
+    graph = engine.get_graph("agency_call")
+    state = engine.start(graph, preset_profile("mother_74_alone"), seed=7)
+    response = engine.turn(graph, state, text="암구호는 모르겠고 입금했습니다", input_type="text")
+    assert response["status"] == "closing" and state["terminal"] == "t_loss_money"
+
+
+# 2번: 확인행동은 설계식 min(25, 10·공식번호확인 + 10·가족확인 + 5·신고)만. '기타'는 감점하지 않는다.
+@pytest.mark.parametrize("closing, verify", [
+    (["k1", "k2", "k3"], 25), (["k1", "k2", "k3", "k4", "k5"], 25), (["k4", "k5"], 0), ([], 0),
+    (["k1", "k1", "k3"], 15), (["k2"], 10),
+])
+def test_closing_points_follow_the_design_formula(closing, verify):
+    graph = engine.get_graph("agency_call")
+    _, result = play(graph, ["정답"], closing=closing)
+    assert result["score"]["breakdown"]["확인행동"] == verify
+
+
+# 3번: 예약된 가상 도메인만 허용하고, 화면에 나오는 모든 칸을 검사한다.
+@pytest.mark.parametrize("url", ["https://test.com/app", "test.com/app", "https://bank.example.kr", "http://x.invalid.com",
+                                 "www.example-bank.co.kr"])
+def test_validator_rejects_real_looking_domains(url):
+    assert validate.scan_unsafe(f"{url} 을 여세요"), url
+
+
+@pytest.mark.parametrize("url", ["https://parcel-kr.example/a7", "www.example.com/x", "http://a.b.test", "https://x.example.org/y",
+                                 "https://y.invalid"])
+def test_validator_allows_reserved_example_domains(url):
+    assert validate.scan_unsafe(url) == [], url
+
+
+@pytest.mark.parametrize("break_it", [
+    lambda g: g["persona"].update(name="수사관 02-3480-2000"),
+    lambda g: g["persona"].update(role="https://test.com 담당"),
+    lambda g: g.update(summary="www.real-bank.com 사칭"),
+    lambda g: g["nodes"]["n1_intro"]["red_flags"].append("010-1234-5678 번호"),
+    lambda g: g["nodes"]["n1_intro"].update(goal="계좌 110-234-567890 받기"),
+    lambda g: g["closing"]["options"][0].update(why="https://test.com 참고"),
+])
+def test_validator_checks_persona_summary_flags_and_closing(break_it):
+    data = graph_data()
+    break_it(data)
+    assert validate.validate(data), "검사기가 표시 칸의 실제 같은 값을 놓침"
+
+
+def test_source_refs_official_urls_are_not_flagged():
+    data = graph_data()
+    assert any(not r["url"].endswith(".example") for r in data["source_refs"])
+    assert validate.validate(data) == []
+
+
+# 5번: 판정 유보(reask) 뒤 다음 장면·종료로 넘어가면 새 장면에 '못 알아들었어요'를 띄우지 않는다.
+def test_reask_is_cleared_when_the_scene_moves_on():
+    graph = engine.get_graph("agency_call")
+    state = engine.start(graph, preset_profile("mother_74_alone"), seed=7)
+    unsure = lambda text, ctx: {"grade": "중답", "intent": "되묻기", "confidence": 0.0, "leaks": [], "source": "default", "reask": True}
+    first = engine.turn(graph, state, text="음 그게", input_type="text", judge_fn=unsure)
+    assert first["judge"]["reask"] is True and first["scene"]["node_id"] == "n1_intro"  # 같은 장면: 되묻기
+    second = engine.turn(graph, state, text="음 그게", input_type="text", judge_fn=unsure)
+    assert second["scene"]["node_id"] != "n1_intro" and second["judge"]["reask"] is False
+    while state["status"] == "active":
+        before = state["node"]
+        last = engine.turn(graph, state, text="음 그게", input_type="text", judge_fn=unsure)
+        moved = last["status"] != "active" or last["scene"]["node_id"] != before
+        assert last["judge"]["reask"] is (not moved)
+    assert last["status"] == "closing" and last["judge"]["reask"] is False
+
+
+# 6번: LLM 토큰은 같은 호스트에만. TTS·STT는 저마다의 키를 쓴다.
+def test_llm_token_is_not_sent_to_other_tts_or_stt_hosts(monkeypatch):
+    from guard import sim_api
+
+    monkeypatch.setenv("SIM_LLM_BASE_URL", "https://llm.example/v1")
+    monkeypatch.setenv("SIM_LLM_API_KEY", "llm-token")
+    monkeypatch.setenv("SIM_TTS_URL", "https://other-tts.example/v1/audio/speech")
+    monkeypatch.setenv("SIM_STT_URL", "https://other-stt.example/v1/audio/transcriptions")
+    assert sim_api._gpu_headers("tts") == {} and sim_api._gpu_headers("stt") == {}
+    monkeypatch.setenv("SIM_TTS_URL", "https://llm.example/tts")
+    monkeypatch.setenv("SIM_STT_URL", "https://llm.example/stt")
+    assert sim_api._gpu_headers("tts") == {"Authorization": "Bearer llm-token"}
+    assert sim_api._gpu_headers("stt") == {"Authorization": "Bearer llm-token"}
+    monkeypatch.setenv("SIM_TTS_API_KEY", "tts-token")
+    monkeypatch.setenv("SIM_STT_API_KEY", "stt-token")
+    assert sim_api._gpu_headers("tts") == {"Authorization": "Bearer tts-token"}
+    assert sim_api._gpu_headers("stt") == {"Authorization": "Bearer stt-token"}
+
+
+def test_stt_request_uses_stt_key_not_llm_key(monkeypatch):
+    import httpx
+
+    from guard import sim_api
+
+    seen = []
+
+    class FakeResponse:
+        def raise_for_status(self):
+            return None
+
+        def json(self):
+            return {"text": "끊을게요"}
+
+    monkeypatch.setattr(httpx, "post", lambda url, **kw: seen.append(kw.get("headers")) or FakeResponse())
+    monkeypatch.setenv("SIM_LLM_BASE_URL", "https://llm.example/v1")
+    monkeypatch.setenv("SIM_LLM_API_KEY", "llm-token")
+    monkeypatch.setenv("SIM_STT_URL", "https://stt-provider.example/v1/audio/transcriptions")
+    assert sim_api.call_stt(b"x", "audio/webm") == "끊을게요"
+    assert seen[-1] == {}
+
+
+# 4번: 늦게 온 음성 인식 결과는 녹음을 시작한 세션·장면·차례와 같을 때만 답으로 낸다(sim2.js, Node로 함수 단위 확인).
+def test_late_stt_result_is_dropped_after_session_or_scene_changes(tmp_path):
+    import re
+    import shutil
+    import subprocess
+
+    node = shutil.which("node")
+    if not node:
+        pytest.skip("node 없음")
+    src = (engine.GRAPH_DIR.parents[2] / "web" / "sim2.js").read_text(encoding="utf-8")
+    parts = [re.search(r"function %s\(.*?\n}\n" % name, src, re.S).group(0) for name in ("s2Ticket", "s2Fresh", "s2CancelStt")]
+    assert src.count("s2Fresh(ticket)") >= 3  # GPU 녹음 두 곳 + 브라우저 인식 한 곳
+    harness = """
+const S2 = { session: { session_id: 'old' }, scene: { node_id: 'n1', turn: 1 }, busy: false, sttGen: 0, sttAbort: null };
+const $ = () => ({});
+""" + "\n".join(parts) + """
+const out = [];
+let t = s2Ticket(); out.push(s2Fresh(t));
+S2.session = { session_id: 'new' }; out.push(s2Fresh(t));
+S2.session = { session_id: 'old' }; S2.scene = { node_id: 'n2', turn: 2 }; out.push(s2Fresh(t));
+S2.scene = { node_id: 'n1', turn: 1 }; let aborted = false; S2.sttAbort = { abort() { aborted = true; } };
+s2CancelStt(); out.push(s2Fresh(t)); out.push(aborted);
+t = s2Ticket(); S2.busy = true; out.push(s2Fresh(t));
+console.log(JSON.stringify(out));
+"""
+    script = tmp_path / "h.js"
+    script.write_text(harness, encoding="utf-8")
+    result = subprocess.run([node, str(script)], capture_output=True, text=True, timeout=20)
+    assert result.returncode == 0, result.stderr
+    assert json.loads(result.stdout) == [True, False, False, False, True, False]
