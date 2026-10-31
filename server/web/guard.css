@@ -25,6 +25,26 @@
 .kv span:last-child { font-weight: 600; text-align: right; overflow-wrap: anywhere; }
 .code-big { font-size: 28px; font-weight: 800; letter-spacing: .12em; text-align: center; color: var(--pri); margin: 8px 0 12px; }
 a.btn { text-decoration: none; }
+.phrase-card { position: relative; overflow: hidden; padding: 18px; border-radius: var(--radius); background: var(--grad); color: #fff; box-shadow: 0 12px 28px rgba(79, 77, 255, .28); }
+.phrase-card::before { content: ""; position: absolute; width: 170px; height: 170px; right: -50px; top: -80px; border-radius: 50%; background: rgba(255, 255, 255, .12); }
+.phrase-top { position: relative; display: flex; justify-content: space-between; align-items: center; gap: 10px; font-size: 13px; font-weight: 600; }
+.phrase-top span { display: inline-flex; align-items: center; gap: 5px; }
+.phrase-top span:last-child { font-weight: 500; opacity: .85; flex: none; }
+.phrase-top svg.lucide { width: 16px; height: 16px; }
+.phrase-words { position: relative; display: block; width: 100%; min-height: 76px; margin: 14px 0 12px; padding: 12px; border-radius: 16px; background: rgba(255, 255, 255, .16); color: #fff; }
+.phrase-text { display: block; font-size: 30px; font-weight: 800; line-height: 52px; letter-spacing: -0.03em; filter: blur(12px); transition: filter .2s; user-select: none; }
+.phrase-mask { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; gap: 6px; font-size: 15px; font-weight: 700; transition: opacity .2s; }
+.phrase-card.shown .phrase-text { filter: none; user-select: auto; }
+.phrase-card.shown .phrase-mask { opacity: 0; pointer-events: none; }
+.phrase-note { position: relative; font-size: 13px; line-height: 1.45; opacity: .92; }
+.phrase-link { margin-top: 10px; }
+.phrase-steps { display: grid; gap: 14px; }
+.phrase-step { display: flex; align-items: center; gap: 12px; font-size: 14.5px; font-weight: 600; line-height: 1.4; }
+.phrase-step small { display: block; font-size: 12px; font-weight: 600; color: var(--sub); }
+.step-no { display: grid; place-items: center; flex: none; width: 38px; height: 38px; border-radius: 12px; background: var(--pri-soft); color: var(--pri); }
+.phrase-verdict { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 12px; }
+.phrase-limit { margin: 14px 2px 0; line-height: 1.5; }
+.type-box .unlock-phrase { font-size: 22px; font-weight: 800; color: var(--pri); }
 .lock-banner { display: flex; align-items: center; gap: 10px; width: 100%; text-align: left; margin-bottom: 12px; font-size: 14px; line-height: 1.45; color: var(--ink2); }
 .lock-banner svg.lucide { width: 22px; height: 22px; color: var(--danger); flex: none; }
 /* 모바일에서 대화 첫 줄이 진행 막대에 가리지 않게 합니다. */

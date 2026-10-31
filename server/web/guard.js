@@ -30,8 +30,9 @@ if (store.get('token')) native?.setToken(store.get('token'));
 
 /* ---------------- 시안 화면 제거 ---------------- */
 ['image', 'voice', 'call', 'url', 'verify', 'report', 'generate', 'weakness', 'training', 'copilot', 'checkup'].forEach((k) => delete SCREENS[k]);
-Object.assign(TAB_OF, { home: 'home', sim: 'sim', play: 'sim', detect: 'detect', family: 'family', me: 'me', lock: 'home' });
+Object.assign(TAB_OF, { home: 'home', sim: 'sim', play: 'sim', detect: 'detect', family: 'family', me: 'me', lock: 'home', passphrase: 'family' });
 delete PARENT.family;
+PARENT.passphrase = 'family';
 
 renderTabs = function (on) {
   const tabs = [['home', 'house', '홈'], ['sim', 'gamepad-2', '체험'], ['detect', 'shield-check', '검사'], ['family', 'users', '가족'], ['me', 'user-round', 'MY']];
@@ -184,6 +185,107 @@ function homeData({ recordings, recs, family, alerts, lock }) {
     ${items.length ? items.slice(0, 3).map(recordingCard).join('') : emptyCard('아직 분석한 통화가 없습니다.')}`;
 }
 
+/* ---------------- 가족 암구호 ---------------- */
+let phraseShown = false;
+let phraseTimer = null;
+
+function showPhrase(on) {
+  phraseShown = on;
+  clearTimeout(phraseTimer);
+  // 켜 둔 화면을 누가 옆에서 읽지 못하게 잠시 뒤 다시 가립니다.
+  if (on) phraseTimer = setTimeout(() => showPhrase(false), 30000);
+  document.querySelector('.phrase-card')?.classList.toggle('shown', on);
+}
+
+function timeLeft(seconds) {
+  const h = Math.floor(seconds / 3600);
+  const m = Math.ceil((seconds % 3600) / 60);
+  return h ? `${h}시간 ${m}분` : `${m}분`;
+}
+
+function phraseCard(p) {
+  return `<div class="phrase-card ${phraseShown ? 'shown' : ''}">
+    <div class="phrase-top"><span>${ic('key-round')}오늘의 가족 암구호</span><span>${timeLeft(p.seconds_left)} 뒤 변경</span></div>
+    <button class="phrase-words" onclick="showPhrase(!phraseShown)" aria-label="암구호 보기">
+      <span class="phrase-text">${p.words.map(esc).join(' ')}</span>
+      <span class="phrase-mask">${ic('eye')}눌러서 보기</span>
+    </button>
+    <div class="phrase-note">상대가 먼저 말하게 하세요. 암구호를 먼저 알려 주지 마세요.</div>
+  </div>`;
+}
+
+SCREENS.passphrase = gated(() => `<div class="page">
+  <div class="lead" style="margin-top:6px">가족 암구호</div>
+  <div class="lead-sub" style="margin-top:6px">가족이라며 돈을 부탁하는 전화가 오면 먼저 물어보세요. 목소리가 같아도 AI일 수 있습니다.</div>
+  <div id="data"></div>
+</div>`);
+
+function passphraseData({ phrase }) {
+  if (!phrase.linked) {
+    return `<div class="card mt center"><div class="empty">가족을 연결하면 매일 바뀌는 암구호가 생깁니다.</div>
+      <button class="btn pri block" onclick="go('family')">가족 연결하기</button></div>`;
+  }
+  const steps = [['phone-incoming', '“오늘 암구호가 뭐야?”라고 먼저 물어요'], ['message-circle', '상대가 말한 단어를 화면과 비교해요'], ['circle-check', '맞을 때만 부탁을 들어 줘요']];
+  const e = phrase.emergency;
+  return `${phraseCard(phrase)}
+    <div class="card mt phrase-steps">${steps.map(([i, t], n) => `<div class="phrase-step"><span class="step-no">${ic(i)}</span><span><small>${n + 1}단계</small>${t}</span></div>`).join('')}</div>
+    <div class="phrase-verdict">
+      <button class="btn line block" onclick="toast('확인했습니다. 그래도 큰돈은 다시 한번 확인하세요')">${ic('check')}맞아요</button>
+      <button class="btn danger block" onclick="mismatchSheet()">${ic('x')}안 맞아요</button>
+    </div>
+    <div class="sec-title">비상 암구호</div>
+    <div class="card">
+      <div class="row between"><div class="b">폰을 잃어버린 가족 확인용</div><span class="chip ${e ? 'safe' : ''}">${e ? '설정됨' : '미설정'}</span></div>
+      <div class="muted small" style="margin-top:6px">${e ? `질문: ${esc(e.question)} · ${esc(e.set_by)}님이 설정` : '오늘의 암구호를 볼 수 없는 가족도 답할 수 있도록, 가족만 아는 질문을 정해 두세요.'}</div>
+      <div class="row" style="margin-top:12px">
+        ${e ? '<button class="btn pri sm grow" onclick="verifySheet()">답 확인</button>' : ''}
+        <button class="btn ghost sm grow" onclick="emergencySheet()">${e ? '바꾸기' : '설정하기'}</button>
+      </div>
+    </div>
+    <div class="muted small phrase-limit">검찰, 금감원 같은 기관 사칭에는 암구호를 쓸 수 없습니다. 기관이 전화로 돈을 요구하면 끊으세요.</div>`;
+}
+
+function mismatchSheet() {
+  openSheet(`<span class="chip danger">${ic('siren')}사칭 의심</span>
+    <div class="b" style="font-size:20px;margin-top:10px">지금 전화를 끊으세요</div>
+    <div class="call-text">가족에게는 원래 저장된 번호로 직접 다시 거세요. 상대가 알려 준 새 번호로 걸면 안 됩니다.</div>
+    <div class="btn-col"><a class="btn danger block" href="tel:112">${ic('phone')}경찰 112</a><button class="btn line block" onclick="closeSheet()">닫기</button></div>`);
+}
+
+function emergencySheet() {
+  openSheet(`<div class="b" style="font-size:18px">비상 암구호 정하기</div>
+    <div class="muted small" style="margin-top:6px">SNS나 통화에서 쉽게 알 수 없는 답으로 정하세요. 답은 복원할 수 없게 저장되어 가족에게 말로 직접 알려 줘야 합니다.</div>
+    <div class="field"><label for="emQ">질문</label><input id="emQ" maxlength="60" placeholder="예: 우리 첫 강아지 이름은?"></div>
+    <div class="field"><label for="emA">답</label><input id="emA" maxlength="60" autocomplete="off"></div>
+    <div class="btn-col"><button class="btn pri block" onclick="saveEmergency()">저장</button><button class="btn line block" onclick="closeSheet()">취소</button></div>`);
+}
+
+async function saveEmergency() {
+  const question = $('#emQ').value.trim();
+  const answer = $('#emA').value.trim();
+  if (question.length < 2 || answer.length < 2) return toast('질문과 답을 두 글자 이상 입력하세요', 'circle-alert');
+  await act('PUT', '/v1/family/passphrase/emergency', { question, answer });
+}
+
+function verifySheet() {
+  openSheet(`<div class="b" style="font-size:18px">상대가 말한 답을 입력하세요</div>
+    <div class="field"><label for="emCheck">답</label><input id="emCheck" maxlength="60" autocomplete="off"></div>
+    <div class="btn-col"><button class="btn pri block" onclick="verifyEmergency()">확인</button><button class="btn line block" onclick="closeSheet()">취소</button></div>`);
+}
+
+async function verifyEmergency() {
+  const answer = $('#emCheck').value.trim();
+  if (!answer) return toast('답을 입력하세요', 'circle-alert');
+  try {
+    const { match } = await api('POST', '/v1/family/passphrase/emergency/verify', { answer });
+    if (!match) return mismatchSheet();
+    closeSheet();
+    toast('답이 맞습니다');
+  } catch (e) {
+    toast(e.message === '429' ? '여러 번 틀렸습니다. 10분 뒤 다시 시도하세요' : '확인하지 못했습니다', 'circle-alert');
+  }
+}
+
 /* ---------------- 금융 앱 잠금 ---------------- */
 const lockMinutes = (lock) => Math.ceil(lock.remaining / 60);
 
@@ -219,8 +321,8 @@ function lockData({ lock }) {
       <a class="btn line block" href="tel:1332">${ic('phone')}금융감독원 1332</a>
     </div>
     <div class="card mt"><div class="b">잠금을 풀려면</div>
-      <div class="call-text">먼저 가족에게 직접 전화해 확인하세요. 연결된 가족은 가족 탭에서 바로 풀 수 있습니다.</div>
-      <div class="link-row"><button class="quiet" onclick="releaseSheet()">사기가 아니에요, 직접 풀기</button></div></div>
+      <div class="call-text">먼저 가족에게 직접 전화해 확인하세요. 연결된 가족은 오늘의 암구호로 서로 확인한 뒤 가족 탭에서 바로 풀 수 있습니다.</div>
+      <div class="link-row"><button onclick="go('passphrase')">오늘의 암구호 보기</button><button class="quiet" onclick="releaseSheet()">사기가 아니에요, 직접 풀기</button></div></div>
     ${blockerBlock()}`;
 }
 
@@ -235,10 +337,13 @@ function releaseSheet() {
     <div class="btn-col"><button class="btn danger block" onclick="act('POST','/v1/lock/release')">아무도 시키지 않았습니다. 10분 뒤 풀기</button><button class="btn line block" onclick="closeSheet()">취소</button></div>`);
 }
 
-function unlockSheet(id) {
+async function unlockSheet(id) {
+  let phrase = {};
+  try { phrase = await api('GET', '/v1/family/passphrase'); } catch (e) { }
   openSheet(`<div class="b" style="font-size:18px">가족의 금융 앱 잠금을 풀까요?</div>
-    <div class="muted small" style="margin-top:6px">본인과 직접 통화해 사기가 아닌 것을 확인한 뒤에 풀어 주세요.</div>
-    <div class="btn-col"><button class="btn danger block" onclick="act('POST','/v1/family/protected/${esc(id)}/unlock')">잠금 풀기</button><button class="btn line block" onclick="closeSheet()">취소</button></div>`);
+    <div class="muted small" style="margin-top:6px">저장된 번호로 본인에게 직접 전화해 오늘의 암구호를 물어본 뒤에 풀어 주세요.</div>
+    ${phrase.words ? `<div class="type-box center"><b>오늘의 암구호</b><p class="unlock-phrase">${phrase.words.map(esc).join(' ')}</p></div>` : ''}
+    <div class="btn-col"><button class="btn danger block" onclick="act('POST','/v1/family/protected/${esc(id)}/unlock')">암구호를 확인했습니다. 잠금 풀기</button><button class="btn line block" onclick="closeSheet()">취소</button></div>`);
 }
 
 /* ---------------- 검사 ---------------- */
@@ -432,11 +537,12 @@ SCREENS.family = gated(() => `<div class="page">
   <button class="btn pri block mt" onclick="linkFamily()">연결</button></div>
 </div>`);
 
-function familyData({ family, alerts }) {
+function familyData({ family, alerts, phrase }) {
   const person = (p, note, removable) => `<div class="card mt"><div class="row between"><div class="grow"><div class="b">${esc(p.name)}${p.locked ? ` <span class="chip danger">${ic('lock')}금융 앱 잠금 중</span>` : ''}</div><div class="muted small" style="margin-top:2px">${note}</div></div>
     ${removable ? `<button class="btn line sm" onclick="act('DELETE','/v1/family/guardians/${esc(p.id)}')">해제</button>` : ''}
     ${p.locked ? `<button class="btn danger sm" onclick="unlockSheet('${esc(p.id)}')">잠금 풀기</button>` : ''}</div></div>`;
-  return `<div class="sec-title">받은 가족 경고</div>
+  return `${phrase.linked ? `<div class="mt">${phraseCard(phrase)}</div><button class="btn ghost block phrase-link" onclick="go('passphrase')">암구호 쓰는 법과 비상 암구호${ic('chevron-right')}</button>` : ''}
+    <div class="sec-title">받은 가족 경고</div>
     ${alerts.items.length ? alerts.items.map(alertCard).join('') : emptyCard('받은 경고가 없습니다.')}
     <div class="sec-title">내 경고를 받는 가족</div>
     ${family.guardians.length ? family.guardians.map((p) => person(p, '내 보이스피싱 의심 여부만 받습니다.', true)).join('') : emptyCard('연결된 가족이 없습니다.')}
@@ -520,7 +626,8 @@ simResult = function () {
 };
 
 /* ---------------- 데이터 갱신 ---------------- */
-const DATA_VIEWS = { home: homeData, detect: detectData, family: familyData, lock: lockData };
+const DATA_VIEWS = { home: homeData, detect: detectData, family: familyData, lock: lockData, passphrase: passphraseData };
+const PHRASE_VIEWS = ['family', 'passphrase'];
 let lastData = '';
 
 async function refresh() {
@@ -532,11 +639,13 @@ async function refresh() {
     const [recordings, recs, family, alerts, lock] = await Promise.all([
       api('GET', '/v1/recordings'), api('GET', '/v1/recommendations'), api('GET', '/v1/family'), api('GET', '/v1/alerts'), api('GET', '/v1/lock'),
     ]);
-    const snapshot = key + JSON.stringify([recordings, recs, family, alerts, lockMinutes(lock), lock.locked]);
+    const phrase = PHRASE_VIEWS.includes(key) ? await api('GET', '/v1/family/passphrase') : null;
+    const shownPhrase = phrase && { ...phrase, seconds_left: Math.ceil((phrase.seconds_left || 0) / 60) };
+    const snapshot = key + JSON.stringify([recordings, recs, family, alerts, lockMinutes(lock), lock.locked, shownPhrase]);
     const host = $('#data');
     if (snapshot === lastData || !host || (route().r || 'home') !== r) return;
     lastData = snapshot;
-    host.innerHTML = draw({ recordings, recs, family, alerts, lock });
+    host.innerHTML = draw({ recordings, recs, family, alerts, lock, phrase });
     icons();
   } catch (e) {
     if ($('#data') && !$('#data').innerHTML) $('#data').innerHTML = emptyCard('서버에 연결할 수 없습니다.');
@@ -585,7 +694,7 @@ async function pollAlerts() {
   }
 }
 
-['home', 'detect', 'family', 'lock'].forEach((k) => { INIT[k] = () => { lastData = ''; refresh(); }; });
+['home', 'detect', 'family', 'lock', 'passphrase'].forEach((k) => { INIT[k] = () => { lastData = ''; refresh(); }; });
 setInterval(refresh, 5000);
 setInterval(pollAlerts, 5000);
 setInterval(scanFolder, SCAN_MS);
