@@ -14,13 +14,12 @@ import java.io.IOException
 import java.net.HttpURLConnection
 import java.net.URL
 
+const val SERVER = "http://54.116.173.130:8091"
+
 /** 기기 설정. 토큰만 저장하며 AWS 자격 증명은 앱에 두지 않습니다. */
 class Store(context: Context) {
     private val p: SharedPreferences = context.getSharedPreferences("guard", Context.MODE_PRIVATE)
 
-    var server: String
-        get() = p.getString("server", "") ?: ""
-        set(v) = p.edit().putString("server", v.trim().trimEnd('/')).apply()
     var token: String
         get() = p.getString("token", "") ?: ""
         set(v) = p.edit().putString("token", v).apply()
@@ -44,7 +43,7 @@ class Store(context: Context) {
 
 class Api(private val store: Store) {
     fun call(method: String, path: String, body: JSONObject? = null): JSONObject {
-        val conn = URL(store.server + path).openConnection() as HttpURLConnection
+        val conn = URL(SERVER + path).openConnection() as HttpURLConnection
         try {
             conn.requestMethod = method
             conn.connectTimeout = 15_000

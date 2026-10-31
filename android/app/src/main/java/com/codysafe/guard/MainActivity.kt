@@ -19,7 +19,6 @@ import android.webkit.WebResourceRequest
 import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
-import android.widget.EditText
 import kotlin.concurrent.thread
 
 /** 화면은 서버의 /app/ 웹 UI이고, 앱은 폴더 접근과 백그라운드 동기화, 알림만 담당합니다. */
@@ -57,7 +56,7 @@ class MainActivity : Activity() {
         web.addJavascriptInterface(Bridge(), "CodySafeNative")
         web.webViewClient = object : WebViewClient() {
             override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean {
-                if (request.url.host == Uri.parse(store.server).host) return false
+                if (request.url.host == Uri.parse(SERVER).host) return false
                 // tel: 같은 외부 링크는 앱 안에서 열지 않습니다.
                 try {
                     startActivity(Intent(Intent.ACTION_VIEW, request.url))
@@ -68,7 +67,7 @@ class MainActivity : Activity() {
             }
 
             override fun onReceivedError(view: WebView, request: WebResourceRequest, error: WebResourceError) {
-                if (request.isForMainFrame) serverDialog("서버에 연결할 수 없습니다")
+                if (request.isForMainFrame) retryDialog()
             }
         }
         web.webChromeClient = object : WebChromeClient() {
@@ -88,25 +87,17 @@ class MainActivity : Activity() {
         }
         setContentView(web)
         if (Build.VERSION.SDK_INT >= 33) requestPermissions(arrayOf(Manifest.permission.POST_NOTIFICATIONS), 1)
-        if (store.server.isEmpty()) serverDialog("서버 주소를 입력하세요") else load()
+        load()
     }
 
-    private fun load() = web.loadUrl(store.server + "/app/")
+    private fun load() = web.loadUrl("$SERVER/app/")
 
-    private fun serverDialog(title: String) {
-        val input = EditText(this).apply {
-            setSingleLine()
-            hint = "http://서버주소:8091"
-            setText(store.server)
-        }
+    private fun retryDialog() {
         AlertDialog.Builder(this)
-            .setTitle(title)
-            .setView(input)
+            .setTitle("서버에 연결할 수 없습니다")
+            .setMessage("인터넷 연결을 확인한 뒤 다시 시도해 주세요.")
             .setCancelable(false)
-            .setPositiveButton("연결") { _, _ ->
-                store.server = input.text.toString()
-                load()
-            }
+            .setPositiveButton("다시 시도") { _, _ -> load() }
             .show()
     }
 
