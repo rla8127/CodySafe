@@ -7,8 +7,8 @@ ROOT = Path(__file__).resolve().parent.parent
 DB_PATH = os.getenv("GUARD_DB", str(ROOT / "data" / "guard.db"))
 LOCAL_AUDIO_DIR = Path(os.getenv("GUARD_LOCAL_AUDIO_DIR", str(ROOT / "data" / "audio")))
 PUBLIC_BASE_URL = os.getenv("GUARD_PUBLIC_BASE_URL", "http://localhost:8091").rstrip("/")
-# 시연 전용. 켜면 접속한 누구나 시연 가족 계정으로 들어올 수 있으니 실제 통화를 올리면 안 됩니다.
-DEMO_FAMILY = os.getenv("GUARD_DEMO_FAMILY", "0") == "1"
+# 웹 시연용 가족. 접속한 누구나 이 계정으로 들어올 수 있으니 실제 통화를 올리면 안 됩니다. 운영에서는 0으로 끕니다.
+DEMO_FAMILY = os.getenv("GUARD_DEMO_FAMILY", "1") == "1"
 ADMIN_TOKEN = os.getenv("GUARD_ADMIN_TOKEN", "")
 AWS_REGION = os.getenv("GUARD_AWS_REGION", "ap-northeast-2")
 

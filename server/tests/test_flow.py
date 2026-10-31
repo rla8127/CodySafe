@@ -5,6 +5,7 @@ from urllib.parse import urlsplit
 
 _tmp = tempfile.mkdtemp()
 os.environ.update(
+    GUARD_DEMO_FAMILY="0",
     GUARD_DB=f"{_tmp}/t.db",
     GUARD_LOCAL_AUDIO_DIR=f"{_tmp}/a",
     GUARD_STORAGE="local",

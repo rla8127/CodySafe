@@ -93,7 +93,13 @@ async function loadDemoFamily() {
     const res = await fetch('/v1/demo/family');
     if (!res.ok) return;
     demoMembers = (await res.json()).items;
-    if (accepted() && !signedIn()) render();
+    // 시연 전에 직접 등록한 브라우저도 가족을 고르는 화면으로 보냅니다.
+    if (store.get('token') && store.get('demo') !== '1') {
+      store.del('token');
+      store.del('name');
+      store.del('role');
+      render();
+    } else if (accepted() && !signedIn()) render();
     else if (route().r === 'me') render();
   } catch (e) { }
 }
@@ -115,6 +121,7 @@ async function demoEnter(id) {
     store.set('token', me.token);
     store.set('name', me.name);
     store.set('role', me.role);
+    store.set('demo', '1');
     ['lastAlert', 'lockSeen', 'seen', 'folderSince'].forEach((k) => store.del(k));
     go('home');
     render();

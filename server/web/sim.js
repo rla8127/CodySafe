@@ -411,7 +411,7 @@ const SIM_TYPING = 280;
 
 function simBubble(m) {
   if (m.photo) {
-    return `<div class="bubble sim-photo"><img src="${m.photo}" alt="사칭에 쓰인 사진 예시"><small>${m.caption}</small><em>사칭 예시 · 실제 배우와 무관</em></div>`;
+    return `<div class="bubble sim-photo"><img src="${m.photo}" alt="사칭에 쓰인 사진 예시" onerror="this.remove()"><small>${m.caption}</small><em>사칭 예시 · 실제 배우와 무관</em></div>`;
   }
   return `<div class="bubble ${/https?:\/\//.test(m) ? 'link' : ''}">${m}</div>`;
 }
