@@ -782,7 +782,8 @@ function signOut() {
 const baseSim = SCREENS.sim;
 SCREENS.sim = () => baseSim()
   .replace('🔥 이번 주 가장 많이 당한 수법', '대표 수법 체험')
-  .replace('기관 사칭 · 평균 정답률 41% · 4분', '기관 사칭 · 4분')
+  .replace('기관 사칭 · 평균 정답률 41% · 4분', '기관 사칭 · 2분')
+  .replace('내 선택에 따라 사기범의 대화가 달라집니다.', '선택할 때마다 왜 위험한지 바로 알려 드립니다.')
   .replace(/<span class="featnum">기능 \d+<\/span>/, '');
 
 const baseSimResult = simResult;
