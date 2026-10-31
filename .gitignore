@@ -1,0 +1,27 @@
+# 비밀값: API 키·비밀번호는 커밋하지 않는다 (.env.example만 올린다)
+.env
+.env.*
+!.env.example
+
+# 데이터 원본: 피싱 URL 원본 목록 등은 올리지 않는다 (내려받기 스크립트와 해시만)
+data/raw/
+**/data/raw/
+
+# 실험 로그
+runs/
+wandb/
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Node
+node_modules/
+
+# OS
+.DS_Store
+
+# 도구를 고른 뒤 로컬 인증 파일·설정·로그의 정확한 경로를 여기에 더한다.
+# .gitignore는 이미 커밋한 파일의 비밀값을 지우지 못하므로, 첫 커밋과 제출 커밋에서 추적 파일을 따로 점검한다.
