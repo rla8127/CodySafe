@@ -1,0 +1,222 @@
+[
+  {
+    "id": "seoyeon_daily",
+    "file": "dataset/seoyeon_daily.wav",
+    "reference": "안녕하세요. 오늘 오후에는 비가 내릴 수 있으니 우산을 챙겨 주세요. 약속 장소는 지하철역 이 번 출구 앞입니다.",
+    "category": "일상",
+    "voice": "Seoyeon",
+    "engine": "neural",
+    "condition": "clean",
+    "duration": 8.96,
+    "sha256": "cf4f556cf4d7f8436cc84c0294bf2163d1c90627f3e580416ca1d9375bc4b7c3"
+  },
+  {
+    "id": "seoyeon_support",
+    "file": "dataset/seoyeon_support.wav",
+    "reference": "고객님, 주문하신 상품은 내일 도착할 예정입니다. 배송지를 변경하려면 상담원에게 새로운 주소를 알려 주세요.",
+    "category": "상담",
+    "voice": "Seoyeon",
+    "engine": "neural",
+    "condition": "clean",
+    "duration": 8.13,
+    "sha256": "d8e5a9641c01bce8aba4b80683d9013bc2e4bea546f784b14106fe23a1706a4d"
+  },
+  {
+    "id": "seoyeon_fraud",
+    "file": "dataset/seoyeon_fraud.wav",
+    "reference": "검사나 금융기관 직원을 사칭하며 안전 계좌로 돈을 보내라고 하면 보이스피싱을 의심해야 합니다. 통화를 끊고 공식 번호로 확인하세요.",
+    "category": "보이스피싱 예방",
+    "voice": "Seoyeon",
+    "engine": "neural",
+    "condition": "clean",
+    "duration": 9.88,
+    "sha256": "6090ef85809456595a993a3ce12e4718b91c8221648c3ebc5e44da231f4bcae6"
+  },
+  {
+    "id": "seoyeon_fraud_telephone_noise",
+    "file": "dataset/seoyeon_fraud_telephone_noise.wav",
+    "reference": "검사나 금융기관 직원을 사칭하며 안전 계좌로 돈을 보내라고 하면 보이스피싱을 의심해야 합니다. 통화를 끊고 공식 번호로 확인하세요.",
+    "category": "보이스피싱 예방",
+    "voice": "Seoyeon",
+    "engine": "neural",
+    "condition": "telephone_band_8khz_plus_10dB_noise",
+    "duration": 9.88,
+    "sha256": "2f362b48808acaefd5a6ee925863295a909bf95b7398914ec9508d61c2b27f08"
+  },
+  {
+    "id": "seoyeon_names",
+    "file": "dataset/seoyeon_names.wav",
+    "reference": "박철민 씨와 김민수 씨는 서울특별시 강남구 테헤란로에서 만나기로 했습니다. 담당자는 이서연이며 방문 시간은 오후 세 시입니다.",
+    "category": "이름과 주소",
+    "voice": "Seoyeon",
+    "engine": "neural",
+    "condition": "clean",
+    "duration": 9.78,
+    "sha256": "85b47e271525c7fb20d482cf2485ef05536aeefb44bc72a98ab3ff148b6008aa"
+  },
+  {
+    "id": "seoyeon_names_telephone_noise",
+    "file": "dataset/seoyeon_names_telephone_noise.wav",
+    "reference": "박철민 씨와 김민수 씨는 서울특별시 강남구 테헤란로에서 만나기로 했습니다. 담당자는 이서연이며 방문 시간은 오후 세 시입니다.",
+    "category": "이름과 주소",
+    "voice": "Seoyeon",
+    "engine": "neural",
+    "condition": "telephone_band_8khz_plus_10dB_noise",
+    "duration": 9.78,
+    "sha256": "0aeaf4290df035a4e2b91e8dfd4f4127ebe29bda797cc6eca04cfdfd3ff78290"
+  },
+  {
+    "id": "seoyeon_finance",
+    "file": "dataset/seoyeon_finance.wav",
+    "reference": "이번 달 카드 결제 금액은 십이만 삼천 원입니다. 계좌 잔액을 확인한 뒤 이체 한도를 오십만 원으로 변경해 주세요.",
+    "category": "금융과 수량",
+    "voice": "Seoyeon",
+    "engine": "neural",
+    "condition": "clean",
+    "duration": 8.73,
+    "sha256": "6d8a69e3b8b3780e4ff0321d31f6f9229af0b57db33a079deaedd1d17347b67d"
+  },
+  {
+    "id": "seoyeon_medical",
+    "file": "dataset/seoyeon_medical.wav",
+    "reference": "진료 예약을 변경하고 싶습니다. 알레르기 비염으로 약을 복용 중이며 최근에는 기침과 두통이 함께 나타났습니다.",
+    "category": "의료 용어",
+    "voice": "Seoyeon",
+    "engine": "neural",
+    "condition": "clean",
+    "duration": 8.2425,
+    "sha256": "a376deecf2c832f2da1212a56180e77c2cd38de357451bfa53063e8c6326bf41"
+  },
+  {
+    "id": "seoyeon_technical",
+    "file": "dataset/seoyeon_technical.wav",
+    "reference": "서버의 메모리 사용량과 응답 시간을 확인해 주세요. 음성 인식 모델을 교체한 뒤 데이터베이스 연결 오류가 발생했습니다.",
+    "category": "기술 용어",
+    "voice": "Seoyeon",
+    "engine": "neural",
+    "condition": "clean",
+    "duration": 8.455,
+    "sha256": "71c004c498be5926743ebb6737bb410bcabe625da60ef82f1910013451d6823d"
+  },
+  {
+    "id": "seoyeon_conversation",
+    "file": "dataset/seoyeon_conversation.wav",
+    "reference": "아, 그게 아니라요. 제가 어제 말씀드렸던 건 다음 주 수요일 회의였어요. 혹시 시간 괜찮으시면 자료를 미리 보내 주실 수 있을까요?",
+    "category": "구어체",
+    "voice": "Seoyeon",
+    "engine": "neural",
+    "condition": "clean",
+    "duration": 9.8975,
+    "sha256": "b959607d126f0b6c7ae74fc504cca1a3272a61ccd015c3ea99e1c7ff54f1221c"
+  },
+  {
+    "id": "jihye_daily",
+    "file": "dataset/jihye_daily.wav",
+    "reference": "안녕하세요. 오늘 오후에는 비가 내릴 수 있으니 우산을 챙겨 주세요. 약속 장소는 지하철역 이 번 출구 앞입니다.",
+    "category": "일상",
+    "voice": "Jihye",
+    "engine": "neural",
+    "condition": "clean",
+    "duration": 8.0975,
+    "sha256": "acfabcc24fe453329197ed57ca1d1b2ce230d716ab4381147962ec40418a18ca"
+  },
+  {
+    "id": "jihye_support",
+    "file": "dataset/jihye_support.wav",
+    "reference": "고객님, 주문하신 상품은 내일 도착할 예정입니다. 배송지를 변경하려면 상담원에게 새로운 주소를 알려 주세요.",
+    "category": "상담",
+    "voice": "Jihye",
+    "engine": "neural",
+    "condition": "clean",
+    "duration": 8.2675,
+    "sha256": "9079a88c5db11d0c497d67bf3dd15834506173d1aed65130073ea1c6b3d7d5ed"
+  },
+  {
+    "id": "jihye_fraud",
+    "file": "dataset/jihye_fraud.wav",
+    "reference": "검사나 금융기관 직원을 사칭하며 안전 계좌로 돈을 보내라고 하면 보이스피싱을 의심해야 합니다. 통화를 끊고 공식 번호로 확인하세요.",
+    "category": "보이스피싱 예방",
+    "voice": "Jihye",
+    "engine": "neural",
+    "condition": "clean",
+    "duration": 9.7425,
+    "sha256": "3ae24586aca73bc0deddc73a2c42ff7673b8647c5c1b730bf2d9e154121e4622"
+  },
+  {
+    "id": "jihye_fraud_telephone_noise",
+    "file": "dataset/jihye_fraud_telephone_noise.wav",
+    "reference": "검사나 금융기관 직원을 사칭하며 안전 계좌로 돈을 보내라고 하면 보이스피싱을 의심해야 합니다. 통화를 끊고 공식 번호로 확인하세요.",
+    "category": "보이스피싱 예방",
+    "voice": "Jihye",
+    "engine": "neural",
+    "condition": "telephone_band_8khz_plus_10dB_noise",
+    "duration": 9.7425,
+    "sha256": "ed9d6cf5bc4f27bd0cf10907ac46e0c6fdfaf3c81d86344c1418b3369cd826e8"
+  },
+  {
+    "id": "jihye_names",
+    "file": "dataset/jihye_names.wav",
+    "reference": "박철민 씨와 김민수 씨는 서울특별시 강남구 테헤란로에서 만나기로 했습니다. 담당자는 이서연이며 방문 시간은 오후 세 시입니다.",
+    "category": "이름과 주소",
+    "voice": "Jihye",
+    "engine": "neural",
+    "condition": "clean",
+    "duration": 9.6925,
+    "sha256": "5a9a21f5a3566516d03cc019dfd8ee82bca339ca0811c77368535d7247f37fa3"
+  },
+  {
+    "id": "jihye_names_telephone_noise",
+    "file": "dataset/jihye_names_telephone_noise.wav",
+    "reference": "박철민 씨와 김민수 씨는 서울특별시 강남구 테헤란로에서 만나기로 했습니다. 담당자는 이서연이며 방문 시간은 오후 세 시입니다.",
+    "category": "이름과 주소",
+    "voice": "Jihye",
+    "engine": "neural",
+    "condition": "telephone_band_8khz_plus_10dB_noise",
+    "duration": 9.6925,
+    "sha256": "0b5a85ebd1a8905e74d05f7eb42d5930e89fa7583fcf0e9a088e4915e45ea6d7"
+  },
+  {
+    "id": "jihye_finance",
+    "file": "dataset/jihye_finance.wav",
+    "reference": "이번 달 카드 결제 금액은 십이만 삼천 원입니다. 계좌 잔액을 확인한 뒤 이체 한도를 오십만 원으로 변경해 주세요.",
+    "category": "금융과 수량",
+    "voice": "Jihye",
+    "engine": "neural",
+    "condition": "clean",
+    "duration": 8.2925,
+    "sha256": "f812f1fb5e6244dd72d2bad0052987377d79c05fe27c7fb3392bf3517d5fa629"
+  },
+  {
+    "id": "jihye_medical",
+    "file": "dataset/jihye_medical.wav",
+    "reference": "진료 예약을 변경하고 싶습니다. 알레르기 비염으로 약을 복용 중이며 최근에는 기침과 두통이 함께 나타났습니다.",
+    "category": "의료 용어",
+    "voice": "Jihye",
+    "engine": "neural",
+    "condition": "clean",
+    "duration": 8.58,
+    "sha256": "a76bf5106e13d2d6ddce1c4ceb21d303713ae1b599452b287e861d536b3c9a73"
+  },
+  {
+    "id": "jihye_technical",
+    "file": "dataset/jihye_technical.wav",
+    "reference": "서버의 메모리 사용량과 응답 시간을 확인해 주세요. 음성 인식 모델을 교체한 뒤 데이터베이스 연결 오류가 발생했습니다.",
+    "category": "기술 용어",
+    "voice": "Jihye",
+    "engine": "neural",
+    "condition": "clean",
+    "duration": 8.63,
+    "sha256": "a556c0c0ff925a0cc70e1f12940823d003edc137596c6ad11b37668668a6fbb6"
+  },
+  {
+    "id": "jihye_conversation",
+    "file": "dataset/jihye_conversation.wav",
+    "reference": "아, 그게 아니라요. 제가 어제 말씀드렸던 건 다음 주 수요일 회의였어요. 혹시 시간 괜찮으시면 자료를 미리 보내 주실 수 있을까요?",
+    "category": "구어체",
+    "voice": "Jihye",
+    "engine": "neural",
+    "condition": "clean",
+    "duration": 9.6975,
+    "sha256": "31f9ea9c24f8b0c0764f88db00ee43acb813cd4bec3f8effe337583ae638867f"
+  }
+]
