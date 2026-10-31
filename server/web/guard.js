@@ -46,7 +46,7 @@ renderTabs = function (on) {
 function onboardingPage() {
   if (!accepted()) {
     return `<div class="page">
-      <div class="home-top"><div class="brand"><img src="assets/logo.svg" width="30" height="30" alt="">CodySafe</div></div>
+      <div class="brand-hero"><img src="assets/brand/logo-vertical.png" alt="Cody Safe"></div>
       <div class="lead-text">AI 사기는 <em>미리 경험</em>하고,<br>가족과 <em>함께</em> 막아요</div>
       <div class="card"><ul class="notice">
         ${['앱이 통화를 직접 녹음하지 않고, 이미 저장된 파일만 읽습니다.', '폴더를 연결한 뒤에 생긴 파일만 서버로 보냅니다.', '음성은 분석 후 삭제하고, 일상 통화는 글자 기록도 남기지 않습니다.', '사기로 의심되는 통화의 글자 기록은 검토를 위해 보관합니다.', '분석 내용은 본인만 봅니다. 가족에게는 보이스피싱 의심 여부만 알립니다.']
@@ -57,7 +57,7 @@ function onboardingPage() {
     </div>`;
   }
   return `<div class="page">
-    <div class="home-top"><div class="brand"><img src="assets/logo.svg" width="30" height="30" alt="">CodySafe</div></div>
+    <div class="brand-bar"><img src="assets/brand/logo-horizontal.png" alt="Cody Safe"></div>
     <div class="lead-text">가족에게 보일<br><em>이름</em>을 정해 주세요</div>
     <div class="card"><div class="field" style="margin-top:0"><label for="regName">이름</label><input id="regName" maxlength="30" placeholder="예: 민수"></div>
     <div class="muted small" style="margin-top:10px">계정이나 비밀번호는 필요 없습니다.</div></div>
@@ -184,7 +184,7 @@ function deleteSheet(id) {
 
 /* ---------------- 홈 ---------------- */
 SCREENS.home = gated(() => `<div class="page">
-  <div class="home-top"><div class="brand"><img src="assets/logo.svg" width="30" height="30" alt="">CodySafe</div></div>
+  <div class="brand-bar"><img src="assets/brand/logo-horizontal.png" alt="Cody Safe"></div>
   <div class="hello" style="margin:0 2px 14px">안녕하세요${store.get('name') ? `, <b>${esc(store.get('name'))}님</b>` : ''} 오늘도 안전한 하루 보내세요</div>
   <div id="data"></div>
 </div>`);
