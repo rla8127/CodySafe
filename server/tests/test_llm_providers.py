@@ -108,7 +108,7 @@ def test_generated_scenario_is_validated_and_cleaned():
 def _capture_llm(monkeypatch):
     seen = {}
 
-    def ask(system, user, schema):
+    def ask(system, user, schema, name="llm"):
         seen["user"] = user
         return {"label": "normal", "confidence": 0.9, "scam_type": "none", "summary": "요약", "evidence": []}
 
@@ -134,3 +134,40 @@ def test_rag_failure_falls_back_to_llm_only(monkeypatch):
     monkeypatch.setattr(remote_rag.httpx, "post", boom)
     assert llm.analyze("안녕")["label"] == "normal"
     assert "<reference>" not in seen["user"]
+
+
+def test_tracing_records_usage_without_call_content_and_survives_failures(monkeypatch):
+    from contextlib import contextmanager
+
+    from guard import tracing
+
+    seen = []
+
+    class Client:
+        def start_as_current_observation(self, **fields):
+            seen.append(fields)
+
+            @contextmanager
+            def context():
+                yield NS(update=lambda **f: seen.append(f))
+
+            return context()
+
+    secret = "안전 계좌로 옮기세요"
+    answer = {**RESULT, "label": "voice_phishing", "scam_type": "unknown", "evidence": [secret]}
+    response = NS(stop_reason="end_turn", usage=NS(input_tokens=11, output_tokens=7), content=[NS(type="text", text=json.dumps(answer))])
+    monkeypatch.setattr(config, "LLM", "anthropic")
+    monkeypatch.setattr(llm, "_client", NS(messages=NS(create=lambda **k: response)))
+    monkeypatch.setattr(tracing, "_ready", True)
+    monkeypatch.setattr(tracing, "_langfuse", Client())
+    assert llm.analyze(secret)["label"] == "voice_phishing"
+    assert any(f.get("name") == "판정" and f.get("as_type") == "generation" for f in seen)
+    assert {"input": 11, "output": 7} in [f.get("usage_details") for f in seen]
+    assert secret not in str(seen) and not any("input" in f or "output" in f for f in seen)
+
+    class Broken:
+        def start_as_current_observation(self, **_):
+            raise OSError("down")
+
+    monkeypatch.setattr(tracing, "_langfuse", Broken())
+    assert llm.analyze(secret)["label"] == "voice_phishing"

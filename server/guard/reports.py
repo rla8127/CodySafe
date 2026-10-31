@@ -130,6 +130,6 @@ def generate(title: str, body: str) -> dict:
     # 구조가 틀리면 한 번만 다시 시도합니다.
     report = f"<report>\n제목: {title}\n내용: {body}\n</report>"
     try:
-        return validate(llm._ask_json(SCENARIO_SYSTEM, report, SCENARIO_SCHEMA))
+        return validate(llm._ask_json(SCENARIO_SYSTEM, report, SCENARIO_SCHEMA, name="시나리오 생성"))
     except ValueError:
-        return validate(llm._ask_json(SCENARIO_SYSTEM, report, SCENARIO_SCHEMA))
+        return validate(llm._ask_json(SCENARIO_SYSTEM, report, SCENARIO_SCHEMA, name="시나리오 생성"))

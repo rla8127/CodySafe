@@ -2,7 +2,7 @@
 import json
 import logging
 
-from . import config, db, llm, providers, rag
+from . import config, db, llm, providers, rag, tracing
 from .scam_kb import BY_ID, OTHER_SCAM, VOICE_PHISHING
 
 log = logging.getLogger("guard.pipeline")
@@ -44,11 +44,17 @@ def public_matches(matches: list[dict]) -> list[dict]:
 
 
 def process(rec_id: str) -> None:
+    with tracing.trace("통화 분석", metadata={"recording": rec_id}) as trace:
+        _process(rec_id, trace)
+
+
+def _process(rec_id: str, trace) -> None:
     with db.connect() as conn:
         row = conn.execute("SELECT * FROM recordings WHERE id = ?", (rec_id,)).fetchone()
     try:
         _set(rec_id, status="transcribing", error=None)
-        transcript = providers.transcribe(rec_id, row["s3_key"])
+        with tracing.observe("음성 변환", metadata={"engine": config.STT}):
+            transcript = providers.transcribe(rec_id, row["s3_key"])
         if not transcript:
             _set(rec_id, status="done", label="uncertain", confidence=0.0, scam_type="none", summary="음성에서 말을 찾지 못했습니다.")
             _finish_audio(row["s3_key"])
@@ -59,7 +65,9 @@ def process(rec_id: str) -> None:
         label, confidence = result["label"], result["confidence"]
         is_scam = label in (VOICE_PHISHING, OTHER_SCAM)
 
-        matches = find_matches(result, transcript)
+        with tracing.observe("유형 검색", as_type="retriever") as search:
+            matches = find_matches(result, transcript)
+            tracing.update(search, metadata={"matches": len(matches)})
 
         alert = label == VOICE_PHISHING and confidence >= config.ALERT_THRESHOLD
         needs_review = label in (OTHER_SCAM, "uncertain") or (label == VOICE_PHISHING and not alert)
@@ -76,9 +84,11 @@ def process(rec_id: str) -> None:
             # 일상 통화 원문은 보관하지 않습니다. 검토와 재학습에 필요한 건만 남깁니다.
             transcript=transcript if is_scam or needs_review else None,
         )
+        locked = label == VOICE_PHISHING and confidence >= config.LOCK_THRESHOLD
+        tracing.update(trace, metadata={"label": label, "confidence": confidence, "scam_type": result["scam_type"], "family_alert": alert, "lock": locked, "evidence": len(result["evidence"])})
         if alert:
             _notify_family(rec_id, row["device_id"])
-        if label == VOICE_PHISHING and confidence >= config.LOCK_THRESHOLD:
+        if locked:
             with db.connect() as conn:
                 db.extend_lock(conn, row["device_id"], config.LOCK_SECONDS)
                 db.log_event(conn, row["device_id"], "lock_auto")
@@ -87,6 +97,7 @@ def process(rec_id: str) -> None:
     except Exception as exc:
         log.exception("recording %s failed", rec_id)
         _set(rec_id, status="failed", error=f"{type(exc).__name__}: {exc}"[:500])
+        tracing.update(trace, level="ERROR", status_message=type(exc).__name__)
 
 
 def recommendations(device_id: str) -> dict:

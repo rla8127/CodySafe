@@ -111,6 +111,7 @@ docs/project-plan.md             초기 QR 판독 기획 (이번 제출 범위 �
 | Anthropic Claude (`claude-opus-5-5`) | 사기 판정, 재순위, 시나리오 생성 |
 | OpenAI `whisper-1` | 음성 변환 |
 | Amazon S3 | 음성 저장 |
+| Langfuse Cloud | 처리 시간, 토큰, 비용 관측. 통화 내용은 보내지 않음 |
 | FastAPI, SQLite | 서버 |
 | AndroidX WorkManager, DocumentFile | 앱 |
 | 네이버 나눔스퀘어 라운드, SUIT 2.0.5, Lucide 0.460.0 | 폰트, 아이콘 |

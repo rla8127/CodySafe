@@ -13,7 +13,7 @@ from fastapi.responses import FileResponse, PlainTextResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
-from . import config, dashboard, db, llm, passphrase, pipeline, providers, reports, samples
+from . import config, dashboard, db, llm, passphrase, pipeline, providers, reports, samples, tracing
 from .lock_apps import LOCK_APPS
 from .scam_kb import BY_ID, OTHER_SCAM, VOICE_PHISHING
 
@@ -32,6 +32,7 @@ async def lifespan(_: FastAPI):
         db.seed_demo_analytics()
     config.LOCAL_AUDIO_DIR.mkdir(parents=True, exist_ok=True)
     yield
+    tracing.shutdown()
 
 
 # uvicorn 기본 설정에서는 guard 로그의 INFO가 보이지 않습니다.
@@ -245,7 +246,8 @@ def create_scenario(report_id: int, device: str = Depends(current_device)):
         if not item["rank"]:
             raise HTTPException(403, "top reports only")
         try:
-            scenario = reports.generate(item["title"], item["body"])
+            with tracing.trace("시나리오 생성", metadata={"report": report_id}):
+                scenario = reports.generate(item["title"], item["body"])
         except Exception as exc:
             logging.getLogger("guard.reports").exception("scenario failed")
             raise HTTPException(502, "scenario generation failed") from exc
@@ -349,17 +351,18 @@ def _analyze_sample(sample_id: str) -> dict:
     # 로그인 없는 랜딩에서도 부르므로 동시에 눌러도 샘플당 한 번만 분석합니다.
     with _sample_lock:
         if sample_id not in _sample_results:
-            text = samples.transcript(sample)
-            result = llm.analyze(text)
-            _sample_results[sample_id] = {
-                "status": "done",
-                "label": result["label"],
-                "confidence": result["confidence"],
-                "review_label": None,
-                "evidence": result["evidence"],
-                "matches": pipeline.public_matches(pipeline.find_matches(result, text)),
-                "expected": sample["expected"],
-            }
+            with tracing.trace("예시 통화 분석", metadata={"sample": sample_id}):
+                text = samples.transcript(sample)
+                result = llm.analyze(text)
+                _sample_results[sample_id] = {
+                    "status": "done",
+                    "label": result["label"],
+                    "confidence": result["confidence"],
+                    "review_label": None,
+                    "evidence": result["evidence"],
+                    "matches": pipeline.public_matches(pipeline.find_matches(result, text)),
+                    "expected": sample["expected"],
+                }
         return _sample_results[sample_id]
 
 
