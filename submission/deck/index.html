@@ -106,7 +106,7 @@ section[style*="padding-top:40px"] td{padding:6px 16px;font-size:22px;line-heigh
 <h1>판정은 API에 맡기되, 믿고 행동하게 만드는 층은 직접 만들었습니다</h1>
 <table>
 <tr><th style="width:22%">층</th><th style="width:44%">적용 방식</th><th style="width:34%">구분</th></tr>
-<tr><td><b>음성 → 글자</b></td><td>자체 서버 CPU Whisper large-v3-turbo INT8, 부하·장애 시 OpenAI <code>whisper-1</code></td><td><b>직접 구축</b>: 모델 비교, 서빙, 전환. 대체 경로만 외부 API</td></tr>
+<tr><td><b>음성 → 글자</b></td><td>자체 서버 CPU Whisper large-v3-turbo INT8, 부하·장애 시 OpenAI <code>whisper-1</code></td><td><b>직접 구축</b>: 5개 설정 비교, 서빙, 전환. 대체 경로만 외부 API</td></tr>
 <tr><td><b>사기 판정</b></td><td>Claude <code>claude-opus-5-5</code>, JSON 스키마 출력. 4개 라벨, 유형, 확신도, 인용 근거</td><td>외부 API + <b>직접 작성</b>: 판정 기준, 스키마, 프롬프트 방어</td></tr>
 <tr><td><b>수법 참고(RAG)</b></td><td>문서를 LLM으로 분류·구조화해 적재. BM25(nori) + bge-m3 kNN을 RRF로 결합, 유사 사례 3건을 판정에 참고. 실패 시 LLM만 사용</td><td><b>직접 구현</b>: 적재·검색 API. Elasticsearch, bge-m3 사용</td></tr>
 <tr><td><b>유형 매칭</b></td><td>음절 2-gram BM25 + 벡터 → RRF 결합 → LLM 재순위 (수법 지식 10종)</td><td><b>직접 구현</b>. 벡터는 현재 해시 임베딩</td></tr>
@@ -189,7 +189,9 @@ def _keep_grounded(result, transcript):
 <tr><td>오픈소스</td><td>Elasticsearch 8.17.0, analysis-nori</td><td>사기 사례 검색, 한국어 분석</td><td>Elastic License 2.0</td></tr>
 <tr><td>오픈소스</td><td>BAAI/bge-m3, sentence-transformers, PyTorch</td><td>문서·질의 임베딩</td><td>MIT, Apache 2.0, BSD-3</td></tr>
 <tr><td>오픈소스</td><td>elasticsearch-py, pypdf, python-dotenv</td><td>색인, PDF 읽기, 설정</td><td>Apache 2.0, BSD-3, BSD-3</td></tr>
-<tr><td>오픈소스</td><td>faster-whisper, Whisper large-v3-turbo <span class="todo">비교 모델 추가</span></td><td>자체 STT 서버, 모델 비교</td><td>MIT, MIT</td></tr>
+<tr><td>오픈소스</td><td>faster-whisper 1.2.1, CTranslate2 4.8.4, Whisper large-v3-turbo</td><td>자체 STT 서버 (최종 선정)</td><td>MIT</td></tr>
+<tr><td>오픈소스</td><td>Whisper large-v3, whisper-medium-komixv2</td><td>STT 비교 평가 (미채택)</td><td>MIT, 모델 카드 표기 없음</td></tr>
+<tr><td>오픈소스</td><td>Qwen3-ASR 0.6B·1.7B, qwen-asr 0.0.6, Transformers 4.57</td><td>STT 비교 평가 (미채택)</td><td>Apache 2.0</td></tr>
 <tr><td>오픈소스</td><td>SUIT 2.0.5, 나눔스퀘어 라운드, Lucide 0.460</td><td>폰트, 아이콘</td><td>OFL, OFL, ISC</td></tr>
 <tr><td>외부 API</td><td>Anthropic claude-opus-5-5, claude-haiku-5-5</td><td>판정, 재순위, 시나리오 생성, 문서 구조화</td><td>상용 API</td></tr>
 <tr><td>외부 API</td><td>OpenAI whisper-1, gpt-image-2</td><td>STT 대체 경로, 체험 가상 인물 사진</td><td>상용 API</td></tr>
@@ -217,7 +219,7 @@ def _keep_grounded(result, transcript):
 <table><tr><th style="width:62%">항목</th><th>상태</th></tr>
 <tr><td>녹음 → STT → 판정 → 경고 → 잠금</td><td><b>실제 폰에서 확인</b></td></tr>
 <tr><td>가족 알림, 암구호, 제보, 피드백</td><td><b>테스트·브라우저 확인</b></td></tr>
-<tr><td>로컬 STT 모델 약 6개 비교</td><td><b>완료</b></td></tr>
+<tr><td>STT 5개 설정 비교 (합성 음성 20개)</td><td><b>turbo CER 3.33%, RTF 1.17</b></td></tr>
 <tr><td>실제 MP3 → 자체 STT → 판정 → 잠금</td><td><b>실서버 확인</b></td></tr>
 <tr><td>탐지율, 오탐률</td><td><b>미측정</b></td></tr>
 <tr><td>실제 피해 감소 효과</td><td><b>미측정</b></td></tr>

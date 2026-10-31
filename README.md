@@ -101,6 +101,7 @@ server/guard/    API, 판정 파이프라인, RAG, 제보, 암구호
 server/web/      웹 화면
 server/tests/    자동 테스트
 android/         WebView 앱, 폴더 감시, 금융 앱 차단
+korean-stt/      자체 STT 서버, 모델 비교 평가 코드와 보고서
 infra/es-server/ 사례 검색 서버 (Terraform, Elasticsearch, 검색 API, 색인 스크립트)
 index.html, css/, js/, assets/   공용 화면 자원과 초기 웹 MVP
 docs/family-guard-plan.md        기획서
@@ -123,7 +124,8 @@ docs/project-plan.md             초기 QR 판독 기획 (이번 제출 범위 �
 | 이름 | 용도 |
 |---|---|
 | Anthropic Claude (`claude-opus-5-5`) | 사기 판정, 재순위, 시나리오 생성 |
-| faster-whisper, Whisper large-v3-turbo | 자체 STT 서버 |
+| faster-whisper, CTranslate2, Whisper large-v3-turbo | 자체 STT 서버 ([비교 보고서](korean-stt/docs/한국어_STT_모델_비교_평가_2026-11-01.md)) |
+| Whisper large-v3, whisper-medium-komixv2, Qwen3-ASR 0.6B·1.7B | STT 비교 평가, 미채택 |
 | OpenAI `whisper-1` | 음성 변환 대체 경로 |
 | Amazon Polly | STT 평가용 한국어 음성 데이터셋 생성 |
 | ElevenLabs | 자연스러운 음성 생성 |
