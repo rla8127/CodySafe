@@ -1,0 +1,21 @@
+.env
+.venv/
+__pycache__/
+models/
+samples/*.wav
+samples/*.mp3
+
+# Local runtime, generated evaluation data, and private input files
+backups/
+deployment/
+benchmark/dataset/
+benchmark/results/
+benchmark/REPORT.html
+benchmark/internal/
+benchmark/*.zip
+*.mp3
+*.wav
+*.stt.json
+*.stt.txt
+*.whisper-turbo-api.json
+*.whisper-turbo-api.txt

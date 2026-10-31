@@ -48,11 +48,28 @@ LLM은 API 키나 Bedrock 중에서 고릅니다. 키는 저장소에 넣지 말
 S3와 Transcribe로 처리하려면 다음을 더합니다.
 
 ```bash
-GUARD_STORAGE=s3 GUARD_S3_BUCKET=<버킷> GUARD_STT=transcribe GUARD_ADMIN_TOKEN=<임의 값> \
+GUARD_STORAGE=s3 GUARD_S3_BUCKET=<버킷> GUARD_STT=transcribe \
 .venv/bin/uvicorn guard.app:app --host 0.0.0.0 --port 8091
 ```
 
 버킷은 공개 차단과 수명 주기 삭제 규칙을 켜 두세요. 분석에 실패한 음성은 재시도를 위해 남기 때문입니다.
+
+## 자체 STT 서버
+
+`GUARD_STT=server`면 음성을 자체 STT 서버로 보냅니다. 키는 `server/.env`에만 두며 화면과 앱으로 내려가지 않습니다.
+
+```
+GUARD_STT=server
+STT_BASE_URL=http://<STT 서버>:8000
+STT_API_KEY=<키>
+```
+
+- **제한:** 파일 50 MiB, 음성 300초, 처리 900초(`STT_TIMEOUT`). 길이를 읽을 수 없는 파일은 서버 판단에 맡깁니다.
+- **동시 처리:** 서버가 한 번에 1건만 처리하므로 백엔드도 1건씩 보내고, 나머지는 `STT_QUEUE_TIMEOUT`(기본 60초)까지 기다립니다.
+- **429:** `Retry-After`만큼 기다려 최대 `STT_MAX_RETRIES`번 다시 보냅니다. 한 번에 최대 60초 기다립니다.
+- **실패:** 400, 401, 413, 429, 연결 실패, 시간 초과는 각각 다른 오류로 구분합니다.
+- **대체 경로:** 400을 뺀 실패(부하, 장애, 인증, 크기·길이 제한 초과)는 OpenAI `whisper-1`로 넘깁니다. 이때 음성이 OpenAI로 전송되며 파일당 25MB까지입니다. `STT_FALLBACK=none`이면 실패로 기록합니다. 전환 사실은 서버 로그와 Langfuse에 남습니다.
+- **상태 확인:** `GET /healthz/stt`
 
 ## 화면 수정
 
@@ -87,9 +104,11 @@ GUARD_STT=openai
 
 폭 1001px 이상에서는 왼쪽 메뉴와 넓은 내용 화면으로 보여 줍니다. 폭 1181px 이상에서는 오른쪽에 접을 수 있는 모바일 미리보기가 나옵니다. 미리보기는 같은 앱을 iframe으로 띄운 것으로, 로그인과 화면 이동을 함께 따라갑니다.
 
-## 관리자 대시보드
+## 트레이싱
 
-시연용으로 비밀번호 없이 열립니다. 공개 주소에서는 누구나 집계를 볼 수 있으므로 실제 운영 전에 인증을 넣어야 합니다. PC는 왼쪽 메뉴, 모바일은 MY 아래 링크나 `/app/#/admin`으로 들어갑니다. 글자 기록이 든 `review-dataset.jsonl`은 `GUARD_DATASET_TOKEN`으로 계속 보호합니다.
+[Langfuse Cloud 트레이스](https://us.cloud.langfuse.com/project/cmvwspomu005fad0e5vr8sgrq/traces)에서 봅니다. 프로젝트 권한이 있어야 열립니다.
+
+`server/.env`에 `LANGFUSE_PUBLIC_KEY`, `LANGFUSE_SECRET_KEY`, `LANGFUSE_BASE_URL`이 있으면 Langfuse로 음성 변환, 사례 검색, 판정, 재순위, 시나리오 생성의 시간과 토큰, 판정 라벨을 보냅니다. 입력과 출력, 통화 내용은 보내지 않습니다. 키가 없거나 전송에 실패해도 분석은 그대로 진행합니다. 통화 분석, 예시 통화 분석, 시나리오 생성 한 번이 트레이스 하나이고, 그 안에 단계별 스팬이 들어갑니다. 다른 API 요청은 기록하지 않습니다.
 
 ## 웹 시연 가족
 
@@ -111,7 +130,7 @@ GUARD_STT=openai
 
 ## 예시 통화
 
-검사 탭의 예시는 `server/guard/samples.py`의 가상 대본입니다. 분석만 실행하며 기록, 가족 알림, 잠금에 영향을 주지 않습니다. 결과는 서버가 켜져 있는 동안 재사용합니다. 시연용이며 탐지 성능의 근거가 아닙니다.
+검사 탭의 예시는 `server/guard/samples.py`의 가상 대본입니다. 분석만 실행하며 가족 알림, 잠금, 통계, 데이터셋에 영향을 주지 않습니다. 웹에서는 검사 결과 목록에 "예시 통화"로 표시하고, 앱에서는 남기지 않습니다. 결과는 서버가 켜져 있는 동안 재사용합니다. 시연용이며 탐지 성능의 근거가 아닙니다.
 
 ## 제약
 

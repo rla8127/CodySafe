@@ -1,0 +1,35 @@
+{
+  "qwen06": {
+    "repo": "Qwen/Qwen3-ASR-0.6B",
+    "revision": "5eb144179a02acc5e5ba31e748d22b0cf3e303b0",
+    "path": "/home/ubuntu/korean-stt/benchmark/models/qwen06"
+  },
+  "qwen17": {
+    "repo": "Qwen/Qwen3-ASR-1.7B",
+    "revision": "7278e1e70fe206f11671096ffdd38061171dd6e5",
+    "path": "/home/ubuntu/korean-stt/benchmark/models/qwen17",
+    "deployment": "PyTorch dynamic INT8 for Linear via quant_cpu.py, BF16 remaining layers",
+    "bf16_probe": "Aborted after >2min warmup due to disk paging; excluded from scoring"
+  },
+  "whisper_turbo": {
+    "repo": "dropbox-dash/faster-whisper-large-v3-turbo",
+    "revision": "0a363e9161cbc7ed1431c9597a8ceaf0c4f78fcf",
+    "path": "/home/ubuntu/korean-stt/benchmark/models/whisper_turbo"
+  },
+  "whisper_large": {
+    "repo": "Systran/faster-whisper-large-v3",
+    "revision": "edaa852ec7e145841d8ffdb056a99866b5f0a478",
+    "path": "/home/ubuntu/korean-stt/benchmark/models/whisper_large"
+  },
+  "komix": {
+    "model": "seastar105/whisper-medium-komixv2",
+    "revision": "752b1b5bfa0c8219bca737ea180a4ad7eed1e621",
+    "quantization": "int8",
+    "converter": "ctranslate2 4.8.4"
+  },
+  "qwen_runtime": {
+    "package": "qwen-asr 0.0.6",
+    "backend": "official transformers CPU BF16 SDPA",
+    "reason": "C runtime smoke emitted repeated !; excluded from benchmark"
+  }
+}
