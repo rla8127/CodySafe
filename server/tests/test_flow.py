@@ -248,3 +248,67 @@ def test_only_linked_guardian_can_unlock(client):
     assert client.post(f"/v1/family/protected/{pid}/unlock", headers=g).status_code == 200
     assert client.get("/v1/lock", headers=p).json()["locked"] is False
     assert client.get("/v1/family", headers=g).json()["protected"][0]["locked"] is False
+
+
+def family_of_three(client):
+    mom, a = linked(client)
+    b = device(client, "둘째")
+    code = client.post("/v1/family/invite", headers=mom).json()["code"]
+    client.post("/v1/family/link", headers=b, json={"code": code})
+    return mom, a, b
+
+
+def test_passphrase_is_shared_across_family_and_changes_daily(client, monkeypatch):
+    from datetime import datetime
+
+    from guard import passphrase
+
+    assert client.get("/v1/family/passphrase", headers=device(client, "혼자")).json() == {"linked": False}
+    mom, a, b = family_of_three(client)
+    get = lambda h: client.get("/v1/family/passphrase", headers=h).json()
+    # 서로 직접 연결되지 않은 형제도 같은 단어를 봅니다.
+    assert get(mom)["words"] == get(a)["words"] == get(b)["words"] and len(get(mom)["words"]) == 2
+    other, _ = linked(client)
+    days = [datetime(2026, 11, d, 23, 59, tzinfo=passphrase.KST) for d in range(1, 9)]
+    seen, others = [], []
+    for day in days:
+        monkeypatch.setattr(passphrase, "now_kst", lambda day=day: day)
+        seen.append(tuple(get(mom)["words"]))
+        others.append(tuple(get(other)["words"]))
+        assert get(mom)["seconds_left"] == 60
+    assert len(set(seen)) > 1 and seen != others
+
+
+def test_emergency_answer_is_hashed_normalized_and_rate_limited(client):
+    import sqlite3
+
+    mom, a, b = family_of_three(client)
+    verify = lambda h, answer: client.post("/v1/family/passphrase/emergency/verify", headers=h, json={"answer": answer})
+    body = {"question": "첫 반려견 이름은?", "answer": "초코 Dog"}
+    assert client.put("/v1/family/passphrase/emergency", headers=device(client, "혼자"), json=body).status_code == 400
+    assert verify(b, "초코").status_code == 404
+    assert client.put("/v1/family/passphrase/emergency", headers=mom, json=body).status_code == 200
+    seen = client.get("/v1/family/passphrase", headers=b).json()["emergency"]
+    assert seen == {"question": "첫 반려견 이름은?", "set_by": "엄마"}
+    assert verify(b, "초코dog").json()["match"] is True
+    with sqlite3.connect(config.DB_PATH) as conn:
+        assert not any("초코" in str(v) for row in conn.execute("SELECT * FROM emergency_phrases") for v in row)
+    for _ in range(5):
+        assert verify(a, "틀림").json()["match"] is False
+    assert verify(a, "초코dog").status_code == 429
+
+
+def test_samples_show_result_without_touching_records_alerts_or_lock(client):
+    p, g = linked(client)
+    assert client.get("/v1/samples").status_code == 401
+    items = client.get("/v1/samples", headers=p).json()["items"]
+    kinds = [s["expected"] for s in items]
+    assert kinds.count("voice_phishing") == 3 and kinds.count("normal") == 3
+    results = {s["id"]: client.post(f"/v1/samples/{s['id']}/analyze", headers=p).json() for s in items}
+    assert client.post("/v1/samples/none/analyze", headers=p).status_code == 404
+    # 규칙 판정의 정확도가 아니라 기록과 알림에 영향이 없는지 봅니다.
+    assert results["prosecutor"]["label"] == "voice_phishing" and results["prosecutor"]["matches"]
+    assert results["dinner"]["label"] == "normal" and results["dinner"]["evidence"] == []
+    assert client.get("/v1/recordings", headers=p).json()["items"] == []
+    assert client.get("/v1/alerts", headers=g).json()["items"] == []
+    assert client.get("/v1/lock", headers=p).json()["locked"] is False

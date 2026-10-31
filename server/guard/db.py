@@ -1,4 +1,5 @@
 import json
+import secrets
 import sqlite3
 import time
 from contextlib import contextmanager
@@ -29,6 +30,10 @@ CREATE TABLE IF NOT EXISTS alerts (
   id INTEGER PRIMARY KEY AUTOINCREMENT, guardian_id TEXT NOT NULL, protected_id TEXT NOT NULL,
   recording_id TEXT NOT NULL, title TEXT NOT NULL, body TEXT NOT NULL,
   acked INTEGER NOT NULL DEFAULT 0, created_at REAL NOT NULL
+);
+CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value BLOB NOT NULL);
+CREATE TABLE IF NOT EXISTS emergency_phrases (
+  device_id TEXT PRIMARY KEY, question TEXT NOT NULL, salt BLOB NOT NULL, hash BLOB NOT NULL, updated_at REAL NOT NULL
 );
 CREATE TABLE IF NOT EXISTS review_dataset (
   recording_id TEXT PRIMARY KEY, transcript TEXT NOT NULL, label TEXT NOT NULL, scam_type TEXT,
@@ -68,6 +73,11 @@ def init() -> None:
 
 def now() -> float:
     return time.time()
+
+
+def passphrase_key(conn: sqlite3.Connection) -> bytes:
+    conn.execute("INSERT OR IGNORE INTO meta VALUES ('passphrase_key', ?)", (secrets.token_bytes(32),))
+    return conn.execute("SELECT value FROM meta WHERE key = 'passphrase_key'").fetchone()["value"]
 
 
 def extend_lock(conn: sqlite3.Connection, device_id: str, seconds: float) -> None:

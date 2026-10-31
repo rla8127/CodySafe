@@ -10,12 +10,15 @@ from fastapi.responses import FileResponse, PlainTextResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
-from . import config, db, pipeline, providers
+from . import config, db, llm, passphrase, pipeline, providers, samples
 from .lock_apps import LOCK_APPS
 from .scam_kb import BY_ID, OTHER_SCAM, VOICE_PHISHING
 
 INVITE_TTL = 600
 INVITE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
+VERIFY_LIMIT = 5
+VERIFY_WINDOW = 600
+_verify_fails: dict[str, list[float]] = {}
 
 
 @asynccontextmanager
@@ -78,6 +81,15 @@ class RecordingIn(BaseModel):
 
 class LockIn(BaseModel):
     minutes: int = Field(ge=1, le=60)
+
+
+class EmergencyIn(BaseModel):
+    question: str = Field(min_length=2, max_length=60)
+    answer: str = Field(min_length=2, max_length=60)
+
+
+class AnswerIn(BaseModel):
+    answer: str = Field(min_length=1, max_length=60)
 
 
 class ReviewIn(BaseModel):
@@ -151,6 +163,91 @@ def remove_guardian(guardian_id: str, device: str = Depends(current_device)):
     with db.connect() as conn:
         conn.execute("DELETE FROM family_links WHERE protected_id = ? AND guardian_id = ?", (device, guardian_id))
     return {"ok": True}
+
+
+# ---------- 시연용 예시 통화: 기록, 가족 알림, 잠금에 영향을 주지 않습니다 ----------
+_sample_results: dict[str, dict] = {}
+
+
+@app.get("/v1/samples")
+def list_samples(_: str = Depends(current_device)):
+    return {"items": samples.SAMPLES}
+
+
+@app.post("/v1/samples/{sample_id}/analyze")
+def analyze_sample(sample_id: str, _: str = Depends(current_device)):
+    sample = samples.BY_ID.get(sample_id)
+    if not sample:
+        raise HTTPException(404)
+    # 눌러 볼 때마다 LLM 비용이 나가지 않도록 서버가 켜져 있는 동안 결과를 재사용합니다.
+    if sample_id not in _sample_results:
+        text = samples.transcript(sample)
+        result = llm.analyze(text)
+        _sample_results[sample_id] = {
+            "status": "done",
+            "label": result["label"],
+            "review_label": None,
+            "evidence": result["evidence"],
+            "matches": pipeline.public_matches(pipeline.find_matches(result, text)),
+            "expected": sample["expected"],
+        }
+    return _sample_results[sample_id]
+
+
+# ---------- 가족 암구호 ----------
+def _emergency(conn, group: list[str]):
+    marks = ",".join("?" * len(group))
+    return conn.execute(
+        f"SELECT e.*, d.name FROM emergency_phrases e JOIN devices d ON d.id = e.device_id"
+        f" WHERE e.device_id IN ({marks}) ORDER BY e.updated_at DESC LIMIT 1",
+        group,
+    ).fetchone()
+
+
+@app.get("/v1/family/passphrase")
+def get_passphrase(device: str = Depends(current_device)):
+    today = passphrase.now_kst()
+    with db.connect() as conn:
+        group = passphrase.members(conn, device)
+        if len(group) < 2:
+            return {"linked": False}
+        emergency = _emergency(conn, group)
+        words = passphrase.words(db.passphrase_key(conn), group, today.date().isoformat())
+    midnight = today.replace(hour=0, minute=0, second=0, microsecond=0) + passphrase.timedelta(days=1)
+    return {
+        "linked": True,
+        "words": words,
+        "seconds_left": int((midnight - today).total_seconds()),
+        # 비상 암구호의 답은 해시만 저장하므로 돌려주지 않습니다.
+        "emergency": {"question": emergency["question"], "set_by": emergency["name"]} if emergency else None,
+    }
+
+
+@app.put("/v1/family/passphrase/emergency")
+def set_emergency(body: EmergencyIn, device: str = Depends(current_device)):
+    salt, digest = passphrase.hash_answer(body.answer)
+    with db.connect() as conn:
+        if len(passphrase.members(conn, device)) < 2:
+            raise HTTPException(400, "no family")
+        conn.execute(
+            "INSERT OR REPLACE INTO emergency_phrases VALUES (?, ?, ?, ?, ?)",
+            (device, body.question.strip(), salt, digest, db.now()),
+        )
+    return {"ok": True}
+
+
+@app.post("/v1/family/passphrase/emergency/verify")
+def verify_emergency(body: AnswerIn, device: str = Depends(current_device)):
+    fails = [t for t in _verify_fails.get(device, []) if t > db.now() - VERIFY_WINDOW]
+    if len(fails) >= VERIFY_LIMIT:
+        raise HTTPException(429, "too many attempts")
+    with db.connect() as conn:
+        emergency = _emergency(conn, passphrase.members(conn, device))
+    if not emergency:
+        raise HTTPException(404)
+    match = hmac.compare_digest(passphrase.hash_answer(body.answer, emergency["salt"])[1], emergency["hash"])
+    _verify_fails[device] = [] if match else [*fails, db.now()]
+    return {"match": match}
 
 
 # ---------- 금융 앱 잠금 ----------

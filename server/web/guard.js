@@ -30,8 +30,9 @@ if (store.get('token')) native?.setToken(store.get('token'));
 
 /* ---------------- 시안 화면 제거 ---------------- */
 ['image', 'voice', 'call', 'url', 'verify', 'report', 'generate', 'weakness', 'training', 'copilot', 'checkup'].forEach((k) => delete SCREENS[k]);
-Object.assign(TAB_OF, { home: 'home', sim: 'sim', play: 'sim', detect: 'detect', family: 'family', me: 'me', lock: 'home' });
+Object.assign(TAB_OF, { home: 'home', sim: 'sim', play: 'sim', detect: 'detect', family: 'family', me: 'me', lock: 'home', passphrase: 'family' });
 delete PARENT.family;
+PARENT.passphrase = 'family';
 
 renderTabs = function (on) {
   const tabs = [['home', 'house', '홈'], ['sim', 'gamepad-2', '체험'], ['detect', 'shield-check', '검사'], ['family', 'users', '가족'], ['me', 'user-round', 'MY']];
@@ -84,7 +85,7 @@ const gated = (fn) => (arg) => (signedIn() ? fn(arg) : onboardingPage());
 const CHIPS = {
   voice_phishing: ['danger', 'siren', '보이스피싱 의심'],
   other_scam: ['warn', 'triangle-alert', '다른 사기 의심'],
-  normal: ['safe', 'shield-check', '사기 징후 없음'],
+  normal: ['safe', 'shield-check', '사기 징후 못 찾음'],
 };
 const STEP = { queued: '대기 중', transcribing: '음성 변환 중', analyzing: '분석 중' };
 
@@ -95,10 +96,28 @@ function verdictChip(r, label) {
   return c ? `<span class="chip ${c[0]}">${ic(c[1])}${c[2]}</span>` : `<span class="chip">${ic('circle-help')}판단 어려움</span>`;
 }
 
-// 삼성 녹음 파일명의 전화번호를 화면에 드러내지 않고 통화 시각만 보여 줍니다.
-function callTitle(filename) {
-  const m = /_\d{2}(\d{2})(\d{2})_(\d{2})(\d{2})\d{2}\./.exec(filename);
-  return m ? `${+m[1]}월 ${+m[2]}일 ${m[3]}:${m[4]} 통화` : esc(filename.replace(/\.[^.]+$/, ''));
+// 파일명의 이름과 전화번호를 화면에 드러내지 않고 시각만 보여 줍니다. 파일명에 시각이 없으면 올린 시각을 씁니다.
+function callTitle(r) {
+  const m = /_\d{2}(\d{2})(\d{2})_(\d{2})(\d{2})\d{2}\./.exec(r.filename);
+  if (m) return `${+m[1]}월 ${+m[2]}일 ${m[3]}:${m[4]} 통화`;
+  const d = new Date(r.created_at * 1000);
+  return `${d.getMonth() + 1}월 ${d.getDate()}일 ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')} 올린 통화`;
+}
+
+// AI가 풀어 쓴 요약은 보여 주지 않고, 녹취에서 대조한 발화만 사실로 표시합니다.
+function factBox(r, top) {
+  if (!r.evidence.length) {
+    if (r.status !== 'done') return '';
+    return `<div class="call-text">${(r.review_label || r.label) === 'normal' ? '사기로 볼 만한 말을 찾지 못했습니다.' : '근거가 될 말을 찾지 못해 판단하지 못했습니다.'}</div>`;
+  }
+  return `<div class="fact-box">
+    <span class="fact-stamp" aria-hidden="true">FACT</span>
+    ${top ? `<small>비슷한 수법</small><b>${esc(top.name)}</b>` : '<b>확인된 말</b>'}
+    <div class="fact-head">통화에서 실제로 나온 말</div>
+    <ul class="fact-list">${r.evidence.map((e) => `<li>${ic('check')}<span>“${esc(e)}”</span></li>`).join('')}</ul>
+    <div class="fact-note">녹취에서 그대로 옮겼습니다. 말한 내용이 사실이라는 뜻은 아니며, 음성 변환 오류가 있을 수 있습니다.</div>
+    ${top ? `<div class="fact-advice"><b>이렇게 확인하세요</b><p>${esc(top.advice)}</p></div>` : ''}
+  </div>`;
 }
 
 function recordingCard(r) {
@@ -106,11 +125,9 @@ function recordingCard(r) {
   const top = r.matches[0];
   return `<div class="card mt">
     ${verdictChip(r, label)}
-    <div class="call-title">${callTitle(r.filename)}</div>
-    ${r.summary ? `<div class="call-text">${esc(r.summary)}</div>` : ''}
+    <div class="call-title">${callTitle(r)}</div>
     ${r.status === 'failed' ? '<div class="call-text">처리에 실패했습니다. 다시 시도해 주세요.</div>' : ''}
-    ${r.evidence.map((e) => `<div class="quote">“${esc(e)}”</div>`).join('')}
-    ${top ? `<div class="type-box"><b>${esc(top.name)}</b><p>${esc(top.advice)}</p></div>` : ''}
+    ${factBox(r, top)}
     <div class="link-row">
       ${r.status === 'failed' ? `<button onclick="act('POST','/v1/recordings/${r.id}/complete')">다시 시도</button>` : ''}
       ${r.status === 'done' ? `<button onclick="reviewSheet('${r.id}')">${r.needs_review ? '판정 확인' : '판정 고치기'}</button>` : ''}
@@ -176,12 +193,113 @@ function homeData({ recordings, recs, family, alerts, lock }) {
     </div>
     ${unread.map(alertCard).join('')}
     ${reviews ? `<button class="card mt soft-warn" style="width:100%;text-align:left" onclick="go('detect')"><b>검토가 필요한 통화 ${reviews}건</b><br>판정을 확인해 주시면 탐지 개선에 쓰입니다.</button>` : ''}
-    <div class="sec-title">자주 노출된 사기 유형</div>
-    ${recs.items.length ? recs.items.map((r) => `<div class="card mt"><span class="chip pri">${r.count}회 노출</span>
+    <div class="sec-title">자주 의심된 사기 유형</div>
+    ${recs.items.length ? recs.items.map((r) => `<div class="card mt"><span class="chip pri">${r.count}회 의심</span>
       <div class="call-title">${esc(r.name)}</div><div class="call-text">${esc(r.advice)}</div>
       <div class="call-text" style="color:var(--pri);font-weight:700;font-size:13px">추천 훈련 · ${esc(r.training)}</div></div>`).join('') : emptyCard('아직 사기로 판정된 통화가 없습니다.')}
     <div class="sec-title">최근 분석 <button class="more" onclick="go('detect')">전체 보기${ic('chevron-right')}</button></div>
     ${items.length ? items.slice(0, 3).map(recordingCard).join('') : emptyCard('아직 분석한 통화가 없습니다.')}`;
+}
+
+/* ---------------- 가족 암구호 ---------------- */
+let phraseShown = false;
+let phraseTimer = null;
+
+function showPhrase(on) {
+  phraseShown = on;
+  clearTimeout(phraseTimer);
+  // 켜 둔 화면을 누가 옆에서 읽지 못하게 잠시 뒤 다시 가립니다.
+  if (on) phraseTimer = setTimeout(() => showPhrase(false), 30000);
+  document.querySelector('.phrase-card')?.classList.toggle('shown', on);
+}
+
+function timeLeft(seconds) {
+  const h = Math.floor(seconds / 3600);
+  const m = Math.ceil((seconds % 3600) / 60);
+  return h ? `${h}시간 ${m}분` : `${m}분`;
+}
+
+function phraseCard(p) {
+  return `<div class="phrase-card ${phraseShown ? 'shown' : ''}">
+    <div class="phrase-top"><span>${ic('key-round')}오늘의 가족 암구호</span><span>${timeLeft(p.seconds_left)} 뒤 변경</span></div>
+    <button class="phrase-words" onclick="showPhrase(!phraseShown)" aria-label="암구호 보기">
+      <span class="phrase-text">${p.words.map(esc).join(' ')}</span>
+      <span class="phrase-mask">${ic('eye')}눌러서 보기</span>
+    </button>
+    <div class="phrase-note">상대가 먼저 말하게 하세요. 암구호를 먼저 알려 주지 마세요.</div>
+  </div>`;
+}
+
+SCREENS.passphrase = gated(() => `<div class="page">
+  <div class="lead" style="margin-top:6px">가족 암구호</div>
+  <div class="lead-sub" style="margin-top:6px">가족이라며 돈을 부탁하는 전화가 오면 먼저 물어보세요. 목소리가 같아도 AI일 수 있습니다.</div>
+  <div id="data"></div>
+</div>`);
+
+function passphraseData({ phrase }) {
+  if (!phrase.linked) {
+    return `<div class="card mt center"><div class="empty">가족을 연결하면 매일 바뀌는 암구호가 생깁니다.</div>
+      <button class="btn pri block" onclick="go('family')">가족 연결하기</button></div>`;
+  }
+  const steps = [['phone-incoming', '“오늘 암구호가 뭐야?”라고 먼저 물어요'], ['message-circle', '상대가 말한 단어를 화면과 비교해요'], ['circle-check', '맞을 때만 부탁을 들어 줘요']];
+  const e = phrase.emergency;
+  return `${phraseCard(phrase)}
+    <div class="card mt phrase-steps">${steps.map(([i, t], n) => `<div class="phrase-step"><span class="step-no">${ic(i)}</span><span><small>${n + 1}단계</small>${t}</span></div>`).join('')}</div>
+    <div class="phrase-verdict">
+      <button class="btn line block" onclick="toast('확인했습니다. 그래도 큰돈은 다시 한번 확인하세요')">${ic('check')}맞아요</button>
+      <button class="btn danger block" onclick="mismatchSheet()">${ic('x')}안 맞아요</button>
+    </div>
+    <div class="sec-title">비상 암구호</div>
+    <div class="card">
+      <div class="row between"><div class="b">폰을 잃어버린 가족 확인용</div><span class="chip ${e ? 'safe' : ''}">${e ? '설정됨' : '미설정'}</span></div>
+      <div class="muted small" style="margin-top:6px">${e ? `질문: ${esc(e.question)} · ${esc(e.set_by)}님이 설정` : '오늘의 암구호를 볼 수 없는 가족도 답할 수 있도록, 가족만 아는 질문을 정해 두세요.'}</div>
+      <div class="row" style="margin-top:12px">
+        ${e ? '<button class="btn pri sm grow" onclick="verifySheet()">답 확인</button>' : ''}
+        <button class="btn ghost sm grow" onclick="emergencySheet()">${e ? '바꾸기' : '설정하기'}</button>
+      </div>
+    </div>
+    <div class="muted small phrase-limit">검찰, 금감원 같은 기관 사칭에는 암구호를 쓸 수 없습니다. 기관이 전화로 돈을 요구하면 끊으세요.</div>`;
+}
+
+function mismatchSheet() {
+  openSheet(`<span class="chip danger">${ic('siren')}사칭 의심</span>
+    <div class="b" style="font-size:20px;margin-top:10px">지금 전화를 끊으세요</div>
+    <div class="call-text">가족에게는 원래 저장된 번호로 직접 다시 거세요. 상대가 알려 준 새 번호로 걸면 안 됩니다.</div>
+    <div class="btn-col"><a class="btn danger block" href="tel:112">${ic('phone')}경찰 112</a><button class="btn line block" onclick="closeSheet()">닫기</button></div>`);
+}
+
+function emergencySheet() {
+  openSheet(`<div class="b" style="font-size:18px">비상 암구호 정하기</div>
+    <div class="muted small" style="margin-top:6px">SNS나 통화에서 쉽게 알 수 없는 답으로 정하세요. 답은 복원할 수 없게 저장되어 가족에게 말로 직접 알려 줘야 합니다.</div>
+    <div class="field"><label for="emQ">질문</label><input id="emQ" maxlength="60" placeholder="예: 우리 첫 강아지 이름은?"></div>
+    <div class="field"><label for="emA">답</label><input id="emA" maxlength="60" autocomplete="off"></div>
+    <div class="btn-col"><button class="btn pri block" onclick="saveEmergency()">저장</button><button class="btn line block" onclick="closeSheet()">취소</button></div>`);
+}
+
+async function saveEmergency() {
+  const question = $('#emQ').value.trim();
+  const answer = $('#emA').value.trim();
+  if (question.length < 2 || answer.length < 2) return toast('질문과 답을 두 글자 이상 입력하세요', 'circle-alert');
+  await act('PUT', '/v1/family/passphrase/emergency', { question, answer });
+}
+
+function verifySheet() {
+  openSheet(`<div class="b" style="font-size:18px">상대가 말한 답을 입력하세요</div>
+    <div class="field"><label for="emCheck">답</label><input id="emCheck" maxlength="60" autocomplete="off"></div>
+    <div class="btn-col"><button class="btn pri block" onclick="verifyEmergency()">확인</button><button class="btn line block" onclick="closeSheet()">취소</button></div>`);
+}
+
+async function verifyEmergency() {
+  const answer = $('#emCheck').value.trim();
+  if (!answer) return toast('답을 입력하세요', 'circle-alert');
+  try {
+    const { match } = await api('POST', '/v1/family/passphrase/emergency/verify', { answer });
+    if (!match) return mismatchSheet();
+    closeSheet();
+    toast('답이 맞습니다');
+  } catch (e) {
+    toast(e.message === '429' ? '여러 번 틀렸습니다. 10분 뒤 다시 시도하세요' : '확인하지 못했습니다', 'circle-alert');
+  }
 }
 
 /* ---------------- 금융 앱 잠금 ---------------- */
@@ -219,9 +337,52 @@ function lockData({ lock }) {
       <a class="btn line block" href="tel:1332">${ic('phone')}금융감독원 1332</a>
     </div>
     <div class="card mt"><div class="b">잠금을 풀려면</div>
-      <div class="call-text">먼저 가족에게 직접 전화해 확인하세요. 연결된 가족은 가족 탭에서 바로 풀 수 있습니다.</div>
-      <div class="link-row"><button class="quiet" onclick="releaseSheet()">사기가 아니에요, 직접 풀기</button></div></div>
+      <div class="call-text">먼저 가족에게 직접 전화해 확인하세요. 연결된 가족은 오늘의 암구호로 서로 확인한 뒤 가족 탭에서 바로 풀 수 있습니다.</div>
+      <div class="link-row"><button onclick="go('passphrase')">오늘의 암구호 보기</button><button class="quiet" onclick="releaseSheet()">사기가 아니에요, 직접 풀기</button></div></div>
     ${blockerBlock()}`;
+}
+
+/* 잠금이 걸리면 어느 화면에 있든 바로 알립니다. 잠금마다 한 번만 띄웁니다. */
+function closeLockAlert() {
+  document.querySelector('#lockAlert')?.remove();
+  store.set('lockSeen', '1');
+}
+
+function showLockAlert(lock) {
+  if (document.querySelector('#lockAlert')) return;
+  const box = document.createElement('div');
+  box.id = 'lockAlert';
+  box.setAttribute('role', 'alertdialog');
+  box.innerHTML = `<div class="lock-alert-body">
+    <div class="lock-alert-icon">${ic('siren')}</div>
+    <div class="lock-alert-title">지금 돈을 보내지 마세요</div>
+    <div class="lock-alert-text">보이스피싱이 의심되어 금융 앱을 ${lockMinutes(lock)}분 동안 잠갔습니다. 누군가 이체나 앱 설치, 잠금 해제를 시키고 있다면 전화를 끊으세요.</div>
+    <div class="btn-col">
+      <a class="btn danger block" href="tel:112">${ic('phone')}경찰 112</a>
+      <button class="btn pri block" onclick="closeLockAlert();go('passphrase')">${ic('key-round')}가족 암구호 확인</button>
+      <button class="btn line block" onclick="closeLockAlert();go('lock')">잠금 내용 보기</button>
+    </div></div>`;
+  document.querySelector('.screen').appendChild(box);
+  icons();
+  vibrate([300, 150, 300]);
+  beep();
+}
+
+async function pollLock() {
+  if (!signedIn()) return;
+  try {
+    const lock = await api('GET', '/v1/lock');
+    if (!lock.locked) {
+      store.del('lockSeen');
+      document.querySelector('#lockAlert')?.remove();
+    } else if (!store.get('lockSeen')) {
+      // 직접 잠갔거나 차단되어 잠금 화면으로 들어온 경우에는 이미 보고 있습니다.
+      if (route().r === 'lock') store.set('lockSeen', '1');
+      else showLockAlert(lock);
+    }
+  } catch (e) {
+    // 다음 주기에 다시 확인합니다.
+  }
 }
 
 async function lockNow(minutes) {
@@ -235,10 +396,13 @@ function releaseSheet() {
     <div class="btn-col"><button class="btn danger block" onclick="act('POST','/v1/lock/release')">아무도 시키지 않았습니다. 10분 뒤 풀기</button><button class="btn line block" onclick="closeSheet()">취소</button></div>`);
 }
 
-function unlockSheet(id) {
+async function unlockSheet(id) {
+  let phrase = {};
+  try { phrase = await api('GET', '/v1/family/passphrase'); } catch (e) { }
   openSheet(`<div class="b" style="font-size:18px">가족의 금융 앱 잠금을 풀까요?</div>
-    <div class="muted small" style="margin-top:6px">본인과 직접 통화해 사기가 아닌 것을 확인한 뒤에 풀어 주세요.</div>
-    <div class="btn-col"><button class="btn danger block" onclick="act('POST','/v1/family/protected/${esc(id)}/unlock')">잠금 풀기</button><button class="btn line block" onclick="closeSheet()">취소</button></div>`);
+    <div class="muted small" style="margin-top:6px">저장된 번호로 본인에게 직접 전화해 오늘의 암구호를 물어본 뒤에 풀어 주세요.</div>
+    ${phrase.words ? `<div class="type-box center"><b>오늘의 암구호</b><p class="unlock-phrase">${phrase.words.map(esc).join(' ')}</p></div>` : ''}
+    <div class="btn-col"><button class="btn danger block" onclick="act('POST','/v1/family/protected/${esc(id)}/unlock')">암구호를 확인했습니다. 잠금 풀기</button><button class="btn line block" onclick="closeSheet()">취소</button></div>`);
 }
 
 /* ---------------- 검사 ---------------- */
@@ -247,6 +411,9 @@ SCREENS.detect = gated(() => `<div class="page">
   <div class="lead-sub" style="margin-top:6px">저장된 통화 녹음을 AI가 분석합니다. 결과는 본인만 볼 수 있습니다.</div>
   <div class="card mt">${folderBlock()}</div>
   <button class="btn grad block mt" onclick="$('#filePick').click()">${ic('upload')}파일 직접 올려 검사</button>
+  <div class="sec-title">예시로 체험하기</div>
+  <div class="muted small sample-intro">가상의 통화 대본으로 분석 결과를 미리 봅니다. 기록에 남지 않고 가족 알림과 잠금도 일어나지 않습니다.</div>
+  <div id="samples"></div>
   <div class="sec-title">분석 결과</div>
   <div id="data"></div>
 </div>`);
@@ -257,6 +424,51 @@ function folderBlock() {
   return `<div class="row between"><div class="b">녹음 폴더</div><span class="chip ${folder ? 'safe' : ''}">${folder ? '연결됨' : '연결 안 됨'}</span></div>
     <div class="muted small" style="margin-top:6px">${folder ? esc(folder) + ' · ' : ''}연결한 뒤에 새로 저장된 파일만 분석합니다.</div>
     <div class="row" style="margin-top:12px"><button class="btn ghost sm grow" onclick="CodySafeNative.pickFolder()">폴더 선택</button><button class="btn line sm grow" onclick="CodySafeNative.syncNow();toast('동기화를 요청했습니다')">지금 동기화</button></div>`;
+}
+
+/* ---------------- 예시 통화 ---------------- */
+let sampleList = [];
+
+async function loadSamples() {
+  if (!signedIn()) return;
+  try {
+    if (!sampleList.length) sampleList = (await api('GET', '/v1/samples')).items;
+    const host = $('#samples');
+    if (!host) return;
+    const button = (s) => `<button class="sample-card" onclick="openSample('${esc(s.id)}')"><span>${esc(s.title)}</span>${ic('chevron-right')}</button>`;
+    const group = (kind, chip, title) => `<div class="sample-group"><span class="chip ${chip}">${title}</span>${sampleList.filter((s) => s.expected === kind).map(button).join('')}</div>`;
+    host.innerHTML = group('voice_phishing', 'danger', '보이스피싱 예시') + group('normal', 'safe', '정상 대화 예시');
+    icons();
+  } catch (e) {
+    if ($('#samples')) $('#samples').innerHTML = emptyCard('예시를 불러오지 못했습니다.');
+  }
+}
+
+function sampleResultHtml(r) {
+  const label = r.label;
+  const matched = label === r.expected;
+  return `<div class="sample-result">${verdictChip(r, label)}
+    ${factBox(r, r.matches[0])}
+    <div class="sample-expected ${matched ? 'ok' : 'miss'}">${ic(matched ? 'circle-check' : 'circle-alert')}대본의 의도와 ${matched ? '같은 결과입니다' : '다른 결과입니다'}</div></div>`;
+}
+
+async function openSample(id) {
+  const s = sampleList.find((x) => x.id === id);
+  if (!s) return;
+  openSheet(`<div class="sample-sheet"><span class="chip">가상 대본</span>
+    <div class="b" style="font-size:18px;margin-top:8px">${esc(s.title)}</div>
+    <div class="sample-chat">${s.turns.map((t, i) => `<div class="sample-line ${i % 2 ? 'me' : ''}">${esc(t)}</div>`).join('')}</div>
+    <div id="sampleResult"><div class="sample-wait">${ic('loader')}AI가 대본을 분석하고 있습니다</div></div>
+    <div class="muted small" style="margin-top:10px">음성 변환 단계는 건너뛰고 분석만 보여 줍니다.</div>
+    <button class="btn line block mt" onclick="closeSheet()">닫기</button></div>`);
+  icons();
+  try {
+    const r = await api('POST', `/v1/samples/${id}/analyze`);
+    if ($('#sampleResult')) $('#sampleResult').innerHTML = sampleResultHtml(r);
+  } catch (e) {
+    if ($('#sampleResult')) $('#sampleResult').innerHTML = '<div class="sample-wait">분석에 실패했습니다. 잠시 뒤 다시 시도해 주세요.</div>';
+  }
+  icons();
 }
 
 const detectData = ({ recordings }) => (recordings.items.length ? recordings.items.map(recordingCard).join('') : emptyCard('아직 올린 파일이 없습니다.'));
@@ -432,11 +644,12 @@ SCREENS.family = gated(() => `<div class="page">
   <button class="btn pri block mt" onclick="linkFamily()">연결</button></div>
 </div>`);
 
-function familyData({ family, alerts }) {
+function familyData({ family, alerts, phrase }) {
   const person = (p, note, removable) => `<div class="card mt"><div class="row between"><div class="grow"><div class="b">${esc(p.name)}${p.locked ? ` <span class="chip danger">${ic('lock')}금융 앱 잠금 중</span>` : ''}</div><div class="muted small" style="margin-top:2px">${note}</div></div>
     ${removable ? `<button class="btn line sm" onclick="act('DELETE','/v1/family/guardians/${esc(p.id)}')">해제</button>` : ''}
     ${p.locked ? `<button class="btn danger sm" onclick="unlockSheet('${esc(p.id)}')">잠금 풀기</button>` : ''}</div></div>`;
-  return `<div class="sec-title">받은 가족 경고</div>
+  return `${phrase.linked ? `<div class="mt">${phraseCard(phrase)}</div><button class="btn ghost block phrase-link" onclick="go('passphrase')">암구호 쓰는 법과 비상 암구호${ic('chevron-right')}</button>` : ''}
+    <div class="sec-title">받은 가족 경고</div>
     ${alerts.items.length ? alerts.items.map(alertCard).join('') : emptyCard('받은 경고가 없습니다.')}
     <div class="sec-title">내 경고를 받는 가족</div>
     ${family.guardians.length ? family.guardians.map((p) => person(p, '내 보이스피싱 의심 여부만 받습니다.', true)).join('') : emptyCard('연결된 가족이 없습니다.')}
@@ -520,7 +733,8 @@ simResult = function () {
 };
 
 /* ---------------- 데이터 갱신 ---------------- */
-const DATA_VIEWS = { home: homeData, detect: detectData, family: familyData, lock: lockData };
+const DATA_VIEWS = { home: homeData, detect: detectData, family: familyData, lock: lockData, passphrase: passphraseData };
+const PHRASE_VIEWS = ['family', 'passphrase'];
 let lastData = '';
 
 async function refresh() {
@@ -532,11 +746,13 @@ async function refresh() {
     const [recordings, recs, family, alerts, lock] = await Promise.all([
       api('GET', '/v1/recordings'), api('GET', '/v1/recommendations'), api('GET', '/v1/family'), api('GET', '/v1/alerts'), api('GET', '/v1/lock'),
     ]);
-    const snapshot = key + JSON.stringify([recordings, recs, family, alerts, lockMinutes(lock), lock.locked]);
+    const phrase = PHRASE_VIEWS.includes(key) ? await api('GET', '/v1/family/passphrase') : null;
+    const shownPhrase = phrase && { ...phrase, seconds_left: Math.ceil((phrase.seconds_left || 0) / 60) };
+    const snapshot = key + JSON.stringify([recordings, recs, family, alerts, lockMinutes(lock), lock.locked, shownPhrase]);
     const host = $('#data');
     if (snapshot === lastData || !host || (route().r || 'home') !== r) return;
     lastData = snapshot;
-    host.innerHTML = draw({ recordings, recs, family, alerts, lock });
+    host.innerHTML = draw({ recordings, recs, family, alerts, lock, phrase });
     icons();
   } catch (e) {
     if ($('#data') && !$('#data').innerHTML) $('#data').innerHTML = emptyCard('서버에 연결할 수 없습니다.');
@@ -585,10 +801,12 @@ async function pollAlerts() {
   }
 }
 
-['home', 'detect', 'family', 'lock'].forEach((k) => { INIT[k] = () => { lastData = ''; refresh(); }; });
+['home', 'detect', 'family', 'lock', 'passphrase'].forEach((k) => { INIT[k] = () => { lastData = ''; refresh(); if (k === 'detect') loadSamples(); }; });
 setInterval(refresh, 5000);
 setInterval(pollAlerts, 5000);
+setInterval(pollLock, 5000);
 setInterval(scanFolder, SCAN_MS);
 render();
 pollAlerts();
+pollLock();
 restoreFolder().then(scanFolder);
