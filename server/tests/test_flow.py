@@ -433,3 +433,38 @@ def test_keep_audio_stores_after_analysis_until_user_deletes(client, monkeypatch
     assert path.exists()
     assert client.delete(f"/v1/recordings/{rec['id']}", headers=h).status_code == 200
     assert not path.exists()
+
+
+def test_feedback_and_dashboards_separate_user_and_admin(client):
+    with db.connect() as conn:
+        for table in ("recording_feedback", "training_results", "response_events"):
+            conn.execute(f"DELETE FROM {table}")
+    a, b = device(client, "대시A"), device(client, "대시B")
+    phishing = send(client, a, PHISHING, "dash-p")
+    normal = send(client, a, NORMAL, "dash-n")
+    # 판정이 맞다는 확인, 오탐 신고, 미탐 신고
+    client.post(f"/v1/recordings/{phishing['id']}/review", headers=a, json={"label": "voice_phishing"})
+    other = send(client, b, PHISHING + " ", "dash-f")
+    client.post(f"/v1/recordings/{other['id']}/review", headers=b, json={"label": "normal", "reason": "정상 통화"})
+    client.post(f"/v1/recordings/{normal['id']}/review", headers=a, json={"label": "voice_phishing"})
+    client.post("/v1/training", headers=a, json={"scenario": "agency", "tag": "기관 사칭", "score": 40})
+    client.post("/v1/training", headers=a, json={"scenario": "agency", "tag": "기관 사칭", "score": 100})
+    client.post("/v1/training", headers=a, json={"scenario": "loan", "tag": "대출 사기", "score": 60})
+    assert client.post("/v1/training", headers=a, json={"scenario": "x", "tag": "y", "score": 101}).status_code == 422
+    me = client.get("/v1/dashboard/me", headers=a).json()
+    assert me["training"]["count"] == 3 and [w["scenario"] for w in me["training"]["weak"]] == ["loan"]
+    assert me["calls"]["confirmed"] == 2
+    assert client.get("/v1/dashboard/me", headers=b).json()["training"]["count"] == 0
+    # 일반 사용자는 관리자 집계를 볼 수 없습니다.
+    assert client.get("/v1/admin/dashboard", headers=a).status_code == 403
+    assert client.get("/v1/admin/dashboard", headers={"X-Admin-Token": "wrong"}).status_code == 403
+    admin = {"X-Admin-Token": "admin"}
+    data = client.get("/v1/admin/dashboard", headers=admin).json()
+    fb = data["feedback"]
+    assert fb["confirmed"] == 3 and fb["false_alarm_n"] == [1, 2] and fb["false_alarm_rate"] == 50.0
+    assert fb["miss_n"] == [1, 2] and fb["small_sample"] is True
+    text = client.get("/v1/admin/dashboard", headers=admin).text + client.get("/v1/admin/feedback-dataset.jsonl", headers=admin).text
+    assert "대시A" not in text and "수사관" not in text and "device_id" not in text
+    # 사용자가 기록을 지우면 라벨도 함께 지워집니다.
+    client.delete(f"/v1/recordings/{normal['id']}", headers=a)
+    assert client.get("/v1/admin/dashboard", headers=admin).json()["feedback"]["confirmed"] == 2

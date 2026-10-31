@@ -424,6 +424,8 @@ body.embedded .web-preview, body.embedded .preview-toggle { display: none !impor
 .flow-home .flow-video { margin-bottom: 14px; }
 .flow-video { margin: 14px 0 4px; padding: 20px; border-radius: 24px; background: var(--navy); color: #fff; }
 .flow-top { display: flex; align-items: center; gap: 8px; }
+.flow-admin { display: flex; gap: 5px; margin-top: 14px; padding-top: 12px; border-top: 1px solid rgba(255, 255, 255, .14); font-size: 11.5px; line-height: 1.45; color: rgba(255, 255, 255, .72); }
+.flow-admin svg.lucide { flex: none; width: 14px; height: 14px; margin-top: 1px; }
 .flow-title { white-space: nowrap; font-size: 14.5px; font-weight: 800; letter-spacing: -0.02em; }
 .flow-note { padding: 2px 7px; border-radius: 99px; background: rgba(255, 255, 255, .12); font-size: 11px; font-weight: 600; white-space: nowrap; }
 .flow-pause { display: inline-flex; align-items: center; gap: 4px; margin-left: auto; color: rgba(255, 255, 255, .78); font-size: 12px; font-weight: 700; white-space: nowrap; }
@@ -450,3 +452,20 @@ body.embedded .web-preview, body.embedded .preview-toggle { display: none !impor
 @media (max-width: 500px) { .flow-node span { display: none; } .flow-node.on span { display: block; position: absolute; top: 32px; } .flow-track { padding-bottom: 20px; } }
 @media (min-width: 1001px) { body:not(.embedded) .flow-home { display: block; } body:not(.embedded) .flow-node { font-size: 12px; } body:not(.embedded) .flow-stage { min-height: 120px; } }
 @media (prefers-reduced-motion: reduce) { .flow-stage, .flow-icon, .flow-copy { animation: none; } .flow-track > i, .flow-node svg.lucide { transition: none; } }
+
+/* 피드백과 대시보드 */
+.feedback-done { display: inline-flex; align-items: center; gap: 4px; font-size: 13.5px; font-weight: 700; color: #08875A; }
+.feedback-done svg.lucide { width: 15px; height: 15px; }
+#view .card .link-row button { display: inline-flex; align-items: center; gap: 4px; }
+#view .card .link-row svg.lucide { width: 15px; height: 15px; }
+.stat-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
+.stat { padding: 16px; border-radius: 18px; background: var(--card); }
+.stat b { display: block; font-size: 22px; font-weight: 800; letter-spacing: -0.03em; }
+.stat b small { display: block; margin-top: 1px; font-size: 11.5px; font-weight: 600; letter-spacing: 0; color: var(--sub); }
+.stat span { display: block; margin-top: 3px; font-size: 12.5px; line-height: 1.35; color: var(--sub); }
+.admin-rows { padding: 14px 18px; }
+.admin-link { display: block; margin: 16px auto 0; font-size: 12.5px; font-weight: 600; color: var(--sub); text-decoration: underline; }
+@media (min-width: 1001px) { body:not(.embedded) .stat-grid { grid-template-columns: repeat(4, 1fr); } }
+
+/* 글꼴 */
+body, input, textarea, select, button { font-family: "SUIT Variable", SUIT, -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Noto Sans KR", sans-serif; }

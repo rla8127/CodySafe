@@ -42,6 +42,17 @@ CREATE TABLE IF NOT EXISTS reports (
 CREATE TABLE IF NOT EXISTS report_votes (
   report_id INTEGER NOT NULL, device_id TEXT NOT NULL, created_at REAL NOT NULL, PRIMARY KEY (report_id, device_id)
 );
+CREATE TABLE IF NOT EXISTS recording_feedback (
+  recording_id TEXT PRIMARY KEY, device_id TEXT NOT NULL, model_label TEXT, model_confidence REAL,
+  human_label TEXT NOT NULL, reason TEXT, scam_type TEXT, created_at REAL NOT NULL
+);
+CREATE TABLE IF NOT EXISTS training_results (
+  id INTEGER PRIMARY KEY AUTOINCREMENT, device_id TEXT NOT NULL, scenario TEXT NOT NULL, tag TEXT NOT NULL,
+  score INTEGER NOT NULL, created_at REAL NOT NULL
+);
+CREATE TABLE IF NOT EXISTS response_events (
+  id INTEGER PRIMARY KEY AUTOINCREMENT, device_id TEXT NOT NULL, kind TEXT NOT NULL, created_at REAL NOT NULL
+);
 CREATE TABLE IF NOT EXISTS review_dataset (
   recording_id TEXT PRIMARY KEY, transcript TEXT NOT NULL, label TEXT NOT NULL, scam_type TEXT,
   model_label TEXT, note TEXT, created_at REAL NOT NULL
@@ -124,6 +135,10 @@ def seed_demo_family() -> None:
 
 def now() -> float:
     return time.time()
+
+
+def log_event(conn: sqlite3.Connection, device_id: str, kind: str) -> None:
+    conn.execute("INSERT INTO response_events (device_id, kind, created_at) VALUES (?, ?, ?)", (device_id, kind, now()))
 
 
 def passphrase_key(conn: sqlite3.Connection) -> bytes:
