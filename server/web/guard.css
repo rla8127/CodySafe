@@ -45,6 +45,12 @@ a.btn { text-decoration: none; }
 .phrase-verdict { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 12px; }
 .phrase-limit { margin: 14px 2px 0; line-height: 1.5; }
 .type-box .unlock-phrase { font-size: 22px; font-weight: 800; color: var(--pri); }
+#lockAlert { position: absolute; inset: 0; z-index: 90; display: flex; align-items: center; padding: 20px; background: rgba(15, 23, 42, .72); }
+.lock-alert-body { width: 100%; padding: 26px 20px 20px; border-radius: 24px; background: var(--card); text-align: center; }
+.lock-alert-icon { display: grid; place-items: center; width: 64px; height: 64px; margin: 0 auto 14px; border-radius: 50%; background: var(--danger-soft); color: var(--danger); }
+.lock-alert-icon svg.lucide { width: 32px; height: 32px; }
+.lock-alert-title { font-size: 23px; font-weight: 800; letter-spacing: -0.03em; }
+.lock-alert-text { margin-top: 10px; font-size: 14.5px; line-height: 1.55; color: var(--ink2); }
 .lock-banner { display: flex; align-items: center; gap: 10px; width: 100%; text-align: left; margin-bottom: 12px; font-size: 14px; line-height: 1.45; color: var(--ink2); }
 .lock-banner svg.lucide { width: 22px; height: 22px; color: var(--danger); flex: none; }
 /* 모바일에서 대화 첫 줄이 진행 막대에 가리지 않게 합니다. */

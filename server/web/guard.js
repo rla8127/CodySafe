@@ -326,6 +326,49 @@ function lockData({ lock }) {
     ${blockerBlock()}`;
 }
 
+/* 잠금이 걸리면 어느 화면에 있든 바로 알립니다. 잠금마다 한 번만 띄웁니다. */
+function closeLockAlert() {
+  document.querySelector('#lockAlert')?.remove();
+  store.set('lockSeen', '1');
+}
+
+function showLockAlert(lock) {
+  if (document.querySelector('#lockAlert')) return;
+  const box = document.createElement('div');
+  box.id = 'lockAlert';
+  box.setAttribute('role', 'alertdialog');
+  box.innerHTML = `<div class="lock-alert-body">
+    <div class="lock-alert-icon">${ic('siren')}</div>
+    <div class="lock-alert-title">지금 돈을 보내지 마세요</div>
+    <div class="lock-alert-text">보이스피싱이 의심되어 금융 앱을 ${lockMinutes(lock)}분 동안 잠갔습니다. 누군가 이체나 앱 설치, 잠금 해제를 시키고 있다면 전화를 끊으세요.</div>
+    <div class="btn-col">
+      <a class="btn danger block" href="tel:112">${ic('phone')}경찰 112</a>
+      <button class="btn pri block" onclick="closeLockAlert();go('passphrase')">${ic('key-round')}가족 암구호 확인</button>
+      <button class="btn line block" onclick="closeLockAlert();go('lock')">잠금 내용 보기</button>
+    </div></div>`;
+  document.querySelector('.screen').appendChild(box);
+  icons();
+  vibrate([300, 150, 300]);
+  beep();
+}
+
+async function pollLock() {
+  if (!signedIn()) return;
+  try {
+    const lock = await api('GET', '/v1/lock');
+    if (!lock.locked) {
+      store.del('lockSeen');
+      document.querySelector('#lockAlert')?.remove();
+    } else if (!store.get('lockSeen')) {
+      // 직접 잠갔거나 차단되어 잠금 화면으로 들어온 경우에는 이미 보고 있습니다.
+      if (route().r === 'lock') store.set('lockSeen', '1');
+      else showLockAlert(lock);
+    }
+  } catch (e) {
+    // 다음 주기에 다시 확인합니다.
+  }
+}
+
 async function lockNow(minutes) {
   await act('POST', '/v1/lock', { minutes });
   native?.syncLock?.();
@@ -697,7 +740,9 @@ async function pollAlerts() {
 ['home', 'detect', 'family', 'lock', 'passphrase'].forEach((k) => { INIT[k] = () => { lastData = ''; refresh(); }; });
 setInterval(refresh, 5000);
 setInterval(pollAlerts, 5000);
+setInterval(pollLock, 5000);
 setInterval(scanFolder, SCAN_MS);
 render();
 pollAlerts();
+pollLock();
 restoreFolder().then(scanFolder);
