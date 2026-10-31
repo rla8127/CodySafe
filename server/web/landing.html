@@ -145,7 +145,9 @@
     .real-note { margin-top: 22px; font-size: 13px; line-height: 1.55; color: var(--sub); }
     .real-phone { position: relative; padding: 9px; border-radius: 42px; background: #0B0F19; box-shadow: 0 26px 60px rgba(11, 31, 69, .22); }
     .real-phone video { display: block; width: 100%; height: auto; aspect-ratio: 540 / 1064; border-radius: 33px; background: #F4F6F9; }
-    .real-toggle { position: absolute; right: 20px; top: 20px; opacity: .85; height: 34px; padding: 0 13px; border: 0; border-radius: 99px; background: rgba(11, 15, 25, .78); color: #fff; font: inherit; font-size: 12.5px; font-weight: 700; cursor: pointer; }
+    .real-badge { position: absolute; left: 20px; top: 20px; display: inline-flex; align-items: center; gap: 6px; height: 30px; padding: 0 11px; border-radius: 99px; background: rgba(11, 15, 25, .86); color: #fff; font-size: 12px; font-weight: 700; white-space: nowrap; pointer-events: none; }
+    .real-badge i { width: 7px; height: 7px; border-radius: 50%; background: #F04438; }
+    .real-toggle { position: absolute; right: 20px; top: 20px; opacity: .85; height: 30px; padding: 0 11px; border: 0; border-radius: 99px; background: rgba(11, 15, 25, .78); color: #fff; font: inherit; font-size: 12.5px; font-weight: 700; cursor: pointer; }
     @media (max-width: 760px) { .real-grid { grid-template-columns: minmax(0, 1fr); } .real-phone { order: -1; width: min(300px, 100%); margin-inline: auto; } }
 
     /* 금융 앱 잠금과 암구호 동작 예시. 영상 대신 CSS로 그려 가볍고 선명합니다. */
@@ -297,10 +299,11 @@
             <li data-start="9.25"><b>통화 속 근거</b><span>실제로 나온 말과 비슷한 수법을 보여 줍니다</span></li>
             <li data-start="12.3"><b>금융 앱 차단</b><span>잠금 중 카드 앱을 열면 경고 화면으로 돌려보냅니다</span></li>
           </ol>
-          <p class="real-note">안드로이드 실기기 화면을 편집한 영상입니다. 대기 시간을 줄이고 개인정보가 나오는 장면은 뺐으며, 테스트 통화를 사용했습니다.</p>
+          <p class="real-note">실제 안드로이드 폰에 설치한 앱을 녹화한 화면입니다. 대기 시간을 줄이고 개인정보가 나오는 장면은 뺐으며, 테스트 통화를 사용했습니다.</p>
         </div>
         <div class="real-phone reveal">
           <video id="realVideo" src="/app/web/media/demo.mp4" poster="/app/web/media/demo-poster.jpg" muted loop playsinline preload="metadata" aria-label="CodySafe 실제 동작 영상"></video>
+          <span class="real-badge"><i></i>실제 안드로이드 앱 녹화 화면</span>
           <button class="real-toggle" id="realToggle" type="button"></button>
         </div>
       </div>
