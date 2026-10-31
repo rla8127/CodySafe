@@ -18,6 +18,8 @@ def _notify_family(rec_id: str, protected_id: str) -> None:
     with db.connect() as conn:
         name = conn.execute("SELECT name FROM devices WHERE id = ?", (protected_id,)).fetchone()["name"]
         guardians = conn.execute("SELECT guardian_id FROM family_links WHERE protected_id = ?", (protected_id,)).fetchall()
+        if guardians:
+            db.log_event(conn, protected_id, "family_alert")
         for g in guardians:
             # 가족에게는 의심 여부만 전달합니다. 요약, 유형, 녹취, 파일명은 보내지 않습니다.
             conn.execute(
@@ -79,6 +81,7 @@ def process(rec_id: str) -> None:
         if label == VOICE_PHISHING and confidence >= config.LOCK_THRESHOLD:
             with db.connect() as conn:
                 db.extend_lock(conn, row["device_id"], config.LOCK_SECONDS)
+                db.log_event(conn, row["device_id"], "lock_auto")
         # 분석이 끝난 뒤에 지워야 LLM 실패 시 다시 시도할 수 있습니다.
         _finish_audio(row["s3_key"])
     except Exception as exc:

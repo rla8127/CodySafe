@@ -24,6 +24,8 @@ PUBLIC_BASE_URL = os.getenv("GUARD_PUBLIC_BASE_URL", "http://localhost:8091").rs
 # 웹 시연용 가족. 접속한 누구나 이 계정으로 들어올 수 있으니 실제 통화를 올리면 안 됩니다. 운영에서는 0으로 끕니다.
 DEMO_FAMILY = os.getenv("GUARD_DEMO_FAMILY", "1") == "1"
 ADMIN_TOKEN = os.getenv("GUARD_ADMIN_TOKEN", "")
+# 글자 기록이 든 데이터셋은 대시보드보다 강한 토큰으로 따로 지킬 수 있습니다.
+DATASET_TOKEN = os.getenv("GUARD_DATASET_TOKEN", "") or ADMIN_TOKEN
 AWS_REGION = os.getenv("GUARD_AWS_REGION", "ap-northeast-2")
 
 STORAGE = os.getenv("GUARD_STORAGE", "local")  # local | s3
@@ -35,6 +37,12 @@ STT = os.getenv("GUARD_STT", "text")  # text | openai | transcribe
 OPENAI_STT_MODEL = os.getenv("GUARD_OPENAI_STT_MODEL", "whisper-1")
 LLM = os.getenv("GUARD_LLM", "rule")  # rule | anthropic | openai | bedrock
 EMBED = os.getenv("GUARD_EMBED", "hash")  # hash | openai | titan
+
+# ES 서버의 사기 수법 검색 API. 비우면 RAG 없이 LLM만 호출합니다.
+RAG_URL = os.getenv("GUARD_RAG_URL", "").rstrip("/")
+RAG_API_KEY = os.getenv("GUARD_RAG_API_KEY", "")
+RAG_TOP = int(os.getenv("GUARD_RAG_TOP", "3"))
+RAG_TIMEOUT = float(os.getenv("GUARD_RAG_TIMEOUT", "8"))
 
 ANTHROPIC_MODEL = os.getenv("GUARD_ANTHROPIC_MODEL", "claude-opus-5-5")
 OPENAI_MODEL = os.getenv("GUARD_OPENAI_MODEL", "")  # GUARD_LLM=openai일 때 필수

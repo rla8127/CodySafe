@@ -13,7 +13,7 @@ from fastapi.responses import FileResponse, PlainTextResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
-from . import config, db, llm, passphrase, pipeline, providers, reports, samples
+from . import config, dashboard, db, llm, passphrase, pipeline, providers, reports, samples
 from .lock_apps import LOCK_APPS
 from .scam_kb import BY_ID, OTHER_SCAM, VOICE_PHISHING
 
@@ -29,9 +29,17 @@ async def lifespan(_: FastAPI):
     db.init()
     if config.DEMO_FAMILY:
         db.seed_demo_family()
+        db.seed_demo_analytics()
     config.LOCAL_AUDIO_DIR.mkdir(parents=True, exist_ok=True)
     yield
 
+
+# uvicorn 기본 설정에서는 guard 로그의 INFO가 보이지 않습니다.
+_handler = logging.StreamHandler()
+_handler.setFormatter(logging.Formatter("%(asctime)s %(levelname)s %(name)s: %(message)s"))
+logging.getLogger("guard").addHandler(_handler)
+logging.getLogger("guard").setLevel(logging.INFO)
+logging.getLogger("guard").propagate = False
 
 app = FastAPI(title="CodySafe Family Guard", lifespan=lifespan)
 
@@ -49,6 +57,11 @@ async def no_stale_ui(request: Request, call_next):
     if request.url.path.startswith("/app"):
         response.headers["Cache-Control"] = "no-cache"
     return response
+
+
+@app.get("/", include_in_schema=False)
+def landing():
+    return FileResponse(WEB_DIR / "landing.html", headers={"Cache-Control": "no-cache"})
 
 
 @app.get("/app", include_in_schema=False)
@@ -119,6 +132,13 @@ class ReviewIn(BaseModel):
     label: str = Field(pattern="^(voice_phishing|other_scam|normal)$")
     scam_type: str | None = None
     note: str = Field(default="", max_length=500)
+    reason: str | None = Field(default=None, max_length=40)
+
+
+class TrainingIn(BaseModel):
+    scenario: str = Field(min_length=1, max_length=40)
+    tag: str = Field(min_length=1, max_length=30)
+    score: int = Field(ge=0, le=100)
 
 
 @app.get("/healthz")
@@ -318,6 +338,29 @@ def remove_guardian(guardian_id: str, device: str = Depends(current_device)):
 
 # ---------- 시연용 예시 통화: 기록, 가족 알림, 잠금에 영향을 주지 않습니다 ----------
 _sample_results: dict[str, dict] = {}
+_sample_lock = threading.Lock()
+
+
+def _analyze_sample(sample_id: str) -> dict:
+    sample = samples.BY_ID.get(sample_id)
+    if not sample:
+        raise HTTPException(404)
+    # 눌러 볼 때마다 LLM 비용이 나가지 않도록 서버가 켜져 있는 동안 결과를 재사용합니다.
+    # 로그인 없는 랜딩에서도 부르므로 동시에 눌러도 샘플당 한 번만 분석합니다.
+    with _sample_lock:
+        if sample_id not in _sample_results:
+            text = samples.transcript(sample)
+            result = llm.analyze(text)
+            _sample_results[sample_id] = {
+                "status": "done",
+                "label": result["label"],
+                "confidence": result["confidence"],
+                "review_label": None,
+                "evidence": result["evidence"],
+                "matches": pipeline.public_matches(pipeline.find_matches(result, text)),
+                "expected": sample["expected"],
+            }
+        return _sample_results[sample_id]
 
 
 @app.get("/v1/samples")
@@ -327,23 +370,17 @@ def list_samples(_: str = Depends(current_device)):
 
 @app.post("/v1/samples/{sample_id}/analyze")
 def analyze_sample(sample_id: str, _: str = Depends(current_device)):
-    sample = samples.BY_ID.get(sample_id)
-    if not sample:
-        raise HTTPException(404)
-    # 눌러 볼 때마다 LLM 비용이 나가지 않도록 서버가 켜져 있는 동안 결과를 재사용합니다.
-    if sample_id not in _sample_results:
-        text = samples.transcript(sample)
-        result = llm.analyze(text)
-        _sample_results[sample_id] = {
-            "status": "done",
-            "label": result["label"],
-            "confidence": result["confidence"],
-            "review_label": None,
-            "evidence": result["evidence"],
-            "matches": pipeline.public_matches(pipeline.find_matches(result, text)),
-            "expected": sample["expected"],
-        }
-    return _sample_results[sample_id]
+    return _analyze_sample(sample_id)
+
+
+@app.get("/v1/demo/samples")
+def list_demo_samples():
+    return {"items": samples.SAMPLES}
+
+
+@app.post("/v1/demo/samples/{sample_id}/analyze")
+def analyze_demo_sample(sample_id: str):
+    return _analyze_sample(sample_id)
 
 
 # ---------- 가족 암구호 ----------
@@ -416,6 +453,7 @@ def lock_state(device: str = Depends(current_device)):
 def lock_now(body: LockIn, device: str = Depends(current_device)):
     with db.connect() as conn:
         db.extend_lock(conn, device, body.minutes * 60)
+        db.log_event(conn, device, "lock_manual")
     return lock_state(device)
 
 
@@ -427,6 +465,7 @@ def request_release(device: str = Depends(current_device)):
             "UPDATE devices SET lock_until = MIN(lock_until, ?) WHERE id = ?",
             (db.now() + config.LOCK_RELEASE_WAIT, device),
         )
+        db.log_event(conn, device, "unlock_self")
     return lock_state(device)
 
 
@@ -439,6 +478,7 @@ def guardian_unlock(protected_id: str, device: str = Depends(current_device)):
         if not link:
             raise HTTPException(404)
         conn.execute("UPDATE devices SET lock_until = 0 WHERE id = ?", (protected_id,))
+        db.log_event(conn, protected_id, "unlock_family")
     return {"ok": True}
 
 
@@ -531,6 +571,7 @@ def delete_recording(rec_id: str, device: str = Depends(current_device)):
             raise HTTPException(404)
         conn.execute("DELETE FROM recordings WHERE id = ?", (rec_id,))
         conn.execute("DELETE FROM alerts WHERE recording_id = ?", (rec_id,))
+        conn.execute("DELETE FROM recording_feedback WHERE recording_id = ?", (rec_id,))
         conn.execute("DELETE FROM review_dataset WHERE recording_id = ?", (rec_id,))
     providers.delete_audio(row["s3_key"])
     return {"ok": True}
@@ -555,7 +596,8 @@ def alerts(after: int = 0, device: str = Depends(current_device)):
 @app.post("/v1/alerts/{alert_id}/ack")
 def ack(alert_id: int, device: str = Depends(current_device)):
     with db.connect() as conn:
-        conn.execute("UPDATE alerts SET acked = 1 WHERE id = ? AND guardian_id = ?", (alert_id, device))
+        if conn.execute("UPDATE alerts SET acked = 1 WHERE id = ? AND guardian_id = ? AND acked = 0", (alert_id, device)).rowcount:
+            db.log_event(conn, device, "alert_ack")
     return {"ok": True}
 
 
@@ -571,6 +613,11 @@ def review(rec_id: str, body: ReviewIn, device: str = Depends(current_device)):
         if row["status"] != "done":
             raise HTTPException(409, "not analyzed")
         scam_type = body.scam_type or row["scam_type"]
+        # 사람이 확인한 라벨입니다. 글자 기록은 넣지 않아 정상 통화 내용 없이도 오탐률을 잴 수 있습니다.
+        conn.execute(
+            "INSERT OR REPLACE INTO recording_feedback VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            (rec_id, device, row["label"], row["confidence"], body.label, body.reason, "none" if body.label == "normal" else scam_type, db.now()),
+        )
         if body.label == "normal":
             # 사람이 정상으로 확인하면 원문을 지우고 데이터셋에서도 뺍니다.
             conn.execute(
@@ -593,9 +640,49 @@ def review(rec_id: str, body: ReviewIn, device: str = Depends(current_device)):
     return {"ok": True, "in_dataset": in_dataset}
 
 
+# ---------- 대시보드: 사용자는 자기 기록만, 관리자는 개인을 알 수 없는 집계만 봅니다 ----------
+@app.post("/v1/training")
+def save_training(body: TrainingIn, device: str = Depends(current_device)):
+    with db.connect() as conn:
+        conn.execute(
+            "INSERT INTO training_results (device_id, scenario, tag, score, created_at) VALUES (?, ?, ?, ?, ?)",
+            (device, body.scenario, body.tag, body.score, db.now()),
+        )
+    return {"ok": True}
+
+
+@app.get("/v1/dashboard/me")
+def my_dashboard(device: str = Depends(current_device)):
+    with db.connect() as conn:
+        return dashboard.user(conn, device)
+
+
+@app.get("/v1/admin/dashboard")
+def admin_dashboard(include_demo: bool = True):
+    with db.connect() as conn:
+        return dashboard.admin(conn, include_demo)
+
+
+@app.get("/v1/admin/ops")
+def admin_ops(hours: int = 168, include_demo: bool = True):
+    if hours not in dashboard.RANGES:
+        raise HTTPException(400, "unknown range")
+    with db.connect() as conn:
+        return dashboard.ops(conn, hours, include_demo, db.now())
+
+
+@app.get("/v1/admin/feedback-dataset.jsonl", response_class=PlainTextResponse)
+def export_feedback():
+    with db.connect() as conn:
+        rows = conn.execute(
+            "SELECT model_label, model_confidence, human_label, reason, scam_type, created_at FROM recording_feedback ORDER BY created_at"
+        ).fetchall()
+    return "\n".join(json.dumps(dict(r), ensure_ascii=False) for r in rows)
+
+
 @app.get("/v1/admin/review-dataset.jsonl", response_class=PlainTextResponse)
 def export_dataset(x_admin_token: str = Header(default="")):
-    if not config.ADMIN_TOKEN or not hmac.compare_digest(config.ADMIN_TOKEN, x_admin_token):
+    if not config.DATASET_TOKEN or not hmac.compare_digest(config.DATASET_TOKEN, x_admin_token):
         raise HTTPException(403)
     with db.connect() as conn:
         rows = conn.execute("SELECT * FROM review_dataset ORDER BY created_at").fetchall()
