@@ -30,9 +30,10 @@ if (store.get('token')) native?.setToken(store.get('token'));
 
 /* ---------------- 시안 화면 제거 ---------------- */
 ['image', 'voice', 'call', 'url', 'verify', 'report', 'generate', 'weakness', 'training', 'copilot', 'checkup'].forEach((k) => delete SCREENS[k]);
-Object.assign(TAB_OF, { home: 'home', sim: 'sim', play: 'sim', detect: 'detect', family: 'family', me: 'me', lock: 'home', passphrase: 'family' });
+Object.assign(TAB_OF, { home: 'home', sim: 'sim', play: 'sim', detect: 'detect', family: 'family', me: 'me', lock: 'home', passphrase: 'family', report: 'sim' });
 delete PARENT.family;
 PARENT.passphrase = 'family';
+PARENT.report = 'sim';
 
 renderTabs = function (on) {
   const tabs = [['home', 'house', '홈'], ['sim', 'gamepad-2', '체험'], ['detect', 'shield-check', '검사'], ['family', 'users', '가족'], ['me', 'user-round', 'MY']];
@@ -321,7 +322,7 @@ SCREENS.home = gated(() => `<div class="page">
   <div id="data"></div>
 </div>`);
 
-function homeData({ recordings, recs, family, alerts, lock }) {
+function homeData({ recordings, recs, family, alerts, lock, reports }) {
   const items = recordings.items;
   const flagged = items.filter((r) => ['voice_phishing', 'other_scam'].includes(r.review_label || r.label)).length;
   const reviews = items.filter((r) => r.needs_review).length;
@@ -345,7 +346,108 @@ function homeData({ recordings, recs, family, alerts, lock }) {
     ${items.length ? `<div class="sec-title">최근 분석 <button class="more" onclick="go('detect')">전체 보기${ic('chevron-right')}</button></div>
       ${items.slice(0, 3).map(recordingCard).join('')}`
     : `<button class="home-empty" onclick="go('detect')"><span>${ic('sparkles')}</span><span><b>아직 분석한 통화가 없어요</b><small>예시 통화로 어떻게 동작하는지 먼저 볼 수 있어요.</small></span>${ic('chevron-right')}</button>`}
-    ${trendsBlock()}`;
+    ${trendsBlock()}
+    ${reports.some((r) => r.rank) ? `<div class="sec-title">제보 TOP 3 <button class="more" onclick="go('report')">전체 보기${ic('chevron-right')}</button></div>
+      <div class="card trend-list">${reports.filter((r) => r.rank).map((r) => `<button class="trend-row top-row" onclick="go('report')"><time>${r.rank}위</time><span><strong>${esc(r.title)}</strong><small>추천 ${r.votes} · 이용자 제보, 사실 확인 전</small></span>${ic('chevron-right')}</button>`).join('')}</div>` : ''}`;
+}
+
+/* ---------------- 커뮤니티 제보 ---------------- */
+let reportCategories = [];
+
+// 제보로 만든 시나리오는 이용자 글에서 나왔으므로 화면에 넣기 전에 모두 이스케이프합니다.
+function registerReportScenario(r) {
+  if (!r.scenario) return;
+  const s = r.scenario;
+  SCENARIOS['r' + r.id] = {
+    title: esc(s.title), tag: '제보 기반', icon: 'megaphone', color: '#0047AB', soft: '#E8F0FB', difficulty: 'AI 생성', mins: 3,
+    desc: esc(s.desc), generated: true,
+    contact: { name: esc(s.contact), sub: '제보를 바탕으로 만든 가상 대화', av: esc(s.contact.slice(0, 1)) },
+    steps: s.steps.map((st) => ({
+      msgs: st.msgs.map(esc),
+      choices: st.choices.map((c) => ({ t: esc(c.t), ok: c.ok, fb: esc(c.fb), act: c.act })),
+    })),
+    signals: s.signals.map(esc),
+  };
+}
+
+async function loadReportScenarios() {
+  if (!signedIn()) return [];
+  const { items, categories } = await api('GET', '/v1/reports');
+  reportCategories = categories;
+  items.forEach(registerReportScenario);
+  return items;
+}
+
+SCREENS.report = gated(() => `<div class="page">
+  <div class="lead" style="margin-top:6px">사기 제보</div>
+  <div class="lead-sub" style="margin-top:6px">새 수법이 제보될수록 방어 훈련도 함께 늘어납니다. 추천 상위 3개 제보는 체험 시나리오로 만들 수 있어요.</div>
+  <button class="btn grad block mt" onclick="reportSheet()">${ic('pencil')}내가 겪은 수법 제보하기</button>
+  <div class="muted small report-note">이용자 제보이며 사실 확인 전입니다. 추천 수는 공식 피해 통계가 아닙니다.</div>
+  <div id="data"></div>
+</div>`);
+
+function reportCard(r) {
+  const made = !!r.scenario;
+  return `<div class="card mt report-card ${r.rank ? 'top' : ''}">
+    <div class="row between"><div class="row" style="gap:6px">${r.rank ? `<span class="rank-badge">${r.rank}</span>` : ''}<span class="chip">${esc(r.category)}</span>${r.is_demo ? '<span class="chip">시연 예시</span>' : ''}</div>
+      <button class="vote ${r.voted ? 'on' : ''}" onclick="voteReport(${r.id}, ${r.voted})" aria-label="추천">${ic('thumbs-up')}${r.votes}</button></div>
+    <div class="call-title">${esc(r.title)}</div>
+    <div class="call-text">${esc(r.body)}</div>
+    <div class="link-row">
+      ${made ? `<button onclick="go('play/r${r.id}')">${ic('play')}시뮬레이션 체험</button>` : r.rank ? `<button id="mk${r.id}" onclick="makeScenario(${r.id})">${ic('wand-sparkles')}AI 시뮬레이션 만들기</button>` : ''}
+      ${r.mine ? `<button class="quiet" onclick="act('DELETE','/v1/reports/${r.id}')">삭제</button>` : ''}
+    </div>
+  </div>`;
+}
+
+const reportData = ({ reports }) => (reports.length ? reports.map(reportCard).join('') : emptyCard('아직 제보가 없습니다. 첫 제보를 남겨 주세요.'));
+
+function reportSheet() {
+  openSheet(`<div class="b" style="font-size:18px">사기 수법 제보</div>
+    <div class="muted small" style="margin-top:6px">이름과 사진, 내 정보는 쓰지 마세요. 전화번호와 계좌번호, 링크는 자동으로 가립니다. 작성자는 공개되지 않습니다.</div>
+    <div class="field"><label for="repCat">유형</label><select id="repCat">${reportCategories.map((c) => `<option>${esc(c)}</option>`).join('')}</select></div>
+    <div class="field"><label for="repTitle">제목</label><input id="repTitle" maxlength="60" placeholder="예: 건강검진 결과 확인 문자"></div>
+    <div class="field"><label for="repBody">어떤 일이 있었나요?</label><textarea id="repBody" maxlength="1000" placeholder="상대가 무엇을 요구했는지 적어 주세요"></textarea></div>
+    <div class="btn-col"><button class="btn pri block" onclick="sendReport()">제보하기</button><button class="btn line block" onclick="closeSheet()">취소</button></div>`);
+}
+
+async function sendReport() {
+  const title = $('#repTitle').value.trim();
+  const body = $('#repBody').value.trim();
+  if (title.length < 4 || body.length < 10) return toast('제목 4자, 내용 10자 이상 입력해 주세요', 'circle-alert');
+  try {
+    await api('POST', '/v1/reports', { category: $('#repCat').value, title, body });
+    closeSheet();
+    toast('제보를 올렸습니다');
+    lastData = '';
+    refresh();
+  } catch (e) {
+    toast(e.message === '429' ? '제보는 하루 5건까지 가능합니다' : '제보하지 못했습니다', 'circle-alert');
+  }
+}
+
+async function voteReport(id, voted) {
+  try {
+    await api(voted ? 'DELETE' : 'POST', `/v1/reports/${id}/vote`);
+    lastData = '';
+    refresh();
+  } catch (e) {
+    toast('추천하지 못했습니다', 'circle-alert');
+  }
+}
+
+async function makeScenario(id) {
+  const button = $('#mk' + id);
+  if (button) { button.disabled = true; button.textContent = 'AI가 시나리오를 만드는 중입니다'; }
+  try {
+    await api('POST', `/v1/reports/${id}/scenario`);
+    await loadReportScenarios();
+    go('play/r' + id);
+  } catch (e) {
+    toast(e.message === '403' ? '추천 상위 3개만 만들 수 있어요' : '만들지 못했습니다. 다시 시도해 주세요', 'circle-alert');
+    lastData = '';
+    refresh();
+  }
 }
 
 /* ---------------- 가족 암구호 ---------------- */
@@ -891,7 +993,7 @@ function signOut() {
 
 /* ---------------- 체험: 검증되지 않은 수치와 없는 화면 연결 제거 ---------------- */
 const baseSim = SCREENS.sim;
-SCREENS.sim = () => baseSim()
+SCREENS.sim = () => baseSim().replace('<div class="sec-title">전체 시나리오', `<button class="card report-entry" onclick="go('report')"><span class="icon-box" style="background:var(--pri-soft);color:var(--pri)">${ic('megaphone')}</span><span class="grow"><b>사기 제보</b><small>새 수법을 제보하고, 상위 제보로 훈련을 만들어요</small></span>${ic('chevron-right')}</button><div class="sec-title">전체 시나리오`)
   .replace('🔥 이번 주 가장 많이 당한 수법', '대표 수법 체험')
   .replace('기관 사칭 · 평균 정답률 41% · 4분', '기관 사칭 · 3분')
   .replace('내 선택에 따라 사기범의 대화가 달라집니다.', '선택할 때마다 왜 위험한지 바로 알려 드립니다.')
@@ -908,7 +1010,8 @@ simResult = function () {
 };
 
 /* ---------------- 데이터 갱신 ---------------- */
-const DATA_VIEWS = { home: homeData, detect: detectData, family: familyData, lock: lockData, passphrase: passphraseData };
+const DATA_VIEWS = { home: homeData, detect: detectData, family: familyData, lock: lockData, passphrase: passphraseData, report: reportData };
+const REPORT_VIEWS = ['home', 'report'];
 const PHRASE_VIEWS = ['family', 'passphrase'];
 let lastData = '';
 
@@ -922,12 +1025,14 @@ async function refresh() {
       api('GET', '/v1/recordings'), api('GET', '/v1/recommendations'), api('GET', '/v1/family'), api('GET', '/v1/alerts'), api('GET', '/v1/lock'),
     ]);
     const phrase = PHRASE_VIEWS.includes(key) ? await api('GET', '/v1/family/passphrase') : null;
+    // 제보를 못 불러와도 홈의 나머지 내용은 보여 줍니다.
+    const reportList = REPORT_VIEWS.includes(key) ? await loadReportScenarios().catch(() => []) : [];
     const shownPhrase = phrase && { ...phrase, seconds_left: Math.ceil((phrase.seconds_left || 0) / 60) };
-    const snapshot = key + JSON.stringify([recordings, recs, family, alerts, lockMinutes(lock), lock.locked, shownPhrase]);
+    const snapshot = key + JSON.stringify([recordings, recs, family, alerts, lockMinutes(lock), lock.locked, shownPhrase, reportList]);
     const host = $('#data');
     if (snapshot === lastData || !host || (route().r || 'home') !== r) return;
     lastData = snapshot;
-    host.innerHTML = draw({ recordings, recs, family, alerts, lock, phrase });
+    host.innerHTML = draw({ recordings, recs, family, alerts, lock, phrase, reports: reportList });
     icons();
   } catch (e) {
     if ($('#data') && !$('#data').innerHTML) $('#data').innerHTML = emptyCard('서버에 연결할 수 없습니다.');
@@ -976,7 +1081,7 @@ async function pollAlerts() {
   }
 }
 
-['home', 'detect', 'family', 'lock', 'passphrase'].forEach((k) => { INIT[k] = () => { lastData = ''; refresh(); if (k === 'detect') loadSamples(); }; });
+['home', 'detect', 'family', 'lock', 'passphrase', 'report'].forEach((k) => { INIT[k] = () => { lastData = ''; refresh(); if (k === 'detect') loadSamples(); }; });
 setInterval(refresh, 5000);
 setInterval(pollAlerts, 5000);
 setInterval(pollLock, 5000);
@@ -986,3 +1091,5 @@ pollAlerts();
 pollLock();
 restoreFolder().then(scanFolder);
 loadDemoFamily();
+// 제보 시나리오 주소로 바로 들어온 경우 시나리오를 먼저 불러온 뒤 다시 그립니다.
+loadReportScenarios().then(() => { if (route().r === 'play' || route().r === 'sim') render(); }).catch(() => {});

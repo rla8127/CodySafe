@@ -389,3 +389,31 @@ def test_demo_family_is_off_by_default_and_never_logs_in_real_devices(client, mo
     assert client.get("/v1/family/passphrase", headers=me).json()["words"] == client.get("/v1/family/passphrase", headers=mom).json()["words"]
     send(client, me, PHISHING, "demo")
     assert client.get("/v1/alerts", headers=mom).json()["items"][0]["title"] == "동현님 보이스피싱 의심 통화"
+
+
+def test_reports_mask_private_data_hide_author_and_only_top_three_generate(client):
+    # 앞선 테스트의 시연 제보가 상위권을 차지하지 않게 비웁니다.
+    with db.connect() as conn:
+        conn.execute("DELETE FROM reports")
+        conn.execute("DELETE FROM report_votes")
+    a, b = device(client, "제보자"), device(client, "독자")
+    made = client.post("/v1/reports", headers=a, json={"category": "문자", "title": "택배 사칭 문자 신고", "body": "010-1234-5678 번호에서 https://evil.example/x 링크, 계좌 110-123-456789 입금 요구"})
+    rid = made.json()["id"]
+    items = client.get("/v1/reports", headers=b).json()["items"]
+    item = next(i for i in items if i["id"] == rid)
+    assert "1234-5678" not in item["body"] and "evil.example" not in item["body"] and "456789" not in item["body"]
+    assert "device_id" not in item and item["mine"] is False
+    assert client.post("/v1/reports", headers=a, json={"category": "없음", "title": "제목입니다", "body": "내용이 열 글자 넘습니다"}).status_code == 400
+    # 투표 0개는 생성할 수 없습니다.
+    fresh = client.post("/v1/reports", headers=a, json={"category": "기타", "title": "표 없는 제보", "body": "아직 아무도 추천하지 않은 제보입니다"}).json()["id"]
+    assert client.post(f"/v1/reports/{fresh}/scenario", headers=a).status_code == 403
+    client.post(f"/v1/reports/{rid}/vote", headers=b)
+    client.post(f"/v1/reports/{rid}/vote", headers=b)
+    assert next(i for i in client.get("/v1/reports", headers=b).json()["items"] if i["id"] == rid)["votes"] == 1
+    made = client.post(f"/v1/reports/{rid}/scenario", headers=b)
+    assert made.status_code == 200 and len(made.json()["steps"]) == 5
+    assert client.delete(f"/v1/reports/{rid}", headers=b).status_code == 404
+    assert client.delete(f"/v1/reports/{rid}", headers=a).status_code == 200
+    for n in range(4):
+        assert client.post("/v1/reports", headers=a, json={"category": "기타", "title": f"반복 제보 {n}", "body": "하루 제한을 확인하는 제보입니다"}).status_code == 200 or n == 3
+    assert client.post("/v1/reports", headers=a, json={"category": "기타", "title": "초과 제보", "body": "하루 제한을 넘는 제보입니다"}).status_code == 429

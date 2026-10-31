@@ -1,6 +1,8 @@
 import hmac
 import json
+import logging
 import secrets
+import threading
 import uuid
 from contextlib import asynccontextmanager
 from pathlib import PurePosixPath
@@ -11,7 +13,7 @@ from fastapi.responses import FileResponse, PlainTextResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
-from . import config, db, llm, passphrase, pipeline, providers, samples
+from . import config, db, llm, passphrase, pipeline, providers, reports, samples
 from .lock_apps import LOCK_APPS
 from .scam_kb import BY_ID, OTHER_SCAM, VOICE_PHISHING
 
@@ -107,6 +109,12 @@ class AnswerIn(BaseModel):
     answer: str = Field(min_length=1, max_length=60)
 
 
+class ReportIn(BaseModel):
+    category: str
+    title: str = Field(min_length=4, max_length=60)
+    body: str = Field(min_length=10, max_length=1000)
+
+
 class ReviewIn(BaseModel):
     label: str = Field(pattern="^(voice_phishing|other_scam|normal)$")
     scam_type: str | None = None
@@ -127,6 +135,103 @@ def register(body: DeviceIn):
             (device_id, token, body.name, body.role, body.memo, db.now()),
         )
     return {"device_id": device_id, "token": token}
+
+
+# ---------- 커뮤니티 제보 ----------
+_scenario_lock = threading.Lock()
+
+
+def _report_rows(conn, device: str) -> list[dict]:
+    rows = conn.execute(
+        "SELECT r.*, COUNT(v.device_id) AS votes, MAX(v.device_id = ?) AS voted FROM reports r"
+        " LEFT JOIN report_votes v ON v.report_id = r.id GROUP BY r.id ORDER BY votes DESC, r.created_at ASC LIMIT 100",
+        (device,),
+    ).fetchall()
+    items = []
+    for rank, r in enumerate(rows, 1):
+        items.append(
+            {
+                # 작성자는 공개하지 않고, 본인 글인지만 알려 줍니다.
+                "id": r["id"], "category": r["category"], "title": r["title"], "body": r["body"],
+                "votes": r["votes"], "voted": bool(r["voted"]), "mine": r["device_id"] == device, "is_demo": bool(r["is_demo"]),
+                "rank": rank if rank <= reports.TOP_N and r["votes"] > 0 else None,
+                "scenario": json.loads(r["scenario"]) if r["scenario"] else None,
+                "created_at": r["created_at"],
+            }
+        )
+    return items
+
+
+@app.get("/v1/reports")
+def list_reports(device: str = Depends(current_device)):
+    with db.connect() as conn:
+        return {"items": _report_rows(conn, device), "categories": reports.CATEGORIES}
+
+
+@app.post("/v1/reports")
+def create_report(body: ReportIn, device: str = Depends(current_device)):
+    if body.category not in reports.CATEGORIES:
+        raise HTTPException(400, "unknown category")
+    title, text = reports.mask(body.title), reports.mask(body.body)
+    with db.connect() as conn:
+        recent = conn.execute(
+            "SELECT COUNT(*) FROM reports WHERE device_id = ? AND created_at > ?", (device, db.now() - 86400)
+        ).fetchone()[0]
+        if recent >= reports.DAILY_LIMIT:
+            raise HTTPException(429, "daily limit")
+        report_id = conn.execute(
+            "INSERT INTO reports (device_id, category, title, body, created_at) VALUES (?, ?, ?, ?, ?)",
+            (device, body.category, title, text, db.now()),
+        ).lastrowid
+    return {"id": report_id}
+
+
+@app.post("/v1/reports/{report_id}/vote")
+def vote_report(report_id: int, device: str = Depends(current_device)):
+    with db.connect() as conn:
+        if not conn.execute("SELECT 1 FROM reports WHERE id = ?", (report_id,)).fetchone():
+            raise HTTPException(404)
+        conn.execute("INSERT OR IGNORE INTO report_votes VALUES (?, ?, ?)", (report_id, device, db.now()))
+    return {"ok": True}
+
+
+@app.delete("/v1/reports/{report_id}/vote")
+def unvote_report(report_id: int, device: str = Depends(current_device)):
+    with db.connect() as conn:
+        conn.execute("DELETE FROM report_votes WHERE report_id = ? AND device_id = ?", (report_id, device))
+    return {"ok": True}
+
+
+@app.delete("/v1/reports/{report_id}")
+def delete_report(report_id: int, device: str = Depends(current_device)):
+    with db.connect() as conn:
+        deleted = conn.execute("DELETE FROM reports WHERE id = ? AND device_id = ?", (report_id, device)).rowcount
+        if not deleted:
+            raise HTTPException(404)
+        conn.execute("DELETE FROM report_votes WHERE report_id = ?", (report_id,))
+    return {"ok": True}
+
+
+@app.post("/v1/reports/{report_id}/scenario")
+def create_scenario(report_id: int, device: str = Depends(current_device)):
+    """비용을 막기 위해 상위 제보만, 제보당 한 번만, 한 번에 하나씩 생성합니다."""
+    with _scenario_lock:
+        with db.connect() as conn:
+            item = next((r for r in _report_rows(conn, device) if r["id"] == report_id), None)
+        if not item:
+            raise HTTPException(404)
+        if item["scenario"]:
+            return item["scenario"]
+        if not item["rank"]:
+            raise HTTPException(403, "top reports only")
+        try:
+            scenario = reports.generate(item["title"], item["body"])
+        except Exception as exc:
+            logging.getLogger("guard.reports").exception("scenario failed")
+            raise HTTPException(502, "scenario generation failed") from exc
+        with db.connect() as conn:
+            conn.execute("UPDATE reports SET scenario = ? WHERE id = ?", (json.dumps(scenario, ensure_ascii=False), report_id))
+    return scenario
 
 
 # ---------- 시연 가족: 웹 시연에서만 씁니다 ----------
