@@ -30,7 +30,7 @@ S3_BUCKET = os.getenv("GUARD_S3_BUCKET", "")
 # 켜면 분석 뒤에도 음성을 저장소에 남깁니다. 앱의 동의 문구도 함께 바뀝니다.
 KEEP_AUDIO = os.getenv("GUARD_KEEP_AUDIO", "0") == "1"
 S3_REGION = os.getenv("GUARD_S3_REGION", AWS_REGION)
-STT = os.getenv("GUARD_STT", "text")  # text | openai | transcribe
+STT = os.getenv("GUARD_STT", "text")  # text | server | openai | transcribe
 OPENAI_STT_MODEL = os.getenv("GUARD_OPENAI_STT_MODEL", "whisper-1")
 LLM = os.getenv("GUARD_LLM", "rule")  # rule | anthropic | openai | bedrock
 EMBED = os.getenv("GUARD_EMBED", "hash")  # hash | openai | titan
@@ -58,4 +58,15 @@ MAX_UPLOAD_BYTES = int(os.getenv("GUARD_MAX_UPLOAD_BYTES", str(200 * 1024 * 1024
 AUDIO_EXTENSIONS = {"m4a", "mp3", "mp4", "wav", "flac", "ogg", "amr", "webm"}
 OPENAI_STT_EXTENSIONS = {"m4a", "mp3", "mp4", "wav", "flac", "ogg", "webm"}
 OPENAI_STT_MAX_BYTES = 25 * 1024 * 1024  # OpenAI 전사 API의 파일 크기 제한
+# 자체 STT 서버. 키는 백엔드에서만 읽습니다.
+STT_BASE_URL = os.getenv("STT_BASE_URL", "").rstrip("/")
+STT_API_KEY = os.getenv("STT_API_KEY", "")
+STT_MODEL = os.getenv("STT_MODEL", "whisper-large-v3-turbo")
+STT_TIMEOUT = float(os.getenv("STT_TIMEOUT", "900"))
+STT_MAX_BYTES = 50 * 1024 * 1024
+STT_MAX_SECONDS = 300
+STT_MAX_RETRIES = int(os.getenv("STT_MAX_RETRIES", "3"))
+# 앞선 전사를 이 시간만큼 기다려도 차례가 안 오면 부하로 보고 대체 경로로 넘깁니다.
+STT_QUEUE_TIMEOUT = float(os.getenv("STT_QUEUE_TIMEOUT", "60"))
+STT_FALLBACK = os.getenv("STT_FALLBACK", "openai")  # openai | none
 TEXT_EXTENSIONS = {"txt"}  # GUARD_STT=text 테스트 전용

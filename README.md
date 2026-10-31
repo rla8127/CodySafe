@@ -50,7 +50,8 @@ flowchart LR
 | 사례 검색 (RAG) | 별도 Elasticsearch 검색 서버를 `GUARD_RAG_URL`로 연결하면 판정 전에 참고 자료로 넣음. 코드와 실행 방법은 [infra/es-server](infra/es-server/codysafe-rag/README.md)에 있음. 원본 데이터는 올리지 않아 재현에 데이터 폴더가 필요. 서버가 없어도 LLM만으로 동작. 내장 검색은 판정 뒤 유형 표시에 쓰며 벡터는 해시 임베딩. 효과 미측정 |
 | 피드백, 사용자 대시보드 | 구현, 자동 테스트와 브라우저로 확인 |
 | 재학습, 검색 색인 갱신 | 추후 과제 |
-| L4 GPU 자체 STT | 미구현 |
+| 자체 STT (CPU, `whisper-large-v3-turbo` INT8) + OpenAI 대체 경로 | 앱 연동 구현, 자동 테스트로 확인. 실서버 전사 검증 전 |
+| GPU 서빙 | 미구현 |
 | 탐지율, 오탐률 | 미측정. 예시 대본 6건은 동작 확인용이며 성능 근거가 아님 |
 
 ## 실행
@@ -59,7 +60,7 @@ flowchart LR
 git clone https://github.com/rla8127/CodySafe.git
 cd CodySafe/server
 python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
-.venv/bin/python -m pytest -q   # 47개, 외부 키 불필요
+.venv/bin/python -m pytest -q   # 70개, 외부 키 불필요
 ```
 
 Python 3.12에서 확인했습니다.
@@ -107,7 +108,7 @@ docs/project-plan.md             초기 QR 판독 기획 (이번 제출 범위 �
 ## 데이터와 개인정보
 
 - 통화 상대의 음성도 전송되므로 동의한 통화나 테스트 파일로만 사용합니다.
-- 음성은 STT를 위해 OpenAI로, 글자 기록은 판정을 위해 Anthropic으로 전송됩니다.
+- 음성은 자체 STT 서버에서 먼저 처리해 외부 전송과 외부 의존을 줄입니다. GPU 서버 사용 제약으로 CPU에서 서빙하며, 부하나 장애 시에는 OpenAI로 전송됩니다. 글자 기록은 판정을 위해 Anthropic으로 전송됩니다.
 - 시연 버킷은 미국 리전에 있습니다. 실제 서비스에는 국내 리전이나 국외 이전 고지, 서버 HTTPS가 필요합니다.
 - 분석 내용은 본인만 조회합니다. 일상 통화의 글자 기록은 저장하지 않습니다.
 
@@ -120,7 +121,9 @@ docs/project-plan.md             초기 QR 판독 기획 (이번 제출 범위 �
 | 이름 | 용도 |
 |---|---|
 | Anthropic Claude (`claude-opus-5-5`) | 사기 판정, 재순위, 시나리오 생성 |
-| OpenAI `whisper-1` | 음성 변환 |
+| faster-whisper, Whisper large-v3-turbo | 자체 STT 서버 |
+| OpenAI `whisper-1` | 음성 변환 대체 경로 |
+| Amazon Polly | STT 평가용 한국어 음성 생성 |
 | Amazon S3 | 음성 저장 |
 | Langfuse Cloud | 처리 시간, 토큰, 비용 관측. 통화 내용은 보내지 않음 |
 | OpenAI `gpt-image-2` | 체험의 가상 인물 사진 3장 생성 |

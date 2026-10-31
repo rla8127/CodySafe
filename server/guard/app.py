@@ -13,7 +13,7 @@ from fastapi.responses import FileResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
-from . import config, dashboard, db, llm, passphrase, pet, pipeline, providers, reports, samples, tracing
+from . import config, dashboard, db, llm, passphrase, pet, pipeline, providers, reports, samples, stt_client, tracing
 from .lock_apps import LOCK_APPS
 from .scam_kb import BY_ID, OTHER_SCAM, VOICE_PHISHING
 
@@ -148,6 +148,11 @@ class TrainingIn(BaseModel):
 @app.get("/healthz")
 def healthz():
     return {"ok": True, "storage": config.STORAGE, "stt": config.STT, "llm": config.LLM, "embed": config.EMBED, "keep_audio": config.KEEP_AUDIO}
+
+
+@app.get("/healthz/stt")
+def stt_health():
+    return stt_client.health()
 
 
 @app.post("/v1/devices")
@@ -495,6 +500,7 @@ def create_recording(body: RecordingIn, device: str = Depends(current_device)):
     allowed = {
         "text": config.TEXT_EXTENSIONS,
         "openai": config.OPENAI_STT_EXTENSIONS,
+        "server": config.OPENAI_STT_EXTENSIONS,
     }.get(config.STT, config.AUDIO_EXTENSIONS)
     if ext not in allowed:
         raise HTTPException(415, f"unsupported format: {ext}")
