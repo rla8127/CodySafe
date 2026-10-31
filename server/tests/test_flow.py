@@ -370,3 +370,22 @@ def test_family_role_is_saved_shown_to_family_and_validated(client):
     assert client.put("/v1/devices/me", headers=parent, json={"role": "mom"}).status_code == 200
     assert client.get("/v1/family", headers=child).json()["guardians"][0]["role"] == "mom"
     assert client.put("/v1/devices/me", headers=parent, json={"role": "x"}).status_code == 422
+
+
+def test_demo_family_is_off_by_default_and_never_logs_in_real_devices(client, monkeypatch):
+    assert client.get("/v1/demo/family").status_code == 404
+    assert client.post("/v1/demo/family/demo-me/login").status_code == 404
+    monkeypatch.setattr(config, "DEMO_FAMILY", True)
+    db.seed_demo_family()
+    db.seed_demo_family()
+    items = client.get("/v1/demo/family").json()["items"]
+    assert [m["name"] for m in items] == ["동현", "상우", "선형", "호연", "병국"]
+    real = client.post("/v1/devices", json={"name": "실사용"}).json()["device_id"]
+    assert client.post(f"/v1/demo/family/{real}/login").status_code == 404
+    me = {"Authorization": "Bearer " + client.post("/v1/demo/family/demo-me/login").json()["token"]}
+    mom = {"Authorization": "Bearer " + client.post("/v1/demo/family/demo-mom/login").json()["token"]}
+    family = client.get("/v1/family", headers=me).json()
+    assert len(family["guardians"]) == 4 and len(family["protected"]) == 4
+    assert client.get("/v1/family/passphrase", headers=me).json()["words"] == client.get("/v1/family/passphrase", headers=mom).json()["words"]
+    send(client, me, PHISHING, "demo")
+    assert client.get("/v1/alerts", headers=mom).json()["items"][0]["title"] == "동현님 보이스피싱 의심 통화"

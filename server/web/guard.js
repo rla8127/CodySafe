@@ -68,7 +68,47 @@ drawIntroToggle();
 const ROLE_INFO = {
   mom: { label: '엄마', icon: '👩' }, dad: { label: '아빠', icon: '👨' }, me: { label: '나', icon: '🙂' },
   child: { label: '자녀', icon: '🧒' }, son: { label: '아들', icon: '👦' }, daughter: { label: '딸', icon: '👧' },
+  brother: { label: '형', icon: '🧑' }, sister: { label: '언니·누나', icon: '👩' }, uncle: { label: '삼촌', icon: '🧔' }, aunt: { label: '이모·고모', icon: '👩' },
 };
+const DEMO_LABEL = { me: '나', dad: '아빠', mom: '엄마', brother: '형', uncle: '삼촌' };
+let demoMembers = [];
+
+/* 웹 시연에서는 등록된 가족 중 한 명을 고릅니다. 앱은 항상 직접 등록합니다. */
+async function loadDemoFamily() {
+  if (native) return;
+  try {
+    const res = await fetch('/v1/demo/family');
+    if (!res.ok) return;
+    demoMembers = (await res.json()).items;
+    if (accepted() && !signedIn()) render();
+    else if (route().r === 'me') render();
+  } catch (e) { }
+}
+
+function demoPicker() {
+  return `<div class="page">
+    <div class="brand-hero small"><img src="assets/brand/logo-horizontal.png" alt="Cody Safe"></div>
+    <div class="lead-text">누구로<br><em>시연</em>할까요?</div>
+    <div class="demo-list">${demoMembers.map((m) => `<button class="demo-person" onclick="demoEnter('${esc(m.id)}')"><span class="role-av">${ROLE_INFO[m.role].icon}</span><span><b>${esc(m.name)}</b><small>${DEMO_LABEL[m.role]}</small></span>${ic('chevron-right')}</button>`).join('')}</div>
+    <div class="card mt soft-warn">시연용 가족입니다. 접속한 사람 모두 같은 기록을 볼 수 있으니 실제 통화는 올리지 마세요.</div>
+  </div>`;
+}
+
+async function demoEnter(id) {
+  try {
+    const res = await fetch(`/v1/demo/family/${id}/login`, { method: 'POST' });
+    if (!res.ok) throw new Error(res.status);
+    const me = await res.json();
+    store.set('token', me.token);
+    store.set('name', me.name);
+    store.set('role', me.role);
+    ['lastAlert', 'lockSeen', 'seen', 'folderSince'].forEach((k) => store.del(k));
+    go('home');
+    render();
+  } catch (e) {
+    toast('들어가지 못했습니다', 'circle-alert');
+  }
+}
 let pickedRole = '';
 
 function rolePicker(role = '', memo = '') {
@@ -141,6 +181,7 @@ function onboardingPage() {
       <button class="btn grad block mt" onclick="store.set('consented','1');render()">동의하고 시작</button>
     </div>`;
   }
+  if (demoMembers.length) return demoPicker();
   return `<div class="page">
     <div class="brand-hero small"><img src="assets/brand/logo-horizontal.png" alt="Cody Safe"></div>
     <div class="lead-text">가족 안에서<br><em>누구</em>신가요?</div>
@@ -828,7 +869,7 @@ SCREENS.me = gated(() => `<div class="page">
     ${['음성은 분석 후 삭제합니다. 실패한 음성은 재시도나 삭제 전까지 남습니다.', '일상 통화는 글자 기록을 남기지 않습니다.', '분석 내용은 본인만 볼 수 있습니다.', '가족에게는 보이스피싱 의심 여부만 전달됩니다.'].map((t) => `<li>${ic('lock')}<span>${t}</span></li>`).join('')}
   </ul></div>
   ${browserNotifyBlock()}
-  <button class="btn line block mt" onclick="signOut()">이 기기 등록 해제</button>
+  <button class="btn line block mt" onclick="signOut()">${demoMembers.length ? '다른 가족으로 보기' : '이 기기 등록 해제'}</button>
 </div>`);
 
 function browserNotifyBlock() {
@@ -852,7 +893,7 @@ function signOut() {
 const baseSim = SCREENS.sim;
 SCREENS.sim = () => baseSim()
   .replace('🔥 이번 주 가장 많이 당한 수법', '대표 수법 체험')
-  .replace('기관 사칭 · 평균 정답률 41% · 4분', '기관 사칭 · 2분')
+  .replace('기관 사칭 · 평균 정답률 41% · 4분', '기관 사칭 · 3분')
   .replace('내 선택에 따라 사기범의 대화가 달라집니다.', '선택할 때마다 왜 위험한지 바로 알려 드립니다.')
   .replace(/<span class="featnum">기능 \d+<\/span>/, '');
 
@@ -944,3 +985,4 @@ render();
 pollAlerts();
 pollLock();
 restoreFolder().then(scanFolder);
+loadDemoFamily();

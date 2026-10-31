@@ -25,6 +25,8 @@ _verify_fails: dict[str, list[float]] = {}
 @asynccontextmanager
 async def lifespan(_: FastAPI):
     db.init()
+    if config.DEMO_FAMILY:
+        db.seed_demo_family()
     config.LOCAL_AUDIO_DIR.mkdir(parents=True, exist_ok=True)
     yield
 
@@ -66,7 +68,7 @@ def current_device(authorization: str = Header(default="")) -> str:
     return row["id"]
 
 
-ROLE_PATTERN = "^(mom|dad|me|son|daughter|child)$"
+ROLE_PATTERN = "^(mom|dad|me|son|daughter|child|brother|sister|uncle|aunt)$"
 
 
 class DeviceIn(BaseModel):
@@ -125,6 +127,23 @@ def register(body: DeviceIn):
             (device_id, token, body.name, body.role, body.memo, db.now()),
         )
     return {"device_id": device_id, "token": token}
+
+
+# ---------- 시연 가족: 웹 시연에서만 씁니다 ----------
+@app.get("/v1/demo/family")
+def demo_family():
+    if not config.DEMO_FAMILY:
+        raise HTTPException(404)
+    return {"items": [{"id": m[0], "name": m[1], "role": m[2]} for m in db.DEMO_MEMBERS]}
+
+
+@app.post("/v1/demo/family/{member_id}/login")
+def demo_login(member_id: str):
+    if not config.DEMO_FAMILY or member_id not in {m[0] for m in db.DEMO_MEMBERS}:
+        raise HTTPException(404)
+    with db.connect() as conn:
+        row = conn.execute("SELECT token, name, role FROM devices WHERE id = ?", (member_id,)).fetchone()
+    return {"token": row["token"], "name": row["name"], "role": row["role"]}
 
 
 @app.get("/v1/devices/me")

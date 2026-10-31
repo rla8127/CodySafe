@@ -38,6 +38,16 @@ body { background: radial-gradient(1200px 800px at 15% 10%, #E6F0FC 0%, transpar
 .home-empty > svg.lucide { color: var(--mute); }
 /* PC 화면: 갤럭시 S 시리즈와 같은 19.5:9 비율을 유지합니다. */
 .stage { padding: 16px 32px; transition: gap .32s ease; }
+/* PC 미리보기: 내용이 상태 표시줄 뒤로 지나가지 않도록 그 아래에서 시작합니다. */
+@media (min-width: 501px) {
+  #view { top: 46px; }
+  .statusbar { height: 46px; padding-top: 0; background: var(--bg); }
+  .statusbar:has(~ #view .chat-wrap) { background: #B9CAE0; }
+  .page { padding-top: 12px; }
+  .chat-head { padding-top: 8px; }
+  .sim-progress { top: 56px; }
+  .subhead { padding-top: 8px !important; margin-top: -12px !important; }
+}
 .phone { width: auto; height: clamp(700px, calc(100dvh - 32px), 868px); aspect-ratio: 9 / 19.5; padding: 7px; border-radius: 40px; box-shadow: 0 0 0 1.5px #3A404D inset, 0 30px 60px rgba(20, 30, 70, .24), 0 8px 24px rgba(0, 0, 0, .18); }
 .screen { border-radius: 33px; }
 .sb-island { top: 14px; width: 13px; height: 13px; border-radius: 50%; box-shadow: 0 0 0 2px #1B1F27; }
@@ -190,6 +200,12 @@ a.btn { text-decoration: none; }
 .trend-row small { display: block; margin-top: 2px; font-size: 11.5px; color: var(--sub); }
 .trend-row svg.lucide { width: 14px; height: 14px; color: var(--mute); }
 .trend-note { margin: 8px 2px 0; font-size: 11.5px; line-height: 1.45; color: var(--sub); }
+.demo-list { display: grid; gap: 8px; }
+.demo-person { display: flex; align-items: center; width: 100%; padding: 12px 14px; border-radius: 18px; background: var(--card); box-shadow: var(--shadow); text-align: left; }
+.demo-person > span:nth-child(2) { flex: 1; min-width: 0; }
+.demo-person b { display: block; font-size: 16px; }
+.demo-person small { font-size: 12.5px; color: var(--sub); }
+.demo-person > svg.lucide { color: var(--mute); }
 .lock-banner { display: flex; align-items: center; gap: 10px; width: 100%; text-align: left; margin-bottom: 12px; font-size: 14px; line-height: 1.45; color: var(--ink2); }
 .lock-banner svg.lucide { width: 22px; height: 22px; color: var(--danger); flex: none; }
 /* 모바일에서 대화 첫 줄이 진행 막대에 가리지 않게 합니다. */

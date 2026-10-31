@@ -75,6 +75,30 @@ def init() -> None:
         )
 
 
+DEMO_MEMBERS = [
+    ("demo-me", "동현", "me"),
+    ("demo-dad", "상우", "dad"),
+    ("demo-mom", "선형", "mom"),
+    ("demo-brother", "호연", "brother"),
+    ("demo-uncle", "병국", "uncle"),
+]
+
+
+def seed_demo_family() -> None:
+    """모든 구성원이 서로의 경고를 받도록 양방향으로 연결합니다."""
+    with connect() as conn:
+        for device_id, name, role in DEMO_MEMBERS:
+            conn.execute(
+                "INSERT OR IGNORE INTO devices (id, token, name, role, created_at) VALUES (?, ?, ?, ?, ?)",
+                (device_id, secrets.token_urlsafe(32), name, role, now()),
+            )
+        ids = [m[0] for m in DEMO_MEMBERS]
+        for protected in ids:
+            for guardian in ids:
+                if protected != guardian:
+                    conn.execute("INSERT OR IGNORE INTO family_links VALUES (?, ?, ?)", (protected, guardian, now()))
+
+
 def now() -> float:
     return time.time()
 
