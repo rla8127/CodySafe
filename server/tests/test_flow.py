@@ -142,3 +142,56 @@ def test_invite_is_single_use_and_guardian_can_be_removed(client):
 def test_hybrid_retrieval_finds_type():
     assert rag.retrieve("저금리 대환대출로 갈아타려면 선납 이자를 입금하라고 함")[0]["id"] == "loan_refinance"
     assert rag.retrieve("아들이 폰이 고장나서 다른 번호로 합의금을 보내달라고 함")[0]["id"] == "family_impersonation"
+
+
+def test_text_mode_rejects_audio_and_binary(client):
+    h = device(client, "음성")
+    assert client.post("/v1/recordings", headers=h, json={"filename": "call.m4a", "client_key": "m"}).status_code == 415
+    r = client.post("/v1/recordings", headers=h, json={"filename": "fake.txt", "client_key": "f"}).json()
+    u = urlsplit(r["upload_url"])
+    client.put(f"{u.path}?{u.query}", content=b"\x00\x00\x00\x18ftyp3gp4\xff\xfe\xfa")
+    client.post(f"/v1/recordings/{r['id']}/complete", headers=h)
+    rec = client.get("/v1/recordings", headers=h).json()["items"][0]
+    assert rec["status"] == "failed" and rec["label"] is None
+
+
+def test_openai_stt_sends_audio_and_enforces_limit(client, monkeypatch):
+    from types import SimpleNamespace as NS
+
+    from guard import providers
+
+    seen = {}
+
+    def create(**kw):
+        seen.update(kw)
+        return NS(text=" " + PHISHING + " ")
+
+    monkeypatch.setattr(config, "STT", "openai")
+    monkeypatch.setattr(providers, "_openai", NS(audio=NS(transcriptions=NS(create=create))))
+    h = device(client, "전사")
+    assert client.post("/v1/recordings", headers=h, json={"filename": "a.amr", "client_key": "amr"}).status_code == 415
+    r = client.post("/v1/recordings", headers=h, json={"filename": "a.m4a", "client_key": "a"}).json()
+    u = urlsplit(r["upload_url"])
+    client.put(f"{u.path}?{u.query}", content=b"\x00audio")
+    client.post(f"/v1/recordings/{r['id']}/complete", headers=h)
+    rec = client.get("/v1/recordings", headers=h).json()["items"][0]
+    assert rec["label"] == "voice_phishing" and seen["language"] == "ko" and seen["file"][1] == b"\x00audio"
+
+    monkeypatch.setattr(config, "OPENAI_STT_MAX_BYTES", 2)
+    r = client.post("/v1/recordings", headers=h, json={"filename": "b.m4a", "client_key": "b"}).json()
+    u = urlsplit(r["upload_url"])
+    client.put(f"{u.path}?{u.query}", content=b"\x00audio")
+    client.post(f"/v1/recordings/{r['id']}/complete", headers=h)
+    assert client.get("/v1/recordings", headers=h).json()["items"][0]["status"] == "failed"
+
+
+def test_samsung_3gp_header_becomes_m4a_without_touching_audio():
+    from guard.providers import _as_m4a
+
+    head = (24).to_bytes(4, "big") + b"ftyp3gp4\x00\x00\x00\x01isom3gp4"
+    body = b"mdat-3gp4-audio-mp4a"
+    out = _as_m4a(head + body)
+    assert out[8:12] == b"M4A " and out[20:24] == b"M4A " and out[16:20] == b"isom"
+    assert out[24:] == body and len(out) == len(head + body)
+    amr = head + b"samr"
+    assert _as_m4a(amr) == amr

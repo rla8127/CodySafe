@@ -72,7 +72,7 @@ def process(rec_id: str) -> None:
         providers.delete_audio(row["s3_key"])
     except Exception as exc:
         log.exception("recording %s failed", rec_id)
-        _set(rec_id, status="failed", error=type(exc).__name__)
+        _set(rec_id, status="failed", error=f"{type(exc).__name__}: {exc}"[:500])
 
 
 def recommendations(device_id: str) -> dict:

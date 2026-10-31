@@ -122,7 +122,10 @@ def remove_guardian(guardian_id: str, device: str = Depends(current_device)):
 @app.post("/v1/recordings")
 def create_recording(body: RecordingIn, device: str = Depends(current_device)):
     ext = PurePosixPath(body.filename).suffix.lstrip(".").lower()
-    allowed = config.AUDIO_EXTENSIONS | (config.TEXT_EXTENSIONS if config.STT == "text" else set())
+    allowed = {
+        "text": config.TEXT_EXTENSIONS,
+        "openai": config.OPENAI_STT_EXTENSIONS,
+    }.get(config.STT, config.AUDIO_EXTENSIONS)
     if ext not in allowed:
         raise HTTPException(415, f"unsupported format: {ext}")
 

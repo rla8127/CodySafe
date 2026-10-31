@@ -13,10 +13,10 @@
 |---|---|
 | 폴더의 음성 수집 | 저장소 접근 프레임워크로 사용자가 고른 폴더를 읽음. 연결 후 생긴 파일만 대상 |
 | S3 전송 | WorkManager 15분 주기와 수동 동기화. 기기에 AWS 키 없이 presigned URL 사용 |
-| STT → LLM | Amazon Transcribe(ko-KR) → Claude Opus 5.5 스키마 출력 |
+| STT → LLM | OpenAI 전사 또는 Amazon Transcribe(ko-KR) → OpenAI, Claude API, Bedrock 중 선택, 스키마 출력 |
 | 개인화 추천 | 기기별 판정 기록을 유형별로 집계해 상위 3개와 훈련 제시 |
 | 가족 알림 | 초대 코드로 연결. 확신도 0.7 이상 보이스피싱만, 요약만 전달 |
-| 유형 판별 | 음절 2-gram BM25 + Titan 벡터 → RRF → Claude 재순위 |
+| 유형 판별 | 음절 2-gram BM25 + 벡터 → RRF → LLM 재순위 |
 | 비보이스피싱 사기 | 사람이 확정한 건만 `review_dataset`에 보관, JSONL로 내보내기 |
 
 보관 기준: 음성은 분석 후 삭제하고, 일상 통화는 글자 기록도 남기지 않습니다.
@@ -35,11 +35,21 @@ AWS 없이 (`.txt`를 녹취로 간주, 키워드 판정):
 GUARD_PUBLIC_BASE_URL=http://<서버주소>:8091 .venv/bin/uvicorn guard.app:app --host 0.0.0.0 --port 8091
 ```
 
-실제 구성:
+LLM은 API 키나 Bedrock 중에서 고릅니다. 키는 저장소에 넣지 말고 환경 변수로만 넘기세요.
+
+| 구성 | 설정 |
+|---|---|
+| OpenAI | `OPENAI_API_KEY=<키> GUARD_LLM=openai GUARD_OPENAI_MODEL=<모델> GUARD_EMBED=openai` |
+| Claude API | `ANTHROPIC_API_KEY=<키> GUARD_LLM=anthropic` (벡터 검색은 해시 방식, 실제 임베딩은 아님) |
+| Bedrock | `GUARD_LLM=bedrock GUARD_EMBED=titan` |
+
+실제 음성을 AWS 없이 처리하려면 `OPENAI_API_KEY=<키> GUARD_STT=openai`를 더합니다. 파일당 25MB까지이고 AMR은 지원하지 않습니다.
+
+S3와 Transcribe로 처리하려면 다음을 더합니다.
 
 ```bash
-GUARD_STORAGE=s3 GUARD_S3_BUCKET=<버킷> GUARD_STT=transcribe GUARD_LLM=bedrock GUARD_EMBED=titan \
-GUARD_ADMIN_TOKEN=<임의 값> .venv/bin/uvicorn guard.app:app --host 0.0.0.0 --port 8091
+GUARD_STORAGE=s3 GUARD_S3_BUCKET=<버킷> GUARD_STT=transcribe GUARD_ADMIN_TOKEN=<임의 값> \
+.venv/bin/uvicorn guard.app:app --host 0.0.0.0 --port 8091
 ```
 
 버킷은 공개 차단과 수명 주기 삭제 규칙을 켜 두세요. 분석에 실패한 음성은 재시도를 위해 남기 때문입니다.
@@ -61,5 +71,5 @@ GUARD_ADMIN_TOKEN=<임의 값> .venv/bin/uvicorn guard.app:app --host 0.0.0.0 --
 - **녹음은 앱이 만들지 않습니다.** 안드로이드는 일반 앱의 통화 음성 녹음을 막습니다. 카카오톡·디스코드 음성은 사용자가 녹음 파일을 폴더에 넣어야 합니다.
 - **가족 알림 지연:** 받는 쪽 앱이 꺼져 있으면 최대 15분 이상 늦습니다. 실서비스에는 FCM이 필요합니다.
 - **HTTP 테스트 전용:** 실제 통화를 올리기 전에 서버를 HTTPS로 바꾸고 `usesCleartextTraffic`를 지웁니다.
-- **데이터 이동:** 기본 모델은 `global.` 추론 프로파일이라 녹취가 국외에서 처리될 수 있습니다.
+- **데이터 이동:** 어떤 LLM을 고르든 녹취가 외부 서비스로 전송되며 국외에서 처리될 수 있습니다.
 - **성능 미측정:** 소수의 합성 대본으로 동작만 확인했습니다. 탐지율과 오탐률은 측정하지 않았습니다.

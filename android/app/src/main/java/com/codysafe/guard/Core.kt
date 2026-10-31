@@ -27,6 +27,9 @@ class Store(context: Context) {
     var token: String
         get() = p.getString("token", "") ?: ""
         set(v) = p.edit().putString("token", v).apply()
+    var name: String
+        get() = p.getString("name", "") ?: ""
+        set(v) = p.edit().putString("name", v).apply()
     var folder: String
         get() = p.getString("folder", "") ?: ""
         set(v) = p.edit().putString("folder", v).apply()
@@ -156,7 +159,7 @@ object Notifier {
         manager.notify(
             id,
             Notification.Builder(context, CHANNEL)
-                .setSmallIcon(android.R.drawable.ic_dialog_alert)
+                .setSmallIcon(R.drawable.ic_shield)
                 .setContentTitle(title)
                 .setContentText(body)
                 .setStyle(Notification.BigTextStyle().bigText(body))

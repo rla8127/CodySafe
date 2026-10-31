@@ -12,10 +12,14 @@ AWS_REGION = os.getenv("GUARD_AWS_REGION", "ap-northeast-2")
 
 STORAGE = os.getenv("GUARD_STORAGE", "local")  # local | s3
 S3_BUCKET = os.getenv("GUARD_S3_BUCKET", "")
-STT = os.getenv("GUARD_STT", "text")  # text | transcribe
-LLM = os.getenv("GUARD_LLM", "rule")  # rule | bedrock
-EMBED = os.getenv("GUARD_EMBED", "hash")  # hash | titan
+STT = os.getenv("GUARD_STT", "text")  # text | openai | transcribe
+OPENAI_STT_MODEL = os.getenv("GUARD_OPENAI_STT_MODEL", "whisper-1")
+LLM = os.getenv("GUARD_LLM", "rule")  # rule | anthropic | openai | bedrock
+EMBED = os.getenv("GUARD_EMBED", "hash")  # hash | openai | titan
 
+ANTHROPIC_MODEL = os.getenv("GUARD_ANTHROPIC_MODEL", "claude-opus-5-5")
+OPENAI_MODEL = os.getenv("GUARD_OPENAI_MODEL", "")  # GUARD_LLM=openai일 때 필수
+OPENAI_EMBED_MODEL = os.getenv("GUARD_OPENAI_EMBED_MODEL", "text-embedding-3-small")
 CLAUDE_MODEL = os.getenv("GUARD_CLAUDE_MODEL", "global.anthropic.claude-opus-5-5")
 CLAUDE_REGION = os.getenv("GUARD_CLAUDE_REGION", AWS_REGION)
 TITAN_MODEL = os.getenv("GUARD_TITAN_MODEL", "amazon.titan-embed-text-v2:0")
@@ -24,4 +28,6 @@ TITAN_MODEL = os.getenv("GUARD_TITAN_MODEL", "amazon.titan-embed-text-v2:0")
 ALERT_THRESHOLD = float(os.getenv("GUARD_ALERT_THRESHOLD", "0.7"))
 MAX_UPLOAD_BYTES = int(os.getenv("GUARD_MAX_UPLOAD_BYTES", str(200 * 1024 * 1024)))
 AUDIO_EXTENSIONS = {"m4a", "mp3", "mp4", "wav", "flac", "ogg", "amr", "webm"}
+OPENAI_STT_EXTENSIONS = {"m4a", "mp3", "mp4", "wav", "flac", "ogg", "webm"}
+OPENAI_STT_MAX_BYTES = 25 * 1024 * 1024  # OpenAI 전사 API의 파일 크기 제한
 TEXT_EXTENSIONS = {"txt"}  # GUARD_STT=text 테스트 전용

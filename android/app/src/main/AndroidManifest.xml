@@ -7,8 +7,8 @@
     <!-- usesCleartextTraffic: HTTP 테스트 서버용. 실제 음성을 다루기 전에 HTTPS로 바꾸고 제거합니다. -->
     <application
         android:allowBackup="false"
-        android:icon="@android:drawable/ic_dialog_alert"
-        android:label="CodySafe 가족보호"
+        android:icon="@mipmap/ic_launcher"
+        android:label="CodySafe"
         android:theme="@android:style/Theme.Material.Light.NoActionBar"
         android:usesCleartextTraffic="true">
         <activity
