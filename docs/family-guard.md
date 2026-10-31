@@ -70,6 +70,8 @@ GUARD_STORAGE=s3 GUARD_S3_BUCKET=<버킷> GUARD_STT=transcribe GUARD_ADMIN_TOKEN
 3. A의 검사 탭에서 파일을 올립니다.
 4. A에는 분석 결과가, B에는 의심 여부만 나오는지 확인합니다.
 
+기획과 기술 판단은 [family-guard-plan.md](family-guard-plan.md)에 있습니다.
+
 ## 금융 앱 잠금
 
 - 보이스피싱 확신도가 `GUARD_LOCK_THRESHOLD`(기본 0.9) 이상이면 `GUARD_LOCK_SECONDS`(기본 1시간) 동안 잠급니다.

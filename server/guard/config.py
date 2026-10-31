@@ -12,6 +12,7 @@ AWS_REGION = os.getenv("GUARD_AWS_REGION", "ap-northeast-2")
 
 STORAGE = os.getenv("GUARD_STORAGE", "local")  # local | s3
 S3_BUCKET = os.getenv("GUARD_S3_BUCKET", "")
+S3_REGION = os.getenv("GUARD_S3_REGION", AWS_REGION)
 STT = os.getenv("GUARD_STT", "text")  # text | openai | transcribe
 OPENAI_STT_MODEL = os.getenv("GUARD_OPENAI_STT_MODEL", "whisper-1")
 LLM = os.getenv("GUARD_LLM", "rule")  # rule | anthropic | openai | bedrock

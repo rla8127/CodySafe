@@ -104,6 +104,15 @@ function callTitle(r) {
   return `${d.getMonth() + 1}월 ${d.getDate()}일 ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')} 올린 통화`;
 }
 
+// 모델이 스스로 매긴 값이라 통계적 확률로 표현하지 않습니다. 사람이 판정을 고치면 숨깁니다.
+function confidenceBar(r) {
+  if (r.status !== 'done' || r.review_label || !['voice_phishing', 'other_scam'].includes(r.label) || r.confidence == null) return '';
+  const percent = Math.round(r.confidence * 100);
+  return `<div class="confidence"><div class="confidence-top"><span>AI 판단 확신도</span><b>${percent}%</b></div>
+    <div class="confidence-track"><span style="width:${percent}%"></span></div>
+    <div class="confidence-note">실제 사기일 확률이 아니라 AI가 판단에 얼마나 확신하는지를 나타냅니다.</div></div>`;
+}
+
 // AI가 풀어 쓴 요약은 보여 주지 않고, 녹취에서 대조한 발화만 사실로 표시합니다.
 function factBox(r, top) {
   if (!r.evidence.length) {
@@ -126,6 +135,7 @@ function recordingCard(r) {
   return `<div class="card mt">
     ${verdictChip(r, label)}
     <div class="call-title">${callTitle(r)}</div>
+    ${confidenceBar(r)}
     ${r.status === 'failed' ? '<div class="call-text">처리에 실패했습니다. 다시 시도해 주세요.</div>' : ''}
     ${factBox(r, top)}
     <div class="link-row">
@@ -448,6 +458,7 @@ function sampleResultHtml(r) {
   const label = r.label;
   const matched = label === r.expected;
   return `<div class="sample-result">${verdictChip(r, label)}
+    ${confidenceBar(r)}
     ${factBox(r, r.matches[0])}
     <div class="sample-expected ${matched ? 'ok' : 'miss'}">${ic(matched ? 'circle-check' : 'circle-alert')}대본의 의도와 ${matched ? '같은 결과입니다' : '다른 결과입니다'}</div></div>`;
 }
@@ -498,11 +509,11 @@ function folderGuide() {
 const detectData = ({ recordings }) => (recordings.items.length ? recordings.items.map(recordingCard).join('') : emptyCard('아직 올린 파일이 없습니다.'));
 
 async function uploadFile(file, clientKey) {
-  const r = await api('POST', '/v1/recordings', { filename: file.name, client_key: clientKey, content_type: 'application/octet-stream' });
+  const r = await api('POST', '/v1/recordings', { filename: file.name, client_key: clientKey, content_type: 'application/octet-stream', direct: false });
   if (r.already_uploaded) return false;
   const url = new URL(r.upload_url);
-  // 로컬 저장 모드는 지금 접속한 주소로 보내 주소 설정과 무관하게 동작하게 합니다.
-  const target = url.pathname.startsWith('/v1/local-upload/') ? url.pathname + url.search : r.upload_url;
+  // 서버의 공개 주소 설정과 무관하게 지금 접속한 주소로 보냅니다.
+  const target = url.pathname + url.search;
   const put = await fetch(target, { method: 'PUT', headers: { 'Content-Type': 'application/octet-stream' }, body: file });
   if (!put.ok) throw new Error(put.status);
   await api('POST', `/v1/recordings/${r.id}/complete`);

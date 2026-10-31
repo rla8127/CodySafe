@@ -308,7 +308,50 @@ def test_samples_show_result_without_touching_records_alerts_or_lock(client):
     assert client.post("/v1/samples/none/analyze", headers=p).status_code == 404
     # 규칙 판정의 정확도가 아니라 기록과 알림에 영향이 없는지 봅니다.
     assert results["prosecutor"]["label"] == "voice_phishing" and results["prosecutor"]["matches"]
+    assert 0 < results["prosecutor"]["confidence"] <= 1
     assert results["dinner"]["label"] == "normal" and results["dinner"]["evidence"] == []
     assert client.get("/v1/recordings", headers=p).json()["items"] == []
     assert client.get("/v1/alerts", headers=g).json()["items"] == []
     assert client.get("/v1/lock", headers=p).json()["locked"] is False
+
+
+def test_s3_mode_keeps_voice_per_device_and_deletes_after_analysis(client, monkeypatch):
+    from guard import providers
+
+    class FakeS3:
+        objects: dict[str, bytes] = {}
+        exceptions = None
+
+        def generate_presigned_url(self, _, Params, ExpiresIn):
+            return f"https://s3.example/{Params['Key']}"
+
+        def upload_file(self, path, bucket, key):
+            assert bucket == "voice-test"
+            self.objects[key] = open(path, "rb").read()
+
+        def head_object(self, Bucket, Key):
+            return {"ContentLength": len(self.objects[Key])}
+
+        def get_object(self, Bucket, Key):
+            from io import BytesIO
+
+            return {"Body": BytesIO(self.objects[Key])}
+
+        def delete_object(self, Bucket, Key):
+            del self.objects[Key]
+
+    fake = FakeS3()
+    monkeypatch.setattr(config, "STORAGE", "s3")
+    monkeypatch.setattr(config, "S3_BUCKET", "voice-test")
+    monkeypatch.setattr(providers, "_s3", fake)
+    h = device(client, "저장")
+    me = client.post("/v1/recordings", headers=h, json={"filename": "app.txt", "client_key": "app"}).json()
+    assert me["upload_url"].startswith("https://s3.example/recordings/")
+    r = client.post("/v1/recordings", headers=h, json={"filename": "web.txt", "client_key": "web", "direct": False}).json()
+    u = urlsplit(r["upload_url"])
+    assert client.put(f"{u.path}?{u.query}", content=NORMAL.encode()).status_code == 200
+    key = next(iter(fake.objects))
+    assert key.startswith("recordings/") and key.endswith(f"/{r['id']}.txt")
+    assert not (config.LOCAL_AUDIO_DIR / key.replace("/", "_")).exists()
+    assert client.post(f"/v1/recordings/{r['id']}/complete", headers=h).status_code == 200
+    assert fake.objects == {}

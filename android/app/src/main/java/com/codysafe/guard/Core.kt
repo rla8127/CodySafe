@@ -110,10 +110,11 @@ class ApiError(val code: Int, message: String) : IOException("HTTP $code: $messa
 
 object Sync {
     private val EXTENSIONS = setOf("m4a", "mp3", "mp4", "wav", "flac", "ogg", "amr", "webm", "txt")
-    private const val SETTLE_MS = 30_000L
+    private const val SETTLE_MS = 15_000L
     private const val LOCK_NOTICE_ID = -1
 
     /** 폴더 연결 이후 생긴 파일만 올립니다. 과거 녹음이 한꺼번에 나가지 않게 하려는 기준입니다. */
+    @Synchronized
     fun uploadNewFiles(context: Context, store: Store): Int {
         if (store.folder.isEmpty()) return 0
         val tree = DocumentFile.fromTreeUri(context, Uri.parse(store.folder)) ?: return 0

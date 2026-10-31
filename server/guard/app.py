@@ -5,6 +5,7 @@ import uuid
 from contextlib import asynccontextmanager
 from pathlib import PurePosixPath
 
+from fastapi.concurrency import run_in_threadpool
 from fastapi import BackgroundTasks, Depends, FastAPI, Header, HTTPException, Query, Request
 from fastapi.responses import FileResponse, PlainTextResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
@@ -77,6 +78,8 @@ class RecordingIn(BaseModel):
     filename: str = Field(min_length=1, max_length=255)
     client_key: str = Field(min_length=1, max_length=255)
     content_type: str = "application/octet-stream"
+    # 브라우저는 S3로 바로 올리려면 버킷 CORS가 필요하므로 서버를 거칩니다.
+    direct: bool = True
 
 
 class LockIn(BaseModel):
@@ -186,6 +189,7 @@ def analyze_sample(sample_id: str, _: str = Depends(current_device)):
         _sample_results[sample_id] = {
             "status": "done",
             "label": result["label"],
+            "confidence": result["confidence"],
             "review_label": None,
             "evidence": result["evidence"],
             "matches": pipeline.public_matches(pipeline.find_matches(result, text)),
@@ -318,15 +322,13 @@ def create_recording(body: RecordingIn, device: str = Depends(current_device)):
         )
     return {
         "id": rec_id,
-        "upload_url": providers.upload_url(key, body.content_type, token, rec_id),
+        "upload_url": providers.upload_url(key, body.content_type, token, rec_id, body.direct),
         "already_uploaded": False,
     }
 
 
 @app.put("/v1/local-upload/{rec_id}")
 async def local_upload(rec_id: str, request: Request, token: str = Query()):
-    if config.STORAGE != "local":
-        raise HTTPException(404)
     with db.connect() as conn:
         row = conn.execute("SELECT s3_key, upload_token FROM recordings WHERE id = ?", (rec_id,)).fetchone()
     if not row or not hmac.compare_digest(row["upload_token"], token):
@@ -340,6 +342,7 @@ async def local_upload(rec_id: str, request: Request, token: str = Query()):
                 path.unlink(missing_ok=True)
                 raise HTTPException(413)
             out.write(chunk)
+    await run_in_threadpool(providers.store_uploaded, row["s3_key"])
     return {"size": size}
 
 

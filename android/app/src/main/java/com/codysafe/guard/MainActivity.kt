@@ -91,6 +91,7 @@ class MainActivity : Activity() {
         }
         setContentView(web)
         if (Build.VERSION.SDK_INT >= 33) requestPermissions(arrayOf(Manifest.permission.POST_NOTIFICATIONS), 1)
+        FolderWatchService.start(this)
         load()
     }
 
@@ -141,6 +142,7 @@ class MainActivity : Activity() {
                 contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
                 store.folder = uri.toString()
                 store.folderSince = System.currentTimeMillis()
+                FolderWatchService.start(this)
                 web.evaluateJavascript("render()", null)
             }
         }
@@ -151,7 +153,10 @@ class MainActivity : Activity() {
         @JavascriptInterface
         fun setToken(token: String) {
             store.token = token
-            if (token.isNotEmpty()) SyncWorker.schedule(this@MainActivity)
+            if (token.isNotEmpty()) {
+                SyncWorker.schedule(this@MainActivity)
+                FolderWatchService.start(this@MainActivity)
+            }
         }
 
         @JavascriptInterface

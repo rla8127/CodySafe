@@ -16,8 +16,8 @@ def s3():
 
         _s3 = boto3.client(
             "s3",
-            region_name=config.AWS_REGION,
-            endpoint_url=f"https://s3.{config.AWS_REGION}.amazonaws.com",
+            region_name=config.S3_REGION,
+            endpoint_url=f"https://s3.{config.S3_REGION}.amazonaws.com",
             config=Config(signature_version="s3v4"),
         )
     return _s3
@@ -27,14 +27,25 @@ def local_path(key: str) -> Path:
     return config.LOCAL_AUDIO_DIR / key.replace("/", "_")
 
 
-def upload_url(key: str, content_type: str, upload_token: str, rec_id: str) -> str:
-    if config.STORAGE == "s3":
+def upload_url(key: str, content_type: str, upload_token: str, rec_id: str, direct: bool = True) -> str:
+    if config.STORAGE == "s3" and direct:
         return s3().generate_presigned_url(
             "put_object",
             Params={"Bucket": config.S3_BUCKET, "Key": key, "ContentType": content_type},
             ExpiresIn=3600,
         )
     return f"{config.PUBLIC_BASE_URL}/v1/local-upload/{rec_id}?token={upload_token}"
+
+
+def store_uploaded(key: str) -> None:
+    """서버를 거쳐 올라온 파일을 S3로 옮기고 임시 파일을 지웁니다."""
+    if config.STORAGE != "s3":
+        return
+    path = local_path(key)
+    try:
+        s3().upload_file(str(path), config.S3_BUCKET, key)
+    finally:
+        path.unlink(missing_ok=True)
 
 
 def uploaded_size(key: str) -> int | None:
