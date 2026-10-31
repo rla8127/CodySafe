@@ -3,7 +3,7 @@ import json
 import logging
 import re
 
-from . import config, remote_rag
+from . import config, remote_rag, tracing
 from .scam_kb import KB, OTHER_SCAM, VOICE_PHISHING
 
 log = logging.getLogger("guard.llm")
@@ -74,7 +74,7 @@ def _llm_client():
     return _client
 
 
-def _ask_openai(system: str, user: str, schema: dict) -> dict:
+def _ask_openai(system: str, user: str, schema: dict, generation) -> dict:
     if not config.OPENAI_MODEL:
         raise RuntimeError("GUARD_OPENAI_MODEL을 설정하세요")
     response = _llm_client().chat.completions.create(
@@ -82,25 +82,33 @@ def _ask_openai(system: str, user: str, schema: dict) -> dict:
         messages=[{"role": "system", "content": system}, {"role": "user", "content": user}],
         response_format={"type": "json_schema", "json_schema": {"name": "result", "strict": True, "schema": schema}},
     )
+    usage = getattr(response, "usage", None)
+    if usage:
+        tracing.update(generation, usage_details={"input": usage.prompt_tokens, "output": usage.completion_tokens})
     choice = response.choices[0]
     if choice.finish_reason != "stop" or not choice.message.content:
         raise RuntimeError(f"OpenAI 응답 중단: {choice.finish_reason}")
     return json.loads(choice.message.content)
 
 
-def _ask_json(system: str, user: str, schema: dict) -> dict:
-    if config.LLM == "openai":
-        return _ask_openai(system, user, schema)
-    response = _llm_client().messages.create(
-        model=config.ANTHROPIC_MODEL if config.LLM == "anthropic" else config.CLAUDE_MODEL,
-        max_tokens=4000,
-        system=system,
-        messages=[{"role": "user", "content": user}],
-        output_config={"effort": "low", "format": {"type": "json_schema", "schema": schema}},
-    )
-    if response.stop_reason != "end_turn":
-        raise RuntimeError(f"Claude 응답 중단: {response.stop_reason}")
-    return json.loads(next(b.text for b in response.content if b.type == "text"))
+def _ask_json(system: str, user: str, schema: dict, name: str = "llm") -> dict:
+    model = {"openai": config.OPENAI_MODEL, "anthropic": config.ANTHROPIC_MODEL}.get(config.LLM, config.CLAUDE_MODEL)
+    with tracing.observe(name, as_type="generation", model=model, metadata={"provider": config.LLM}) as generation:
+        if config.LLM == "openai":
+            return _ask_openai(system, user, schema, generation)
+        response = _llm_client().messages.create(
+            model=model,
+            max_tokens=4000,
+            system=system,
+            messages=[{"role": "user", "content": user}],
+            output_config={"effort": "low", "format": {"type": "json_schema", "schema": schema}},
+        )
+        usage = getattr(response, "usage", None)
+        if usage:
+            tracing.update(generation, usage_details={"input": usage.input_tokens, "output": usage.output_tokens})
+        if response.stop_reason != "end_turn":
+            raise RuntimeError(f"Claude 응답 중단: {response.stop_reason}")
+        return json.loads(next(b.text for b in response.content if b.type == "text"))
 
 
 def _rule_analyze(transcript: str) -> dict:
@@ -155,12 +163,14 @@ def _keep_grounded(result: dict, transcript: str) -> dict:
 
 def analyze(transcript: str) -> dict:
     if config.LLM != "rule":
-        hits = remote_rag.search(transcript)
+        with tracing.observe("사례 검색", as_type="retriever") as search:
+            hits = remote_rag.search(transcript)
+            tracing.update(search, metadata={"documents": len(hits)})
         user = f"<transcript>\n{transcript}\n</transcript>"
         if hits:
             user += f"\n<reference>\n{remote_rag.format_reference(hits)}\n</reference>"
         log.info("LLM 분석 호출 provider=%s rag_docs=%d", config.LLM, len(hits))
-        result = _ask_json(ANALYSIS_SYSTEM, user, ANALYSIS_SCHEMA)
+        result = _ask_json(ANALYSIS_SYSTEM, user, ANALYSIS_SCHEMA, name="판정")
     else:
         result = _rule_analyze(transcript)
     result["confidence"] = max(0.0, min(1.0, float(result["confidence"])))
@@ -176,6 +186,7 @@ def rerank(query: str, candidates: list[dict]) -> list[dict]:
         "통화 분석 내용과 가장 잘 맞는 사기 유형 순으로 후보 id를 정렬하세요. 후보에 있는 id만 쓰고, 분명히 관련 없는 후보는 뺍니다.",
         f"<query>\n{query}\n</query>\n<candidates>\n{docs}\n</candidates>",
         RERANK_SCHEMA,
+        name="재순위",
     )
     by_id = {d["id"]: d for d in candidates}
     return [by_id[i] for i in dict.fromkeys(result["ranked_ids"]) if i in by_id]

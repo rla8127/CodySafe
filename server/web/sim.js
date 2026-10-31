@@ -5,6 +5,9 @@
 const simSay = (t, ok, fb) => ({ t, ok, fb });
 const simAct = (t, ok, fb) => ({ t, ok, fb, act: true });
 
+const SIM_AI_PHOTO_TIP = '요즘은 <a href="https://www.stealcut.com/" target="_blank" rel="noopener noreferrer">StealCut</a> 같은 AI 이미지 판별 서비스도 있어요(제휴 아님). 다만 도용된 실제 사진은 판별로 걸러지지 않으니, 돈 요구는 사진과 상관없이 거절하세요.';
+const SIM_AI_PHOTO_NOTE = '사실 세 장 모두 AI로 만든 사진이에요. 요즘은 눈으로 구분하기 어렵습니다. ' + SIM_AI_PHOTO_TIP;
+
 Object.keys(SCENARIOS).forEach((k) => delete SCENARIOS[k]);
 Object.assign(SCENARIOS, {
   agency: {
@@ -105,6 +108,40 @@ Object.assign(SCENARIOS, {
         ] },
     ],
     signals: ['유명인 사칭', '비밀 유지 요구', '다른 메신저 유도', '급격한 친밀감', '영상통화 회피', '오늘까지 입금 압박', '협박'],
+  },
+  photo: {
+    title: '이 사람, 진짜일까요?', tag: '로맨스 스캠', icon: 'image', color: '#E5487A', soft: '#FDECF2',
+    difficulty: '어려움', mins: 3, desc: '셀카를 보내 믿게 만든 뒤 투자를 권하는 수법. 사진으로 진짜를 가려낼 수 있을까요?',
+    contact: { name: '민준 (가상 인물)', sub: 'Instagram DM', av: '민' },
+    steps: [
+      { msgs: ['프로필 보고 연락드려요 😊', '해외에서 사업하는 민준이라고 해요. 친구로 지내요!'],
+        choices: [
+          simSay('반가워요! 무슨 사업 하세요?', false, '모르는 사람이 먼저 친근하게 다가오면 일단 경계하세요.'),
+          simAct('답장하기 전에 계정을 살펴본다', true, '좋아요. 만든 지 얼마 안 됐거나 게시물이 적은 계정은 조심하세요.'),
+        ] },
+      { sys: '의심스럽다고 하자 사진을 보내 왔어요', msgs: ['저 진짜 사람이에요. 제 사진 보세요!', { gallery: ['web/media/quiz-1.jpg', 'web/media/quiz-2.jpg', 'web/media/quiz-3.jpg'] }, '이 중에 진짜 제 사진이 있어요. 어떤 사진이 진짜 같아요?'],
+        choices: [
+          simSay('1번 사진은 진짜 같아요', false, SIM_AI_PHOTO_NOTE),
+          simSay('3번 사진은 진짜 같아요', false, SIM_AI_PHOTO_NOTE),
+          simAct('사진만으로는 진짜인지 알 수 없다고 판단한다', true, '정답이에요. 세 장 모두 AI로 만든 사진입니다. ' + SIM_AI_PHOTO_TIP),
+        ] },
+      { sys: '2주 동안 매일 다정한 메시지가 왔어요', msgs: ['우리 이제 믿는 사이잖아요 ❤️', '제가 하는 투자 앱 알려 드릴게요. 같이 해요.'],
+        choices: [
+          simAct('앱을 설치하고 소액을 넣어 본다', false, '친밀해진 뒤 투자를 권하는 것은 대표적인 수법이에요.'),
+          simSay('만난 적 없는 사람과 돈 얘기는 안 할게요', true, '좋아요. 돈 얘기가 나오면 사진이 진짜인지와 상관없이 멈추세요.'),
+        ] },
+      { msgs: ['영상통화는 회사 규정 때문에 어려워요 😢', '저를 못 믿는 거예요? 오늘까지만 할인돼요.'],
+        choices: [
+          simAct('믿음을 보여 주려고 입금한다', false, '죄책감과 시간 압박으로 판단을 흐리게 하는 말이에요.'),
+          simAct('가족이나 친구에게 보여 주고 상의한다', true, '정답이에요. 다른 사람의 눈으로 보면 이상한 점이 잘 보여요.'),
+        ] },
+      { msgs: ['그동안 나눈 대화를 주변에 다 알릴 거예요.'],
+        choices: [
+          simAct('돈을 보내지 않고 증거를 저장해 112에 신고한다', true, '정답이에요. 협박에 돈을 보내도 요구가 끝나지 않을 수 있어요.'),
+          simAct('무서우니 대화를 지운다', false, '대화 기록은 신고할 때 증거가 돼요. 지우지 말고 저장하세요.'),
+        ] },
+    ],
+    signals: ['먼저 온 DM', '사진으로 신뢰 유도', '급격한 친밀감', '투자 권유', '영상통화 회피', '협박'],
   },
   loan: {
     title: '저금리로 갈아타세요', tag: '대출 사기', icon: 'banknote', color: '#0E9F8E', soft: '#E3F7F4',
@@ -413,6 +450,9 @@ function simBubble(m) {
   if (m.photo) {
     return `<div class="bubble sim-photo"><img src="${m.photo}" alt="사칭에 쓰인 사진 예시" onerror="this.remove()"><small>${m.caption}</small><em>사칭 예시 · 실제 배우와 무관</em></div>`;
   }
+  if (m.gallery) {
+    return `<div class="bubble sim-gallery">${m.gallery.map((src, i) => `<figure><img src="${src}" alt="상대가 보낸 사진 ${i + 1}"><figcaption>${i + 1}번</figcaption><em>AI 생성</em></figure>`).join('')}</div>`;
+  }
   return `<div class="bubble ${/https?:\/\//.test(m) ? 'link' : ''}">${m}</div>`;
 }
 
@@ -448,6 +488,8 @@ simStep = function () {
 const baseSimChoose = simChoose;
 simChoose = function (j) {
   const ch = sim.s.steps[sim.i].choices[j];
+  // 답을 고르면 사진이 모두 AI로 만든 것임을 표시합니다.
+  document.querySelectorAll('.sim-gallery').forEach((el) => el.classList.add('revealed'));
   if (!ch.act) return baseSimChoose(j);
   baseSimChoose(j);
   const sent = $('#chat').querySelector('.msg.me:last-child');

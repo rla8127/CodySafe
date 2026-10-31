@@ -1,0 +1,10 @@
+# CPU torch: pip install --index-url https://download.pytorch.org/whl/cpu torch
+torch
+sentence-transformers
+elasticsearch>=8.17,<9
+anthropic
+pypdf
+python-dotenv
+fastapi
+uvicorn[standard]
+httpx

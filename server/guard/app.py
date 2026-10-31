@@ -9,13 +9,13 @@ from pathlib import PurePosixPath
 
 from fastapi.concurrency import run_in_threadpool
 from fastapi import BackgroundTasks, Depends, FastAPI, Header, HTTPException, Query, Request
-from fastapi.responses import FileResponse, PlainTextResponse, RedirectResponse
+from fastapi.responses import FileResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-from . import config, dashboard, db, llm, passphrase, pipeline, providers, reports, samples, sim_api
+from . import config, dashboard, db, llm, passphrase, pet, pipeline, providers, reports, samples, sim_api, stt_client, tracing
 from .sim.schema import PRESETS, AgeBand
 from .lock_apps import LOCK_APPS
 from .scam_kb import BY_ID, OTHER_SCAM, VOICE_PHISHING
@@ -32,9 +32,9 @@ async def lifespan(_: FastAPI):
     db.init()
     if config.DEMO_FAMILY:
         db.seed_demo_family()
-        db.seed_demo_analytics()
     config.LOCAL_AUDIO_DIR.mkdir(parents=True, exist_ok=True)
     yield
+    tracing.shutdown()
 
 
 # uvicorn 기본 설정에서는 guard 로그의 INFO가 보이지 않습니다.
@@ -163,6 +163,10 @@ class ReviewIn(BaseModel):
     reason: str | None = Field(default=None, max_length=40)
 
 
+class QuizAnswerIn(BaseModel):
+    is_scam: bool
+
+
 class TrainingIn(BaseModel):
     scenario: str = Field(min_length=1, max_length=40)
     tag: str = Field(min_length=1, max_length=30)
@@ -172,6 +176,11 @@ class TrainingIn(BaseModel):
 @app.get("/healthz")
 def healthz():
     return {"ok": True, "storage": config.STORAGE, "stt": config.STT, "llm": config.LLM, "embed": config.EMBED, "keep_audio": config.KEEP_AUDIO}
+
+
+@app.get("/healthz/stt")
+def stt_health():
+    return stt_client.health()
 
 
 @app.post("/v1/devices")
@@ -273,7 +282,8 @@ def create_scenario(report_id: int, device: str = Depends(current_device)):
         if not item["rank"]:
             raise HTTPException(403, "top reports only")
         try:
-            scenario = reports.generate(item["title"], item["body"])
+            with tracing.trace("시나리오 생성", metadata={"report": report_id}):
+                scenario = reports.generate(item["title"], item["body"])
         except Exception as exc:
             logging.getLogger("guard.reports").exception("scenario failed")
             raise HTTPException(502, "scenario generation failed") from exc
@@ -389,17 +399,19 @@ def _analyze_sample(sample_id: str) -> dict:
     # 로그인 없는 랜딩에서도 부르므로 동시에 눌러도 샘플당 한 번만 분석합니다.
     with _sample_lock:
         if sample_id not in _sample_results:
-            text = samples.transcript(sample)
-            result = llm.analyze(text)
-            _sample_results[sample_id] = {
-                "status": "done",
-                "label": result["label"],
-                "confidence": result["confidence"],
-                "review_label": None,
-                "evidence": result["evidence"],
-                "matches": pipeline.public_matches(pipeline.find_matches(result, text)),
-                "expected": sample["expected"],
-            }
+            with tracing.trace("예시 통화 분석", metadata={"sample": sample_id}):
+                text = samples.transcript(sample)
+                result = llm.analyze(text)
+                _sample_results[sample_id] = {
+                    "status": "done",
+                    "label": result["label"],
+                    "confidence": result["confidence"],
+                    "scam_type": result["scam_type"],
+                    "review_label": None,
+                    "evidence": result["evidence"],
+                    "matches": pipeline.public_matches(pipeline.find_matches(result, text)),
+                    "expected": sample["expected"],
+                }
         return _sample_results[sample_id]
 
 
@@ -408,9 +420,27 @@ def list_samples(_: str = Depends(current_device)):
     return {"items": samples.SAMPLES}
 
 
+def _record_sample(device: str, sample_id: str, result: dict) -> None:
+    """검사 결과 목록에 예시로 남깁니다. 가족 알림, 잠금, 통계, 데이터셋에는 영향을 주지 않습니다."""
+    with db.connect() as conn:
+        conn.execute(
+            "INSERT INTO recordings (id, device_id, client_key, filename, s3_key, upload_token, status, label, confidence, scam_type, evidence, matches, created_at)"
+            " VALUES (?, ?, ?, ?, '', '', 'done', ?, ?, ?, ?, ?, ?)"
+            " ON CONFLICT (device_id, client_key) DO UPDATE SET created_at = excluded.created_at",
+            (
+                uuid.uuid4().hex, device, f"{db.SAMPLE_KEY_PREFIX}{sample_id}", samples.BY_ID[sample_id]["title"],
+                result["label"], result["confidence"], result["scam_type"],
+                json.dumps(result["evidence"], ensure_ascii=False), json.dumps(result["matches"], ensure_ascii=False), db.now(),
+            ),
+        )
+
+
 @app.post("/v1/samples/{sample_id}/analyze")
-def analyze_sample(sample_id: str, _: str = Depends(current_device)):
-    return _analyze_sample(sample_id)
+def analyze_sample(sample_id: str, record: bool = False, device: str = Depends(current_device)):
+    result = _analyze_sample(sample_id)
+    if record:
+        _record_sample(device, sample_id, result)
+    return result
 
 
 @app.get("/v1/demo/samples")
@@ -529,6 +559,7 @@ def create_recording(body: RecordingIn, device: str = Depends(current_device)):
     allowed = {
         "text": config.TEXT_EXTENSIONS,
         "openai": config.OPENAI_STT_EXTENSIONS,
+        "server": config.OPENAI_STT_EXTENSIONS,
     }.get(config.STT, config.AUDIO_EXTENSIONS)
     if ext not in allowed:
         raise HTTPException(415, f"unsupported format: {ext}")
@@ -613,7 +644,9 @@ def delete_recording(rec_id: str, device: str = Depends(current_device)):
         conn.execute("DELETE FROM alerts WHERE recording_id = ?", (rec_id,))
         conn.execute("DELETE FROM recording_feedback WHERE recording_id = ?", (rec_id,))
         conn.execute("DELETE FROM review_dataset WHERE recording_id = ?", (rec_id,))
-    providers.delete_audio(row["s3_key"])
+    # 예시 통화는 음성 파일이 없습니다.
+    if row["s3_key"]:
+        providers.delete_audio(row["s3_key"])
     return {"ok": True}
 
 
@@ -638,6 +671,7 @@ def ack(alert_id: int, device: str = Depends(current_device)):
     with db.connect() as conn:
         if conn.execute("UPDATE alerts SET acked = 1 WHERE id = ? AND guardian_id = ? AND acked = 0", (alert_id, device)).rowcount:
             db.log_event(conn, device, "alert_ack")
+            pet.record_alert_check(conn, device)
     return {"ok": True}
 
 
@@ -652,6 +686,8 @@ def review(rec_id: str, body: ReviewIn, device: str = Depends(current_device)):
             raise HTTPException(404)
         if row["status"] != "done":
             raise HTTPException(409, "not analyzed")
+        if row["client_key"].startswith(db.SAMPLE_KEY_PREFIX):
+            raise HTTPException(409, "sample")
         scam_type = body.scam_type or row["scam_type"]
         # 사람이 확인한 라벨입니다. 글자 기록은 넣지 않아 정상 통화 내용 없이도 오탐률을 잴 수 있습니다.
         conn.execute(
@@ -680,7 +716,7 @@ def review(rec_id: str, body: ReviewIn, device: str = Depends(current_device)):
     return {"ok": True, "in_dataset": in_dataset}
 
 
-# ---------- 대시보드: 사용자는 자기 기록만, 관리자는 개인을 알 수 없는 집계만 봅니다 ----------
+# ---------- 대시보드: 사용자는 자기 기록만 봅니다 ----------
 @app.post("/v1/training")
 def save_training(body: TrainingIn, device: str = Depends(current_device)):
     with db.connect() as conn:
@@ -688,45 +724,35 @@ def save_training(body: TrainingIn, device: str = Depends(current_device)):
             "INSERT INTO training_results (device_id, scenario, tag, score, created_at) VALUES (?, ?, ?, ?, ?)",
             (device, body.scenario, body.tag, body.score, db.now()),
         )
-    return {"ok": True}
+        return {"ok": True, "pet": pet.record_training(conn, device, body.scenario)}
+
+
+# ---------- 가족 마스코트와 저녁 식탁 퀴즈 ----------
+@app.get("/v1/pet")
+def pet_status(device: str = Depends(current_device)):
+    with db.connect() as conn:
+        return pet.status(conn, device)
+
+
+@app.get("/v1/quiz")
+def quiz_view(device: str = Depends(current_device)):
+    with db.connect() as conn:
+        return pet.quiz(conn, device)
+
+
+@app.post("/v1/quiz/{card_id}/answer")
+def quiz_answer(card_id: str, body: QuizAnswerIn, device: str = Depends(current_device)):
+    with db.connect() as conn:
+        result = pet.answer(conn, device, card_id, body.is_scam)
+    if result is None:
+        raise HTTPException(404)
+    return result
 
 
 @app.get("/v1/dashboard/me")
 def my_dashboard(device: str = Depends(current_device)):
     with db.connect() as conn:
         return dashboard.user(conn, device)
-
-
-@app.get("/v1/admin/dashboard")
-def admin_dashboard(include_demo: bool = True):
-    with db.connect() as conn:
-        return dashboard.admin(conn, include_demo)
-
-
-@app.get("/v1/admin/ops")
-def admin_ops(hours: int = 168, include_demo: bool = True):
-    if hours not in dashboard.RANGES:
-        raise HTTPException(400, "unknown range")
-    with db.connect() as conn:
-        return dashboard.ops(conn, hours, include_demo, db.now())
-
-
-@app.get("/v1/admin/feedback-dataset.jsonl", response_class=PlainTextResponse)
-def export_feedback():
-    with db.connect() as conn:
-        rows = conn.execute(
-            "SELECT model_label, model_confidence, human_label, reason, scam_type, created_at FROM recording_feedback ORDER BY created_at"
-        ).fetchall()
-    return "\n".join(json.dumps(dict(r), ensure_ascii=False) for r in rows)
-
-
-@app.get("/v1/admin/review-dataset.jsonl", response_class=PlainTextResponse)
-def export_dataset(x_admin_token: str = Header(default="")):
-    if not config.DATASET_TOKEN or not hmac.compare_digest(config.DATASET_TOKEN, x_admin_token):
-        raise HTTPException(403)
-    with db.connect() as conn:
-        rows = conn.execute("SELECT * FROM review_dataset ORDER BY created_at").fetchall()
-    return "\n".join(json.dumps(dict(r), ensure_ascii=False) for r in rows)
 
 
 # ---------- 모의 훈련 v2: 대본 그래프·판정·안심 대응 점수 (server/guard/sim_api.py) ----------

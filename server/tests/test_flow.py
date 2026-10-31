@@ -12,7 +12,6 @@ os.environ.update(
     GUARD_STT="text",
     GUARD_LLM="rule",
     GUARD_EMBED="hash",
-    GUARD_ADMIN_TOKEN="admin",
 )
 
 import pytest
@@ -85,12 +84,13 @@ def test_other_scam_review_goes_to_separate_dataset(client):
     rec = send(client, p, INVEST, "inv")
     assert rec["label"] == "other_scam" and rec["needs_review"]
     assert client.get("/v1/alerts", headers=g).json()["items"] == []
-    assert client.get("/v1/admin/review-dataset.jsonl").status_code == 403
     assert client.post(f"/v1/recordings/{rec['id']}/review", headers=p, json={"label": "other_scam"}).json()["in_dataset"]
-    dump = client.get("/v1/admin/review-dataset.jsonl", headers={"X-Admin-Token": "admin"}).text
-    assert rec["id"] in dump and "리딩방" in dump
+    with db.connect() as conn:
+        row = conn.execute("SELECT transcript FROM review_dataset WHERE recording_id = ?", (rec["id"],)).fetchone()
+    assert "리딩방" in row["transcript"]
     assert client.post(f"/v1/recordings/{rec['id']}/review", headers=p, json={"label": "normal"}).json()["in_dataset"] is False
-    assert rec["id"] not in client.get("/v1/admin/review-dataset.jsonl", headers={"X-Admin-Token": "admin"}).text
+    with db.connect() as conn:
+        assert not conn.execute("SELECT 1 FROM review_dataset WHERE recording_id = ?", (rec["id"],)).fetchone()
 
 
 def test_normal_call_keeps_no_transcript_and_audio_is_deleted(client):
@@ -316,6 +316,22 @@ def test_samples_show_result_without_touching_records_alerts_or_lock(client):
     assert client.get("/v1/lock", headers=p).json()["locked"] is False
 
 
+def test_recorded_sample_shows_as_example_without_side_effects(client):
+    p, g = linked(client)
+    first = client.post("/v1/samples/prosecutor/analyze?record=1", headers=p).json()
+    client.post("/v1/samples/prosecutor/analyze?record=1", headers=p)
+    items = client.get("/v1/recordings", headers=p).json()["items"]
+    assert len(items) == 1 and items[0]["sample"] is True
+    assert items[0]["label"] == first["label"] and items[0]["evidence"] == first["evidence"] and items[0]["matches"] == first["matches"]
+    assert client.post(f"/v1/recordings/{items[0]['id']}/review", headers=p, json={"label": "normal"}).status_code == 409
+    assert client.get("/v1/alerts", headers=g).json()["items"] == []
+    assert client.get("/v1/lock", headers=p).json()["locked"] is False
+    assert client.get("/v1/recommendations", headers=p).json()["analyzed"] == 0
+    assert client.get("/v1/dashboard/me", headers=p).json()["calls"]["total"] == 0
+    assert client.delete(f"/v1/recordings/{items[0]['id']}", headers=p).status_code == 200
+    assert client.get("/v1/recordings", headers=p).json()["items"] == []
+
+
 def test_s3_mode_keeps_voice_per_device_and_deletes_after_analysis(client, monkeypatch):
     from guard import providers
 
@@ -435,7 +451,7 @@ def test_keep_audio_stores_after_analysis_until_user_deletes(client, monkeypatch
     assert not path.exists()
 
 
-def test_feedback_and_dashboards_separate_user_and_admin(client):
+def test_feedback_and_user_dashboard(client):
     with db.connect() as conn:
         for table in ("recording_feedback", "training_results", "response_events"):
             conn.execute(f"DELETE FROM {table}")
@@ -455,26 +471,14 @@ def test_feedback_and_dashboards_separate_user_and_admin(client):
     assert me["training"]["count"] == 3 and [w["scenario"] for w in me["training"]["weak"]] == ["loan"]
     assert me["calls"]["confirmed"] == 2
     assert client.get("/v1/dashboard/me", headers=b).json()["training"]["count"] == 0
-    # 대시보드는 비밀번호 없이 열리지만 이름과 통화 내용은 없습니다.
-    assert client.get("/v1/admin/dashboard").status_code == 200
-    admin = {"X-Admin-Token": "admin"}
-    data = client.get("/v1/admin/dashboard", headers=admin).json()
-    fb = data["feedback"]
-    assert fb["confirmed"] == 3 and fb["false_alarm_n"] == [1, 2] and fb["false_alarm_rate"] == 50.0
-    assert fb["miss_n"] == [1, 2] and fb["small_sample"] is True
-    text = client.get("/v1/admin/dashboard", headers=admin).text + client.get("/v1/admin/feedback-dataset.jsonl", headers=admin).text
-    assert "대시A" not in text and "수사관" not in text and "device_id" not in text
     # 사용자가 기록을 지우면 라벨도 함께 지워집니다.
     client.delete(f"/v1/recordings/{normal['id']}", headers=a)
-    assert client.get("/v1/admin/dashboard", headers=admin).json()["feedback"]["confirmed"] == 2
+    assert client.get("/v1/dashboard/me", headers=a).json()["calls"]["confirmed"] == 1
 
 
-def test_transcript_dataset_can_use_stronger_token_than_dashboard(client, monkeypatch):
-    monkeypatch.setattr(config, "DATASET_TOKEN", "strong")
-    weak, strong = {"X-Admin-Token": "admin"}, {"X-Admin-Token": "strong"}
-    assert client.get("/v1/admin/dashboard", headers=weak).status_code == 200
-    assert client.get("/v1/admin/review-dataset.jsonl", headers=weak).status_code == 403
-    assert client.get("/v1/admin/review-dataset.jsonl", headers=strong).status_code == 200
+def test_admin_api_is_removed(client):
+    for path in ("dashboard", "ops", "feedback-dataset.jsonl", "review-dataset.jsonl"):
+        assert client.get(f"/v1/admin/{path}").status_code == 404
 
 
 def test_landing_demo_runs_only_fixed_samples_without_login(client):
@@ -484,33 +488,122 @@ def test_landing_demo_runs_only_fixed_samples_without_login(client):
     assert client.post("/v1/demo/samples/none/analyze").status_code == 404
 
 
-def test_ops_finds_surge_masks_numbers_and_excludes_normal_calls(client):
-    import sqlite3
+def test_one_analysis_is_one_trace_and_other_requests_add_none(client, monkeypatch):
+    from contextlib import contextmanager
+    from types import SimpleNamespace as NS
 
-    from guard import dashboard
+    from guard import tracing
+
+    names = []
+
+    @contextmanager
+    def trace(name, **_):
+        names.append(name)
+        yield NS(update=lambda **f: None)
+
+    monkeypatch.setattr(tracing, "trace", trace)
+    h = device(client, "요청")
+    client.get("/v1/lock", headers=h)
+    send(client, h, NORMAL, "trace")
+    assert names == ["통화 분석"]
+
+
+def _quiz_answers(client, headers, right=True):
+    from guard.quiz_cards import BY_ID
+
+    gained = 0
+    for card in client.get("/v1/quiz", headers=headers).json()["cards"]:
+        is_scam = BY_ID[card["id"]]["is_scam"] == right
+        gained += client.post(f"/v1/quiz/{card['id']}/answer", headers=headers, json={"is_scam": is_scam}).json()["gained"]
+    return gained
+
+
+def test_pet_grows_from_training_with_daily_limit_and_new_scenario_bonus(client):
+    p, g = linked(client)
+    start = client.get("/v1/pet", headers=p).json()
+    assert start["xp"] == 0 and start["stage_name"] == "아기 코디" and start["mood"]["key"] == "green"
+    assert device(client, "혼자") and client.get("/v1/pet", headers=device(client, "혼자")).json()["stage_name"] == "알"
+    first = client.post("/v1/training", headers=p, json={"scenario": "agency", "tag": "기관 사칭", "score": 0}).json()["pet"]
+    assert first["gained"] == 30
+    assert client.post("/v1/training", headers=p, json={"scenario": "agency", "tag": "기관 사칭", "score": 100}).json()["pet"]["gained"] == 0
+    assert client.post("/v1/training", headers=p, json={"scenario": "loan", "tag": "대출 사기", "score": 100}).json()["pet"]["gained"] == 10
+    # 가족이 한 마리를 함께 키웁니다.
+    assert client.get("/v1/pet", headers=g).json()["xp"] == 40
+
+
+def test_pet_mood_shows_only_suspicion_to_family_and_turns_blue_after_check(client):
+    p, g = linked(client)
+    with db.connect() as conn:
+        protected_id, guardian_id = (
+            conn.execute("SELECT id FROM devices WHERE token = ?", (h["Authorization"].removeprefix("Bearer "),)).fetchone()["id"] for h in (p, g)
+        )
+        conn.execute(
+            "INSERT INTO recordings (id, device_id, client_key, filename, s3_key, upload_token, status, needs_review, created_at)"
+            " VALUES ('uncertain', ?, 'k', 'f', 's', 't', 'done', 1, ?)",
+            (protected_id, db.now()),
+        )
+    # 애매한 통화는 본인만 노랑으로 보고 가족에게는 드러나지 않습니다.
+    assert client.get("/v1/pet", headers=p).json()["mood"]["key"] == "yellow"
+    assert client.get("/v1/pet", headers=g).json()["mood"]["key"] == "green"
+    with db.connect() as conn:
+        alert = conn.execute(
+            "INSERT INTO alerts (guardian_id, protected_id, recording_id, title, body, created_at) VALUES (?, ?, 'r1', 't', 'b', ?)",
+            (guardian_id, protected_id, db.now()),
+        ).lastrowid
+    seen = client.get("/v1/pet", headers=g).json()
+    assert seen["mood"]["key"] == "red" and "r1" not in str(seen)
+    assert client.post(f"/v1/alerts/{alert}/ack", headers=g).status_code == 200
+    after = client.get("/v1/pet", headers=g).json()
+    assert after["mood"]["key"] == "blue" and after["xp"] == 30
+
+
+def test_quiz_hides_answers_until_answered_and_reveals_when_family_done(client):
+    p, g = linked(client)
+    view = client.get("/v1/quiz", headers=p).json()
+    assert len(view["cards"]) == 3 and all("is_scam" not in c and "why" not in c for c in view["cards"])
+    assert client.post("/v1/quiz/none/answer", headers=p, json={"is_scam": True}).status_code == 404
+    assert _quiz_answers(client, p) == 25
+    waiting = client.get("/v1/quiz", headers=p).json()
+    assert waiting["finished"] and not waiting["reveal"] and waiting["dishes"] is None
+    assert [m["score"] for m in waiting["members"] if not m["me"]] == [None]
+    # 다시 답해도 점수와 정답 기록은 바뀌지 않습니다.
+    assert _quiz_answers(client, p, right=False) == 0
+    assert _quiz_answers(client, g, right=False) == 40
+    done = client.get("/v1/quiz", headers=g).json()
+    assert done["reveal"] and done["dishes"] == "자녀"
+    assert client.get("/v1/pet", headers=g).json()["xp"] == 65
+
+
+def test_weekly_quiz_always_mixes_scam_and_normal():
+    from guard import pet
+
+    for week in range(1, 53):
+        cards = pet.week_cards(f"2026-W{week:02d}")
+        kinds = {c["is_scam"] for c in cards}
+        assert len({c["id"] for c in cards}) == 3 and kinds == {True, False}
+
+
+def test_quiz_cards_clue_appears_in_text():
+    from guard.quiz_cards import CARDS
+
+    assert len(CARDS) == 15
+    for card in CARDS:
+        assert card["clue"] in card["text"], card["id"]
+    # 발신자만 보고 찍을 수 없어야 합니다.
+    assert not any(card["sender"] == "모르는 번호" for card in CARDS)
+    scam_senders = {card["sender"] for card in CARDS if card["is_scam"]}
+    assert scam_senders & {card["sender"] for card in CARDS if not card["is_scam"]}
+
+
+def test_quiz_ignores_answers_to_retired_cards(client):
+    p = device(client, "교체")
+    from guard import pet
 
     with db.connect() as conn:
-        for table in ("recordings", "recording_feedback", "response_events"):
-            conn.execute(f"DELETE FROM {table}")
-    db.seed_demo_analytics()
-    with db.connect() as conn:
-        now = db.now()
-        for i in range(3):
-            db.add_demo_recording(conn, f"n{i}", "demo-seed-1", "통화 01099998888_260101_120000.m4a", "normal", "none", now - 60)
-    admin = {"X-Admin-Token": "admin"}
-    assert client.get("/v1/admin/ops").status_code == 200
-    assert client.get("/v1/admin/ops?hours=5", headers=admin).status_code == 400
-    data = client.get("/v1/admin/ops?hours=168", headers=admin).json()
-    assert any(s["type"] == "family_impersonation" for s in data["surges"])
-    top = data["callers"][0]
-    assert top["number"] == "010-****-1001" and top["calls"] >= 16
-    text = str(data)
-    assert "9998888" not in text and "8888" not in text and "01000001001" not in text
-    assert len(data["heatmap"]) == 7 and len(data["heatmap"][0]) == 24
-    assert data["funnel"][0][0] == "보이스피싱 의심" and data["totals"]["phishing"] > 0
-    empty = client.get("/v1/admin/ops?hours=24&include_demo=false", headers=admin).json()
-    assert empty["totals"]["calls"] == 0 and empty["callers"] == []
-    # 시연 집계용 기기는 가족 목록과 실제 사용자 기록에 섞이지 않습니다.
-    assert sqlite3.connect(config.DB_PATH).execute("SELECT COUNT(*) FROM family_links WHERE protected_id LIKE 'demo-seed-%'").fetchone()[0] == 0
-    assert dashboard._number("통화 김철수_260101_120000.m4a") is None
-    assert dashboard._number("통화 010-1234-5678_260101_120000.m4a") == "01012345678"
+        device_id = conn.execute("SELECT id FROM devices WHERE token = ?", (p["Authorization"].removeprefix("Bearer "),)).fetchone()["id"]
+        conn.execute(
+            "INSERT INTO quiz_answers (device_id, week, card_id, answer, correct, created_at) VALUES (?, ?, 'retired', 1, 0, ?)",
+            (device_id, pet.week_key(), db.now()),
+        )
+    assert client.get("/v1/pet", headers=p).json()["quiz_answered"] == 0
+    assert client.get("/v1/quiz", headers=p).status_code == 200

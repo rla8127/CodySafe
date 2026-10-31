@@ -5,3 +5,5 @@ anthropic[bedrock]
 openai
 pytest
 httpx
+langfuse
+mutagen
