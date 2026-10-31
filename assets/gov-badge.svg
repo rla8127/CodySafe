@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 56" width="48" height="56">
+  <!-- 정부·공공기관 공인 인증 배지 (CodySafe 자체 디자인, 공식 정부 상징 아님) -->
+  <defs>
+    <linearGradient id="gb-shield" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#1E3A8A"/>
+      <stop offset="1" stop-color="#0B1B3F"/>
+    </linearGradient>
+  </defs>
+  <path d="M24 2 L44 9 V27 C44 40 35 49 24 54 C13 49 4 40 4 27 V9 Z" fill="url(#gb-shield)"/>
+  <path d="M24 6 L40 11.6 V27 C40 37.6 32.8 45 24 49.4 C15.2 45 8 37.6 8 27 V11.6 Z" fill="none" stroke="#C9A227" stroke-width="1.2"/>
+  <g transform="translate(12 14)">
+    <circle cx="12" cy="12" r="11" fill="#fff"/>
+    <circle cx="12" cy="12" r="9" fill="#0047A0"/>
+    <path d="M3 12 A9 9 0 0 1 21 12 A4.5 4.5 0 0 1 12 12 A4.5 4.5 0 0 0 3 12 Z" fill="#CD2E3A"/>
+  </g>
+  <path d="M17 41 L21.5 45 L31 37" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>
