@@ -24,19 +24,21 @@ async function api(method, path, body) {
   return res.json();
 }
 
-const accepted = () => store.get('consented') === '1';
+// 음성 보관 여부가 바뀌면 달라진 내용으로 다시 동의받습니다.
+let keepAudio = false;
+const consentVersion = () => (keepAudio ? '2' : '1');
+const accepted = () => store.get('consented') === consentVersion();
 const signedIn = () => accepted() && !!store.get('token');
 if (store.get('token')) native?.setToken(store.get('token'));
 
 /* ---------------- 시안 화면 제거 ---------------- */
 ['image', 'voice', 'call', 'url', 'verify', 'report', 'generate', 'weakness', 'training', 'copilot', 'checkup'].forEach((k) => delete SCREENS[k]);
-Object.assign(TAB_OF, { home: 'home', sim: 'sim', play: 'sim', detect: 'detect', family: 'family', me: 'me', lock: 'home', passphrase: 'family', report: 'sim' });
+Object.assign(TAB_OF, { home: 'home', sim: 'sim', play: 'sim', detect: 'detect', family: 'family', me: '', lock: 'home', passphrase: 'family', report: 'report' });
 delete PARENT.family;
 PARENT.passphrase = 'family';
-PARENT.report = 'sim';
 
 renderTabs = function (on) {
-  const tabs = [['home', 'house', '홈'], ['sim', 'gamepad-2', '체험'], ['detect', 'shield-check', '검사'], ['family', 'users', '가족'], ['me', 'user-round', 'MY']];
+  const tabs = [['home', 'house', '홈'], ['sim', 'gamepad-2', '체험'], ['detect', 'shield-check', '검사'], ['report', 'messages-square', '커뮤니티'], ['family', 'users', '가족']];
   // 시작 전에는 아직 쓸 수 없는 탭을 보여 주지 않습니다.
   if (!signedIn()) {
     $('#tabbar').classList.add('hidden');
@@ -75,6 +77,16 @@ const DEMO_LABEL = { me: '나', dad: '아빠', mom: '엄마', brother: '형', un
 let demoMembers = [];
 
 /* 웹 시연에서는 등록된 가족 중 한 명을 고릅니다. 앱은 항상 직접 등록합니다. */
+async function loadServerInfo() {
+  try {
+    const info = await (await fetch('/healthz')).json();
+    if (info.keep_audio !== keepAudio) {
+      keepAudio = info.keep_audio;
+      render();
+    }
+  } catch (e) { }
+}
+
 async function loadDemoFamily() {
   if (native) return;
   try {
@@ -175,11 +187,11 @@ function onboardingPage() {
       <div class="brand-hero"><img src="assets/brand/logo-vertical.png" alt="Cody Safe"></div>
       <div class="lead-text">AI 사기는 <em>미리 경험</em>하고,<br>가족과 <em>함께</em> 막아요</div>
       <div class="card"><ul class="notice">
-        ${['앱이 통화를 직접 녹음하지 않고, 이미 저장된 파일만 읽습니다.', '폴더를 연결한 뒤에 생긴 파일만 서버로 보냅니다.', '음성은 분석 후 삭제하고, 일상 통화는 글자 기록도 남기지 않습니다.', '사기로 의심되는 통화의 글자 기록은 검토를 위해 보관합니다.', '분석 내용은 본인만 봅니다. 가족에게는 보이스피싱 의심 여부만 알립니다.']
+        ${['앱이 통화를 직접 녹음하지 않고, 이미 저장된 파일만 읽습니다.', '폴더를 연결한 뒤에 생긴 파일만 서버로 보냅니다.', (keepAudio ? '음성은 분석 후에도 사용자별로 저장되며, 기록을 삭제하면 함께 지워집니다. 일상 통화는 글자 기록을 남기지 않습니다.' : '음성은 분석 후 삭제하고, 일상 통화는 글자 기록도 남기지 않습니다.'), '사기로 의심되는 통화의 글자 기록은 검토를 위해 보관합니다.', '분석 내용은 본인만 봅니다. 가족에게는 보이스피싱 의심 여부만 알립니다.']
           .map((t) => `<li>${ic('circle-check')}<span>${t}</span></li>`).join('')}
       </ul></div>
       <div class="card soft-warn">통화 상대의 음성도 함께 전송됩니다. 테스트 버전이므로 동의한 사람의 통화나 테스트 파일로만 사용하세요.</div>
-      <button class="btn grad block mt" onclick="store.set('consented','1');render()">동의하고 시작</button>
+      <button class="btn grad block mt" onclick="store.set('consented',consentVersion());render()">동의하고 시작</button>
     </div>`;
   }
   if (demoMembers.length) return demoPicker();
@@ -316,7 +328,7 @@ function deleteSheet(id) {
 /* ---------------- 홈 ---------------- */
 SCREENS.home = gated(() => `<div class="page">
   <div class="brand-bar"><img src="assets/brand/logo-horizontal.png" alt="Cody Safe">
-    <button class="brand-bell" onclick="go('family')" aria-label="가족 경고">${ic('bell')}</button></div>
+    <span class="brand-actions"><button class="brand-bell" onclick="go('family')" aria-label="가족 경고">${ic('bell')}</button><button class="brand-bell" onclick="go('me')" aria-label="MY">${ic('user-round')}</button></span></div>
   <div class="home-greeting">${ROLE_INFO[store.get('role')] ? `<span class="role-av big">${ROLE_INFO[store.get('role')].icon}</span>` : ''}안녕하세요${store.get('name') ? `, ${esc(store.get('name'))}님` : ''}</div>
   <div class="home-sub">오늘도 함께 살펴볼게요.</div>
   <div id="data"></div>
@@ -379,7 +391,7 @@ async function loadReportScenarios() {
 }
 
 SCREENS.report = gated(() => `<div class="page">
-  <div class="lead" style="margin-top:6px">사기 제보</div>
+  <div class="lead" style="margin-top:6px">커뮤니티</div>
   <div class="lead-sub" style="margin-top:6px">새 수법이 제보될수록 방어 훈련도 함께 늘어납니다. 추천 상위 3개 제보는 체험 시나리오로 만들 수 있어요.</div>
   <button class="btn grad block mt" onclick="reportSheet()">${ic('pencil')}내가 겪은 수법 제보하기</button>
   <div class="muted small report-note">이용자 제보이며 사실 확인 전입니다. 추천 수는 공식 피해 통계가 아닙니다.</div>
@@ -968,7 +980,7 @@ SCREENS.me = gated(() => `<div class="page">
   <button class="btn ghost block mt" onclick="go('lock')">${ic('lock')}금융 앱 잠금</button>
   <div class="sec-title">데이터 처리</div>
   <div class="card"><ul class="notice">
-    ${['음성은 분석 후 삭제합니다. 실패한 음성은 재시도나 삭제 전까지 남습니다.', '일상 통화는 글자 기록을 남기지 않습니다.', '분석 내용은 본인만 볼 수 있습니다.', '가족에게는 보이스피싱 의심 여부만 전달됩니다.'].map((t) => `<li>${ic('lock')}<span>${t}</span></li>`).join('')}
+    ${[keepAudio ? '음성은 사용자별로 저장되며, 기록을 삭제하면 함께 지워집니다.' : '음성은 분석 후 삭제합니다. 실패한 음성은 재시도나 삭제 전까지 남습니다.', '일상 통화는 글자 기록을 남기지 않습니다.', '분석 내용은 본인만 볼 수 있습니다.', '가족에게는 보이스피싱 의심 여부만 전달됩니다.'].map((t) => `<li>${ic('lock')}<span>${t}</span></li>`).join('')}
   </ul></div>
   ${browserNotifyBlock()}
   <button class="btn line block mt" onclick="signOut()">${demoMembers.length ? '다른 가족으로 보기' : '이 기기 등록 해제'}</button>
@@ -993,7 +1005,7 @@ function signOut() {
 
 /* ---------------- 체험: 검증되지 않은 수치와 없는 화면 연결 제거 ---------------- */
 const baseSim = SCREENS.sim;
-SCREENS.sim = () => baseSim().replace('<div class="sec-title">전체 시나리오', `<button class="card report-entry" onclick="go('report')"><span class="icon-box" style="background:var(--pri-soft);color:var(--pri)">${ic('megaphone')}</span><span class="grow"><b>사기 제보</b><small>새 수법을 제보하고, 상위 제보로 훈련을 만들어요</small></span>${ic('chevron-right')}</button><div class="sec-title">전체 시나리오`)
+SCREENS.sim = () => baseSim()
   .replace('🔥 이번 주 가장 많이 당한 수법', '대표 수법 체험')
   .replace('기관 사칭 · 평균 정답률 41% · 4분', '기관 사칭 · 3분')
   .replace('내 선택에 따라 사기범의 대화가 달라집니다.', '선택할 때마다 왜 위험한지 바로 알려 드립니다.')
@@ -1090,6 +1102,7 @@ render();
 pollAlerts();
 pollLock();
 restoreFolder().then(scanFolder);
+loadServerInfo();
 loadDemoFamily();
 // 제보 시나리오 주소로 바로 들어온 경우 시나리오를 먼저 불러온 뒤 다시 그립니다.
 loadReportScenarios().then(() => { if (route().r === 'play' || route().r === 'sim') render(); }).catch(() => {});

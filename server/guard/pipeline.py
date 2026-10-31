@@ -26,6 +26,11 @@ def _notify_family(rec_id: str, protected_id: str) -> None:
             )
 
 
+def _finish_audio(key: str) -> None:
+    if not config.KEEP_AUDIO:
+        providers.delete_audio(key)
+
+
 def find_matches(result: dict, transcript: str) -> list[dict]:
     if result["label"] == VOICE_PHISHING:
         return rag.retrieve(f"{result['summary']}\n{transcript}")
@@ -44,7 +49,7 @@ def process(rec_id: str) -> None:
         transcript = providers.transcribe(rec_id, row["s3_key"])
         if not transcript:
             _set(rec_id, status="done", label="uncertain", confidence=0.0, scam_type="none", summary="음성에서 말을 찾지 못했습니다.")
-            providers.delete_audio(row["s3_key"])
+            _finish_audio(row["s3_key"])
             return
 
         _set(rec_id, status="analyzing")
@@ -75,7 +80,7 @@ def process(rec_id: str) -> None:
             with db.connect() as conn:
                 db.extend_lock(conn, row["device_id"], config.LOCK_SECONDS)
         # 분석이 끝난 뒤에 지워야 LLM 실패 시 다시 시도할 수 있습니다.
-        providers.delete_audio(row["s3_key"])
+        _finish_audio(row["s3_key"])
     except Exception as exc:
         log.exception("recording %s failed", rec_id)
         _set(rec_id, status="failed", error=f"{type(exc).__name__}: {exc}"[:500])

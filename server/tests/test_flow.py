@@ -417,3 +417,18 @@ def test_reports_mask_private_data_hide_author_and_only_top_three_generate(clien
     for n in range(4):
         assert client.post("/v1/reports", headers=a, json={"category": "기타", "title": f"반복 제보 {n}", "body": "하루 제한을 확인하는 제보입니다"}).status_code == 200 or n == 3
     assert client.post("/v1/reports", headers=a, json={"category": "기타", "title": "초과 제보", "body": "하루 제한을 넘는 제보입니다"}).status_code == 429
+
+
+def test_keep_audio_stores_after_analysis_until_user_deletes(client, monkeypatch):
+    monkeypatch.setattr(config, "KEEP_AUDIO", True)
+    assert client.get("/healthz").json()["keep_audio"] is True
+    h = device(client, "보관")
+    rec = send(client, h, NORMAL, "keep")
+    assert rec["status"] == "done"
+    import sqlite3
+
+    key = sqlite3.connect(config.DB_PATH).execute("SELECT s3_key FROM recordings WHERE id = ?", (rec["id"],)).fetchone()[0]
+    path = config.LOCAL_AUDIO_DIR / key.replace("/", "_")
+    assert path.exists()
+    assert client.delete(f"/v1/recordings/{rec['id']}", headers=h).status_code == 200
+    assert not path.exists()

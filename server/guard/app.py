@@ -123,7 +123,7 @@ class ReviewIn(BaseModel):
 
 @app.get("/healthz")
 def healthz():
-    return {"ok": True, "storage": config.STORAGE, "stt": config.STT, "llm": config.LLM, "embed": config.EMBED}
+    return {"ok": True, "storage": config.STORAGE, "stt": config.STT, "llm": config.LLM, "embed": config.EMBED, "keep_audio": config.KEEP_AUDIO}
 
 
 @app.post("/v1/devices")

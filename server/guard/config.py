@@ -14,6 +14,8 @@ AWS_REGION = os.getenv("GUARD_AWS_REGION", "ap-northeast-2")
 
 STORAGE = os.getenv("GUARD_STORAGE", "local")  # local | s3
 S3_BUCKET = os.getenv("GUARD_S3_BUCKET", "")
+# 켜면 분석 뒤에도 음성을 저장소에 남깁니다. 앱의 동의 문구도 함께 바뀝니다.
+KEEP_AUDIO = os.getenv("GUARD_KEEP_AUDIO", "0") == "1"
 S3_REGION = os.getenv("GUARD_S3_REGION", AWS_REGION)
 STT = os.getenv("GUARD_STT", "text")  # text | openai | transcribe
 OPENAI_STT_MODEL = os.getenv("GUARD_OPENAI_STT_MODEL", "whisper-1")
