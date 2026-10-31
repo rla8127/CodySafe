@@ -22,7 +22,7 @@ from pydantic import BaseModel, Field
 from . import config, db
 from .sim import engine
 from .sim import score as sim_score
-from .sim.schema import DEFAULT_PRESET, PRESETS, SimProfile, preset_profile
+from .sim.schema import DEFAULT_PRESET, PRESETS, TONE_GUIDE, SimProfile, Tone, preset_profile
 
 log = logging.getLogger("guard.sim")
 
@@ -57,6 +57,7 @@ class ClosingIn(BaseModel):
 
 class TtsIn(BaseModel):
     text: str = Field(min_length=1, max_length=400)
+    tone: Tone | None = None  # 장면 말투(감정). 임대 GPU TTS에 emotion·instruct로 넘긴다
 
 
 # ---------- 프로필 ----------
@@ -159,17 +160,19 @@ def _timeout(name: str, default: float) -> float:
         return default
 
 
-def _tts_path(text: str):
+def _tts_path(text: str, tone: str | None = None):
     voice = os.getenv("SIM_TTS_VOICE", "")
-    return TTS_CACHE / (hashlib.sha256(f"{voice}|{text}".encode()).hexdigest()[:32] + ".audio")
+    return TTS_CACHE / (hashlib.sha256(f"{voice}|{tone or ''}|{text}".encode()).hexdigest()[:32] + ".audio")
 
 
-def call_tts(text: str) -> tuple[bytes, str]:
+def call_tts(text: str, tone: str | None = None) -> tuple[bytes, str]:
     import httpx
 
     url = os.getenv("SIM_TTS_URL", "").strip()
     payload = {"model": os.getenv("SIM_TTS_MODEL", "tts"), "input": text, "text": text,
                "voice": os.getenv("SIM_TTS_VOICE", "default"), "response_format": "wav", "language": "ko"}
+    if tone:
+        payload.update(emotion=tone, instruct=TONE_GUIDE.get(tone, ""))  # 감정을 모르는 서버는 이 두 칸을 무시하면 된다
     r = httpx.post(url, json=payload, headers=_gpu_headers(), timeout=_timeout("SIM_TTS_TIMEOUT", 10))
     r.raise_for_status()
     kind = r.headers.get("content-type", "")
@@ -179,12 +182,12 @@ def call_tts(text: str) -> tuple[bytes, str]:
     return base64.b64decode(data["audio"]), data.get("content_type", "audio/wav")
 
 
-def cached_tts(text: str) -> tuple[bytes, str]:
-    path = _tts_path(text)
+def cached_tts(text: str, tone: str | None = None) -> tuple[bytes, str]:
+    path = _tts_path(text, tone)
     if path.exists():
         kind = (path.with_suffix(".type").read_text() if path.with_suffix(".type").exists() else "audio/wav")
         return path.read_bytes(), kind
-    audio, kind = call_tts(text)
+    audio, kind = call_tts(text, tone)
     TTS_CACHE.mkdir(parents=True, exist_ok=True)
     path.write_bytes(audio)
     path.with_suffix(".type").write_text(kind)
@@ -217,7 +220,7 @@ def warm_gpu() -> None:
             log.info("sim GPU 깨우기(LLM) 실패: %s", type(exc).__name__)
     if tts:
         try:
-            cached_tts("여보세요.")
+            cached_tts("여보세요.", "official")
         except Exception as exc:
             log.info("sim GPU 깨우기(TTS) 실패: %s", type(exc).__name__)
     log.info("sim GPU 깨우기 %dms", int((time.perf_counter() - started) * 1000))
@@ -233,9 +236,9 @@ def prerender(profile: dict) -> None:
             continue
         values = engine.start(graph, prof, seed=0)["values"]
         for node in graph.nodes.values():
-            for line in node.lines + node.pressure:
+            for line, tone in [(x, node.tone) for x in node.lines] + [(x, node.pressure_tone) for x in node.pressure]:
                 try:
-                    cached_tts(engine.render(line, values))
+                    cached_tts(engine.render(line, values), tone)
                 except Exception as exc:
                     log.warning("sim 음성 미리 만들기 실패: %s", type(exc).__name__)
                     return
@@ -350,7 +353,10 @@ def make_router(current_device) -> APIRouter:
         with db.connect() as conn:
             state = _load(conn, sid, device)
             graph = _graph(state)
-            body = {"session_id": sid, "status": state["status"], "current_node": state["node"]}
+            values = state["values"]
+            body = {"session_id": sid, "status": state["status"], "current_node": state["node"], "mode": state["mode"],
+                    "title": graph.title, "persona": {"role": engine.render(graph.persona.role, values),
+                                                      "name": engine.render(graph.persona.name, values)}}
             if state["status"] == "done":
                 body.update(engine.result(graph, state))
                 body["next"] = recommend(conn, device, graph.id)
@@ -390,7 +396,7 @@ def make_router(current_device) -> APIRouter:
             return fallback(501, "tts_not_configured")
         started = time.perf_counter()
         try:
-            audio, kind = cached_tts(body.text)
+            audio, kind = cached_tts(body.text, body.tone)
         except Exception as exc:
             log.warning("sim TTS 실패: %s", type(exc).__name__)
             return fallback(502, "tts_failed")

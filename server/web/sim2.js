@@ -284,7 +284,7 @@ async function s2Resume(sid, mode) {
   if (S2.session && S2.session.session_id === sid) return 'active';
   try {
     const r = await api('GET', `/v1/sim/sessions/${encodeURIComponent(sid)}/result`);
-    S2.session = { session_id: sid, mode, persona: { name: '모르는 번호', role: '' }, scenario: { title: r.title || '' } };
+    S2.session = { session_id: sid, mode, persona: r.persona || { name: '모르는 번호', role: '' }, scenario: { title: r.title || '' } };
     if (r.status === 'done') { S2.result = r; history.replaceState(null, '', '#/sim2result/' + sid); render(); return 'done'; }
     if (r.status === 'closing') { s2ClosingPage(r.terminal, r.closing); return 'closing'; }
     S2.scene = r.scene;
@@ -365,7 +365,7 @@ function s2Items(scene) {
 
 function s2ChatScene(scene, reask) {
   S2.scene = scene;
-  $('#choices').style.display = 'none';
+  s2ChatChoices(scene, reask, true); // 상대가 쓰는 동안 입력창은 잠가 둔다
   s2Progress(scene.turn - 1);
   const items = s2Items(scene);
   items.forEach((m, k) => {
@@ -375,34 +375,49 @@ function s2ChatScene(scene, reask) {
   later(() => s2ChatChoices(scene, reask), items.length * 900 + 250);
 }
 
-function s2ChatChoices(scene, reask) {
+// 아래 입력창: 기본은 직접 답하기, 왼쪽 '선택지'를 누르면 선택지 3개가 펼쳐진다. 알아듣지 못했을 때만 저절로 펼친다.
+function s2ChatChoices(scene, reask, locked) {
   const c = $('#choices');
   if (!c) return;
   c.textContent = '';
   c.style.display = '';
-  const q = s2el('div', 'q');
-  q.append(s2icon('mouse-pointer-click'), document.createTextNode(reask ? '잘 알아듣지 못했어요. 아래에서 골라 주세요' : `어떻게 답할까요? (${scene.turn}/${scene.max_turns})`));
-  c.append(q);
+  c.classList.add('s2-dock');
+  if (reask && !locked) c.append(s2el('div', 's2-reask', '잘 알아듣지 못했어요. 아래 선택지에서 골라 주세요'));
+  const form = s2el('form', 's2-inbar');
+  const pick = s2el('button', 's2-pick');
+  pick.type = 'button';
+  const input = s2el('input', 's2-input');
+  input.maxLength = 300;
+  input.placeholder = locked ? '상대가 쓰는 중…' : '직접 답하기';
+  input.setAttribute('aria-label', '직접 답하기');
+  const send = s2el('button', 's2-send');
+  send.type = 'submit';
+  send.setAttribute('aria-label', '보내기');
+  send.append(s2icon('arrow-up'));
+  form.append(pick, input, send);
+  const list = s2el('div', 's2-picks');
   scene.choices.forEach((ch) => {
     const label = ch.act === 'do' ? `(행동) ${ch.text}` : ch.text;
-    c.append(s2btn('choice', '', label, () => s2Answer({ choice_id: ch.id, input_type: 'choice' }, label)));
+    list.append(s2btn('choice', '', label, () => s2Answer({ choice_id: ch.id, input_type: 'choice' }, label)));
   });
-  const form = s2el('form', 's2-free');
-  const input = s2el('input', 's2-input');
-  input.placeholder = '직접 답하기 (예: 누구세요?)';
-  input.maxLength = 300;
-  const send = s2el('button', 'btn pri sm');
-  send.type = 'submit';
-  send.append(s2icon('send'));
-  form.append(input, send);
+  const setOpen = (open) => {
+    list.hidden = !open;
+    pick.textContent = '';
+    pick.append(s2icon(open ? 'x' : 'list'), document.createTextNode(open ? '닫기' : '선택지'));
+    pick.setAttribute('aria-expanded', open ? 'true' : 'false');
+    icons();
+    view.scrollTop = view.scrollHeight;
+  };
+  pick.onclick = () => setOpen(list.hidden);
   form.onsubmit = (e) => {
     e.preventDefault();
     const t = input.value.trim();
     if (t) s2Answer({ text: t, input_type: 'text' }, t);
   };
-  c.append(form);
-  icons();
-  view.scrollTop = view.scrollHeight;
+  [pick, input, send].forEach((el) => { el.disabled = !!locked; });
+  c.append(form, list);
+  setOpen(!!reask && !locked);
+  if (!locked && !reask) input.focus({ preventScroll: true });
 }
 
 async function s2Answer(payload, shown) {
@@ -410,7 +425,7 @@ async function s2Answer(payload, shown) {
   S2.busy = true;
   const isCall = !!$('#c2Tr');
   if (isCall) s2CallLine('me', shown); else s2Bubble('me', shown);
-  if (!isCall) $('#choices').textContent = '';
+  if (!isCall) s2ChatChoices(S2.scene, false, true);
   else { $('#c2Ans').hidden = true; s2Status('상대가 듣는 중…'); }
   try {
     const r = await api('POST', `/v1/sim/sessions/${s2sid()}/turn`, payload);
@@ -512,7 +527,7 @@ async function s2CallScene(scene, reask) {
     if (token !== S2.speakToken || !$('#c2Tr')) return;
     if (m.kind === 'sms' || m.kind === 'link') { s2CallLine('them', `[문자로 온 것] ${m.text}`); continue; }
     s2CallLine('them', m.text);
-    await s2Speak(m.text, token);
+    await s2Speak(m.text, token, scene.tone);
   }
   if (token !== S2.speakToken || !$('#c2Tr')) return;
   s2CallAnswer(scene, reask);
@@ -648,17 +663,17 @@ function s2StopRec(submit) {
 }
 
 // 대사 읽기: 임대 GPU TTS(전화 음질 300–3400Hz) → 안 되면 브라우저 speechSynthesis(ko-KR).
-async function s2Speak(text, token) {
-  if (S2.caps.tts && await s2PlayTts(text, token)) return;
-  await s2SpeakBrowser(text, token);
+async function s2Speak(text, token, tone) {
+  if (S2.caps.tts && await s2PlayTts(text, token, tone)) return;
+  await s2SpeakBrowser(text, token, tone);
 }
 
-async function s2PlayTts(text, token) {
+async function s2PlayTts(text, token, tone) {
   try {
     const res = await fetch('/v1/sim/tts', {
       method: 'POST',
       headers: { Authorization: 'Bearer ' + store.get('token'), 'Content-Type': 'application/json' },
-      body: JSON.stringify({ text }),
+      body: JSON.stringify({ text, tone }),
     });
     if (!res.ok) {
       if (res.status === 501 || res.status === 502) S2.caps.tts = false;
@@ -687,13 +702,24 @@ async function s2PlayTts(text, token) {
   }
 }
 
-function s2SpeakBrowser(text, token) {
+// 브라우저 음성은 감정을 낼 수 없어 말투마다 빠르기·높낮이만 바꾼다. 자연스러운 감정 음성은 임대 GPU TTS 몫이다.
+const S2_PROSODY = { calm: [1, 1], official: [0.95, 0.85], urgent: [1.2, 1.05], threat: [0.9, 0.75], tremble: [0.95, 1.2], sob: [0.85, 1.25], friendly: [1.05, 1.15] };
+function s2Voice() {
+  const ko = speechSynthesis.getVoices().filter((v) => (v.lang || '').toLowerCase().startsWith('ko'));
+  const rank = (v) => (/premium|enhanced|고급|향상|natural|neural/i.test(v.name) ? 0 : /google/i.test(v.name) ? 1 : /유나|yuna/i.test(v.name) ? 2 : 3);
+  return ko.sort((a, b) => rank(a) - rank(b))[0];
+}
+
+function s2SpeakBrowser(text, token, tone) {
   return new Promise((resolve) => {
     if (!('speechSynthesis' in window) || token !== S2.speakToken) return resolve();
     const u = new SpeechSynthesisUtterance(text);
     u.lang = 'ko-KR';
-    const voice = speechSynthesis.getVoices().find((v) => (v.lang || '').toLowerCase().startsWith('ko'));
+    const voice = s2Voice();
     if (voice) u.voice = voice;
+    const [rate, pitch] = S2_PROSODY[tone] || S2_PROSODY.calm;
+    u.rate = rate;
+    u.pitch = pitch;
     const done = () => { clearTimeout(guard); resolve(); };
     u.onend = done;
     u.onerror = done;
@@ -902,8 +928,17 @@ function s2RenderResult(r) {
   .s2-seg button { flex: 1; height: 52px; border-radius: 14px; border: 2px solid var(--line); background: #fff; font-size: 16px; font-weight: 700; }
   .s2-seg button.on { border-color: var(--pri); color: var(--pri); background: var(--pri-soft); }
   .s2-input { width: 100%; height: 50px; border-radius: 14px; border: 1px solid var(--line); padding: 0 14px; font-size: 16px; background: #fff; }
-  .s2-free { display: flex; gap: 8px; margin-top: 10px; }
-  .s2-free .s2-input { flex: 1; height: 46px; }
+  .s2-dock { padding: 10px 12px 16px; }
+  .s2-inbar { display: flex; align-items: center; gap: 8px; background: var(--bg); border-radius: 30px; padding: 6px; }
+  .s2-pick { flex: none; display: flex; align-items: center; gap: 4px; height: 46px; padding: 0 14px; border-radius: 23px; background: #fff; color: var(--pri); font-size: 15px; font-weight: 800; border: 1.5px solid var(--pri-soft); }
+  .s2-pick svg.lucide { width: 18px; height: 18px; }
+  .s2-inbar .s2-input { flex: 1; min-width: 0; height: 46px; border: 0; background: transparent; padding: 0 6px; font-size: 17px; }
+  .s2-inbar .s2-input:focus { outline: none; }
+  .s2-send { flex: none; width: 46px; height: 46px; border-radius: 50%; background: var(--pri); color: #fff; display: grid; place-items: center; }
+  .s2-inbar button:disabled, .s2-inbar .s2-input:disabled { opacity: .45; }
+  .s2-picks { margin-top: 4px; }
+  .s2-picks .choice { font-size: 16px; }
+  .s2-reask { margin: 0 4px 8px; font-size: 13.5px; font-weight: 700; color: #C46A00; }
   .s2-chat .choice { font-size: 16px; }
   .s2-stop { background: rgba(255,255,255,.7); }
   .bubble.s2-sms { background: #FFF8E1; border: 1px dashed #E0B000; }

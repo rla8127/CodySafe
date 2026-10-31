@@ -25,6 +25,17 @@ Channel = Literal["call", "chat", "sms", "video"]
 Stage = Literal["접근", "신뢰", "공포·긴급", "요구", "압박", "마무리"]
 Tactic = Literal["권위", "공포", "긴급", "비밀유지", "보상", "동정", "고립"]
 ClosingKind = Literal["공식번호확인", "가족확인", "신고", "기타"]
+Tone = Literal["calm", "official", "urgent", "threat", "tremble", "sob", "friendly"]
+# 음성 합성에 넘기는 말투 지시. 임대 GPU TTS가 감정 표현을 지원하면 이 글을 따르고, 브라우저 음성은 빠르기·높낮이만 바꾼다.
+TONE_GUIDE = {
+    "calm": "차분하고 또박또박하게",
+    "official": "공무원처럼 딱딱하고 사무적인 말투로, 조금 낮은 목소리로",
+    "urgent": "다급하고 빠르게, 재촉하듯이",
+    "threat": "위압적으로 다그치듯, 단호하고 낮게",
+    "tremble": "불안해서 떨리는 목소리로, 숨이 가쁘게",
+    "sob": "울먹이며 흐느끼듯, 말끝이 떨리게",
+    "friendly": "다정하고 밝게",
+}
 
 MAX_STAY = 2  # 한 장면에서 받을 수 있는 최대 답 수
 MAX_TURNS = 8  # 한 대본에서 받을 수 있는 최대 답 수
@@ -72,6 +83,8 @@ class Node(_Strict):
     red_flags: list[str] = Field(min_length=1)
     choices: list[Choice]
     pressure: list[str] = Field(min_length=1)  # 중답 뒤 한 번 더 미는 말
+    tone: Tone = "calm"  # 이 장면 대사의 말투
+    pressure_tone: Tone = "threat"  # 한 번 더 미는 말의 말투
     debrief: str
     media: Media | None = None
 

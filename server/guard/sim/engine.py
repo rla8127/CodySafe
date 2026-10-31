@@ -144,6 +144,7 @@ def scene(graph: Graph, state: dict, pressure: str | None = None) -> dict:
         "stage": node.stage,
         "lines": [render(line, values) for line in node.lines] if pressure is None else [pressure],
         "pressure": pressure is not None,
+        "tone": node.tone if pressure is None else node.pressure_tone,
         "media": {"kind": node.media.kind, "text": render(node.media.text, values)} if node.media and pressure is None else None,
         "choices": _choices(graph, state, node_id),
         "turn": len(state["turns"]) + 1,

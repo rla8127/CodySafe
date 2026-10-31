@@ -7,7 +7,11 @@
   "impersonated": "자녀",
   "difficulty": "쉬움",
   "synthetic": true,
-  "aliases": ["family_impersonation", "가족지인사칭", "family"],
+  "aliases": [
+    "family_impersonation",
+    "가족지인사칭",
+    "family"
+  ],
   "source_refs": [
     {
       "title": "보이스피싱 피해예방 10계명",
@@ -17,85 +21,280 @@
       "note": "❸ 가족도 AI 조작 의심, 일단 끊고 직접 확인, ❼ 불분명한 링크 클릭 금지. 대사는 이 수칙과 팀의 기존 체험 시나리오(server/web/sim.js)를 바탕으로 새로 쓴 가상 대화"
     }
   ],
-  "persona": {"role": "자녀 사칭", "name": "{child_title}", "tone": "다급하고 서운한 척"},
-  "slots": ["child_title", "family_other", "bank"],
+  "persona": {
+    "role": "자녀 사칭",
+    "name": "{child_title}",
+    "tone": "다급하고 서운한 척"
+  },
+  "slots": [
+    "child_title",
+    "family_other",
+    "bank"
+  ],
   "start": "n1_newnum",
-  "bait": {"otp": "742615"},
+  "bait": {
+    "otp": "742615"
+  },
   "nodes": {
     "n1_newnum": {
       "stage": "접근",
-      "tactics": ["동정"],
-      "goal": "새 번호를 가족 번호로 믿게 하기",
-      "lines": ["나 폰 액정 깨져서 수리 맡겼어ㅠㅠ", "이거 임시 번호야. 저장해 줘!"],
-      "media": {"kind": "sms", "text": "보낸 사람: 010-0000-3417 (저장되지 않은 번호)"},
-      "red_flags": ["처음 보는 번호로 가족이라며 연락함"],
-      "choices": [
-        {"id": "a", "grade": "정답", "intent": "가족확인", "act": "do", "text": "{child_title}의 원래 번호로 전화해 본다", "next": "t_safe"},
-        {"id": "b", "grade": "중답", "intent": "되묻기", "text": "진짜 {child_title} 맞아? 어디서 수리 맡겼는데?", "next": "n2_auth"},
-        {"id": "c", "grade": "오답", "intent": "따르기", "text": "어머 괜찮아? 번호 저장해 둘게.", "next": "n2_auth"}
+      "tactics": [
+        "동정"
       ],
-      "pressure": ["나 맞다니까ㅠ 수리점이라 통화가 안 돼. 문자로만 얘기하자."],
-      "debrief": "새 번호로 온 가족 연락은 먼저 원래 번호로 전화해 확인하세요. 목소리와 사진도 AI로 꾸밀 수 있으니 일단 멈추고 직접 확인해요. (금융위 10계명 ❸)"
+      "goal": "새 번호를 가족 번호로 믿게 하기",
+      "lines": [
+        "나 폰 액정 깨져서 수리 맡겼어ㅠㅠ",
+        "이거 임시 번호야. 저장해 줘!"
+      ],
+      "media": {
+        "kind": "sms",
+        "text": "보낸 사람: 010-0000-3417 (저장되지 않은 번호)"
+      },
+      "red_flags": [
+        "처음 보는 번호로 가족이라며 연락함"
+      ],
+      "choices": [
+        {
+          "id": "a",
+          "grade": "정답",
+          "intent": "가족확인",
+          "act": "do",
+          "text": "{child_title}의 원래 번호로 전화해 본다",
+          "next": "t_safe"
+        },
+        {
+          "id": "b",
+          "grade": "중답",
+          "intent": "되묻기",
+          "text": "진짜 {child_title} 맞아? 어디서 수리 맡겼는데?",
+          "next": "n2_auth"
+        },
+        {
+          "id": "c",
+          "grade": "오답",
+          "intent": "따르기",
+          "text": "어머 괜찮아? 번호 저장해 둘게.",
+          "next": "n2_auth"
+        }
+      ],
+      "pressure": [
+        "나 맞다니까ㅠ 수리점이라 통화가 안 돼. 문자로만 얘기하자."
+      ],
+      "debrief": "새 번호로 온 가족 연락은 먼저 원래 번호로 전화해 확인하세요. 목소리와 사진도 AI로 꾸밀 수 있으니 일단 멈추고 직접 확인해요. (금융위 10계명 ❸)",
+      "tone": "tremble",
+      "pressure_tone": "urgent"
     },
     "n2_auth": {
       "stage": "신뢰",
-      "tactics": ["동정", "긴급"],
-      "goal": "인증번호 받아 내기",
-      "lines": ["급하게 결제할 게 있는데 내 폰으로는 본인인증이 안 돼ㅠ", "그쪽 폰으로 인증번호 하나 갈 거야. 그것만 알려 줘"],
-      "media": {"kind": "sms", "text": "[Web발신] 인증번호 [{otp}] 타인에게 절대 알려 주지 마세요."},
-      "red_flags": ["통화는 피하고 인증번호를 요구함"],
-      "choices": [
-        {"id": "a", "grade": "정답", "intent": "가족확인", "text": "우리 가족 암구호부터 말해 봐.", "next": "t_safe"},
-        {"id": "b", "grade": "중답", "intent": "되묻기", "text": "인증번호는 뭐 하려고? 어디에 쓰는데?", "next": "n3_secret"},
-        {"id": "c", "grade": "오답", "intent": "정보제공", "leaks": ["인증번호"], "text": "알았어, 인증번호 불러 줄게. {otp}", "next": "n3_secret"}
+      "tactics": [
+        "동정",
+        "긴급"
       ],
-      "pressure": ["지금 설명할 시간이 없어ㅠ 결제 끝나면 다 말해 줄게."],
-      "debrief": "인증번호를 대신 알려 주면 내 명의로 결제나 대출이 일어날 수 있어요. 가족끼리 정한 암구호로 확인하세요."
+      "goal": "인증번호 받아 내기",
+      "lines": [
+        "급하게 결제할 게 있는데 내 폰으로는 본인인증이 안 돼ㅠ",
+        "그쪽 폰으로 인증번호 하나 갈 거야. 그것만 알려 줘"
+      ],
+      "media": {
+        "kind": "sms",
+        "text": "[Web발신] 인증번호 [{otp}] 타인에게 절대 알려 주지 마세요."
+      },
+      "red_flags": [
+        "통화는 피하고 인증번호를 요구함"
+      ],
+      "choices": [
+        {
+          "id": "a",
+          "grade": "정답",
+          "intent": "가족확인",
+          "text": "우리 가족 암구호부터 말해 봐.",
+          "next": "t_safe"
+        },
+        {
+          "id": "b",
+          "grade": "중답",
+          "intent": "되묻기",
+          "text": "인증번호는 뭐 하려고? 어디에 쓰는데?",
+          "next": "n3_secret"
+        },
+        {
+          "id": "c",
+          "grade": "오답",
+          "intent": "정보제공",
+          "leaks": [
+            "인증번호"
+          ],
+          "text": "알았어, 인증번호 불러 줄게. {otp}",
+          "next": "n3_secret"
+        }
+      ],
+      "pressure": [
+        "지금 설명할 시간이 없어ㅠ 결제 끝나면 다 말해 줄게."
+      ],
+      "debrief": "인증번호를 대신 알려 주면 내 명의로 결제나 대출이 일어날 수 있어요. 가족끼리 정한 암구호로 확인하세요.",
+      "tone": "urgent",
+      "pressure_tone": "sob"
     },
     "n3_secret": {
       "stage": "공포·긴급",
-      "tactics": ["비밀유지", "동정"],
-      "goal": "신분증과 비밀번호 받아 내기, 다른 가족과 떼어 놓기",
-      "lines": ["보험 처리하게 신분증 사진이랑 통장 비밀번호도 보내 줘", "{family_other}한테는 말하지 마. 괜히 걱정하잖아ㅠ"],
-      "red_flags": ["신분증과 비밀번호를 요구함", "다른 가족에게 말하지 말라고 함"],
-      "choices": [
-        {"id": "a", "grade": "정답", "intent": "가족확인", "act": "do", "text": "{family_other}에게 바로 연락해 확인한다", "next": "t_safe"},
-        {"id": "b", "grade": "중답", "intent": "망설임", "text": "신분증까지는 좀 그런데… 꼭 필요해?", "next": "n4_gift"},
-        {"id": "c", "grade": "오답", "intent": "정보제공", "leaks": ["신분증", "비밀번호"], "text": "알았어, 신분증 사진이랑 비밀번호 보낼게.", "next": "n4_gift"}
+      "tactics": [
+        "비밀유지",
+        "동정"
       ],
-      "pressure": ["나 못 믿는 거야? 진짜 서운하다ㅠㅠ 빨리 좀 해 줘."],
-      "debrief": "가족이라도 메시지로 신분증·비밀번호를 보내면 안 돼요. 말하지 말라는 요구가 나오면 더 빨리 다른 가족에게 알리세요."
+      "goal": "신분증과 비밀번호 받아 내기, 다른 가족과 떼어 놓기",
+      "lines": [
+        "보험 처리하게 신분증 사진이랑 통장 비밀번호도 보내 줘",
+        "{family_other}한테는 말하지 마. 괜히 걱정하잖아ㅠ"
+      ],
+      "red_flags": [
+        "신분증과 비밀번호를 요구함",
+        "다른 가족에게 말하지 말라고 함"
+      ],
+      "choices": [
+        {
+          "id": "a",
+          "grade": "정답",
+          "intent": "가족확인",
+          "act": "do",
+          "text": "{family_other}에게 바로 연락해 확인한다",
+          "next": "t_safe"
+        },
+        {
+          "id": "b",
+          "grade": "중답",
+          "intent": "망설임",
+          "text": "신분증까지는 좀 그런데… 꼭 필요해?",
+          "next": "n4_gift"
+        },
+        {
+          "id": "c",
+          "grade": "오답",
+          "intent": "정보제공",
+          "leaks": [
+            "신분증",
+            "비밀번호"
+          ],
+          "text": "알았어, 신분증 사진이랑 비밀번호 보낼게.",
+          "next": "n4_gift"
+        }
+      ],
+      "pressure": [
+        "나 못 믿는 거야? 진짜 서운하다ㅠㅠ 빨리 좀 해 줘."
+      ],
+      "debrief": "가족이라도 메시지로 신분증·비밀번호를 보내면 안 돼요. 말하지 말라는 요구가 나오면 더 빨리 다른 가족에게 알리세요.",
+      "tone": "sob",
+      "pressure_tone": "sob"
     },
     "n4_gift": {
       "stage": "요구",
-      "tactics": ["긴급"],
-      "goal": "상품권 번호나 원격 앱 설치 받아 내기",
-      "lines": ["그럼 상품권 50만 원어치만 사서 번호 보내 줘", "아니면 이 앱 깔아 주면 내가 알아서 할게!"],
-      "media": {"kind": "link", "text": "https://fix-app.example/install"},
-      "red_flags": ["상품권 번호를 보내라고 함", "모르는 앱 설치 링크를 보냄"],
-      "choices": [
-        {"id": "a", "grade": "정답", "intent": "신고", "act": "do", "text": "대화를 멈추고 112에 신고한다", "next": "t_safe"},
-        {"id": "b", "grade": "중답", "intent": "망설임", "text": "지금은 바빠서 이따가 볼게.", "next": "t_quit"},
-        {"id": "c", "grade": "오답", "intent": "송금동의", "text": "알았어, 상품권 사서 번호 보내 줄게.", "next": "t_loss_money"}
+      "tactics": [
+        "긴급"
       ],
-      "pressure": ["진짜 급하다니까ㅠ 10분 안에 안 하면 큰일 나."],
-      "debrief": "상품권 번호는 받는 순간 현금처럼 빠져나가요. 링크로 받은 앱은 설치하지 말고, 대화를 멈춘 뒤 신고하세요. (금융위 10계명 ❼)"
+      "goal": "상품권 번호나 원격 앱 설치 받아 내기",
+      "lines": [
+        "그럼 상품권 50만 원어치만 사서 번호 보내 줘",
+        "아니면 이 앱 깔아 주면 내가 알아서 할게!"
+      ],
+      "media": {
+        "kind": "link",
+        "text": "https://fix-app.example/install"
+      },
+      "red_flags": [
+        "상품권 번호를 보내라고 함",
+        "모르는 앱 설치 링크를 보냄"
+      ],
+      "choices": [
+        {
+          "id": "a",
+          "grade": "정답",
+          "intent": "신고",
+          "act": "do",
+          "text": "대화를 멈추고 112에 신고한다",
+          "next": "t_safe"
+        },
+        {
+          "id": "b",
+          "grade": "중답",
+          "intent": "망설임",
+          "text": "지금은 바빠서 이따가 볼게.",
+          "next": "t_quit"
+        },
+        {
+          "id": "c",
+          "grade": "오답",
+          "intent": "송금동의",
+          "text": "알았어, 상품권 사서 번호 보내 줄게.",
+          "next": "t_loss_money"
+        }
+      ],
+      "pressure": [
+        "진짜 급하다니까ㅠ 10분 안에 안 하면 큰일 나."
+      ],
+      "debrief": "상품권 번호는 받는 순간 현금처럼 빠져나가요. 링크로 받은 앱은 설치하지 말고, 대화를 멈춘 뒤 신고하세요. (금융위 10계명 ❼)",
+      "tone": "urgent",
+      "pressure_tone": "urgent"
     }
   },
   "terminals": {
-    "t_safe": {"type": "safe", "by": "user", "message": "잘하셨어요. 진짜 가족인지 직접 확인하면 이 수법은 더 나아가지 못해요."},
-    "t_quit": {"type": "safe", "by": "scammer", "message": "답이 늦어지자 상대가 대화를 멈췄어요. 피해는 없었지만, 다음에는 먼저 원래 번호로 확인하세요."},
-    "t_loss_money": {"type": "loss", "loss": "송금", "message": "상품권 번호를 보내면 바로 현금으로 바뀌어 되찾기 어려워요. 112와 상품권 회사에 바로 알리세요."},
-    "t_loss_app": {"type": "loss", "loss": "앱설치", "message": "설치한 앱으로 휴대폰이 원격 조종될 수 있어요. 비행기 모드로 바꾸고 다른 전화로 112와 은행에 알리세요."}
+    "t_safe": {
+      "type": "safe",
+      "by": "user",
+      "message": "잘하셨어요. 진짜 가족인지 직접 확인하면 이 수법은 더 나아가지 못해요."
+    },
+    "t_quit": {
+      "type": "safe",
+      "by": "scammer",
+      "message": "답이 늦어지자 상대가 대화를 멈췄어요. 피해는 없었지만, 다음에는 먼저 원래 번호로 확인하세요."
+    },
+    "t_loss_money": {
+      "type": "loss",
+      "loss": "송금",
+      "message": "상품권 번호를 보내면 바로 현금으로 바뀌어 되찾기 어려워요. 112와 상품권 회사에 바로 알리세요."
+    },
+    "t_loss_app": {
+      "type": "loss",
+      "loss": "앱설치",
+      "message": "설치한 앱으로 휴대폰이 원격 조종될 수 있어요. 비행기 모드로 바꾸고 다른 전화로 112와 은행에 알리세요."
+    }
   },
   "closing": {
     "question": "대화를 멈춘 뒤 무엇을 하시겠어요? 여러 개 고를 수 있어요.",
     "options": [
-      {"id": "k1", "kind": "공식번호확인", "points": 10, "text": "{bank} 대표번호로 내 계좌와 카드에 이상이 없는지 확인한다", "why": "내 돈과 명의가 안전한지 공식 창구로 확인해요."},
-      {"id": "k2", "kind": "가족확인", "points": 10, "text": "{child_title}의 원래 번호로 전화하고 {family_other}에게도 알린다", "why": "가족끼리 알려야 같은 수법에 다시 속지 않아요."},
-      {"id": "k3", "kind": "신고", "points": 5, "text": "112에 신고한다", "why": "신고가 쌓여야 같은 번호로 다른 사람이 속지 않아요."},
-      {"id": "k4", "kind": "기타", "points": -10, "text": "새 번호로 다시 문자해 정말 {child_title}인지 묻는다", "why": "사기범에게 묻는 것은 확인이 아니에요."},
-      {"id": "k5", "kind": "기타", "points": 0, "text": "번호만 지우고 넘어간다", "why": "가족에게 알리지 않으면 다른 가족이 같은 연락을 받을 수 있어요."}
+      {
+        "id": "k1",
+        "kind": "공식번호확인",
+        "points": 10,
+        "text": "{bank} 대표번호로 내 계좌와 카드에 이상이 없는지 확인한다",
+        "why": "내 돈과 명의가 안전한지 공식 창구로 확인해요."
+      },
+      {
+        "id": "k2",
+        "kind": "가족확인",
+        "points": 10,
+        "text": "{child_title}의 원래 번호로 전화하고 {family_other}에게도 알린다",
+        "why": "가족끼리 알려야 같은 수법에 다시 속지 않아요."
+      },
+      {
+        "id": "k3",
+        "kind": "신고",
+        "points": 5,
+        "text": "112에 신고한다",
+        "why": "신고가 쌓여야 같은 번호로 다른 사람이 속지 않아요."
+      },
+      {
+        "id": "k4",
+        "kind": "기타",
+        "points": -10,
+        "text": "새 번호로 다시 문자해 정말 {child_title}인지 묻는다",
+        "why": "사기범에게 묻는 것은 확인이 아니에요."
+      },
+      {
+        "id": "k5",
+        "kind": "기타",
+        "points": 0,
+        "text": "번호만 지우고 넘어간다",
+        "why": "가족에게 알리지 않으면 다른 가족이 같은 연락을 받을 수 있어요."
+      }
     ]
   }
 }

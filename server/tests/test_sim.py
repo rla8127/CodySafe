@@ -327,3 +327,36 @@ def test_gpu_is_warmed_once_per_five_minutes_and_never_without_address(monkeypat
     sim_api.warm_gpu()
     sim_api.warm_gpu()
     assert calls == ["http://gpu.example/v1/models"]
+
+
+def test_scene_carries_tone_and_tts_sends_emotion(client, monkeypatch, tmp_path):
+    import httpx
+
+    from guard import sim_api
+
+    graph = engine.get_graph("agency_call")
+    state = engine.start(graph, preset_profile("mother_74_alone"), seed=1)
+    assert engine.scene(graph, state)["tone"] == graph.nodes["n1_intro"].tone
+    assert engine.scene(graph, state, pressure="더 미는 말")["tone"] == graph.nodes["n1_intro"].pressure_tone
+
+    sent = []
+
+    class FakeResponse:
+        headers = {"content-type": "audio/wav"}
+        content = b"RIFF0000WAVE"
+
+        def raise_for_status(self):
+            return None
+
+    monkeypatch.setattr(httpx, "post", lambda url, json=None, **kw: sent.append(json) or FakeResponse())
+    monkeypatch.setattr(sim_api, "TTS_CACHE", tmp_path)
+    monkeypatch.setenv("SIM_TTS_URL", "http://gpu.example/tts")
+    h = device(client, "말투")
+    r = client.post("/v1/sim/tts", headers=h, json={"text": "지금 끊으면 구속됩니다", "tone": "threat"})
+    assert r.status_code == 200 and r.headers["content-type"] == "audio/wav"
+    assert sent[-1]["emotion"] == "threat" and sent[-1]["instruct"] and sent[-1]["text"] == "지금 끊으면 구속됩니다"
+    client.post("/v1/sim/tts", headers=h, json={"text": "지금 끊으면 구속됩니다", "tone": "threat"})
+    assert len(sent) == 1  # 같은 말·같은 말투는 캐시에서
+    client.post("/v1/sim/tts", headers=h, json={"text": "지금 끊으면 구속됩니다", "tone": "tremble"})
+    assert len(sent) == 2 and sent[-1]["emotion"] == "tremble"  # 말투가 다르면 다시 합성
+    assert client.post("/v1/sim/tts", headers=h, json={"text": "x", "tone": "angry"}).status_code == 422
