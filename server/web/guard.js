@@ -47,22 +47,36 @@ renderTabs = function (on) {
   icons();
 };
 
-/* ---------------- PC 소개 접기 ---------------- */
-function drawIntroToggle() {
-  const closed = document.body.classList.contains('intro-closed');
-  const button = $('#introToggle');
-  button.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg>${closed ? '소개 펼치기' : '소개 접기'}`;
+/* ---------------- PC 화면: 오른쪽 모바일 미리보기 ---------------- */
+const embedded = document.body.classList.contains('embedded');
+const previewFrame = $('#previewFrame');
+
+function previewOpen() {
+  return !embedded && !native && !document.body.classList.contains('preview-closed') && window.matchMedia('(min-width: 1181px)').matches;
+}
+
+// 닫혀 있으면 앱을 한 벌 더 띄우지 않도록 필요할 때만 불러옵니다.
+function syncPreview() {
+  const button = $('#previewToggle');
+  const closed = document.body.classList.contains('preview-closed');
+  button.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="7" y="2" width="10" height="20" rx="2.5"/><path d="M11 18h2"/></svg>${closed ? '모바일 화면 보기' : '모바일 화면 접기'}`;
   button.setAttribute('aria-expanded', String(!closed));
+  if (!previewOpen()) return;
+  if (!previewFrame.getAttribute('src')) previewFrame.src = `./${location.hash}`;
+  else if (previewFrame.contentWindow.location.hash !== location.hash) previewFrame.contentWindow.location.hash = location.hash;
 }
 
-function toggleIntro() {
-  const closed = document.body.classList.toggle('intro-closed');
-  if (closed) store.set('introClosed', '1');
-  else store.del('introClosed');
-  drawIntroToggle();
+function togglePreview() {
+  const closed = document.body.classList.toggle('preview-closed');
+  if (closed) store.set('previewClosed', '1');
+  else store.del('previewClosed');
+  syncPreview();
 }
 
-drawIntroToggle();
+const previewClock = () => {
+  const d = new Date();
+  if ($('#previewClock')) $('#previewClock').textContent = `${d.getHours()}:${String(d.getMinutes()).padStart(2, '0')}`;
+};
 
 /* ---------------- 가족 역할 ---------------- */
 const ROLE_INFO = {
@@ -175,9 +189,9 @@ async function saveRole() {
 }
 
 /* ---------------- 상태 표시줄 (PC 미리보기 전용, 실제 폰에서는 숨김) ---------------- */
-$('.sb-icons').innerHTML = `<svg width="17" height="12" viewBox="0 0 17 12" aria-hidden="true"><rect x="0" y="8" width="3" height="4" rx=".8"/><rect x="4.6" y="5.5" width="3" height="6.5" rx=".8"/><rect x="9.2" y="3" width="3" height="9" rx=".8"/><rect x="13.8" y="0" width="3" height="12" rx=".8"/></svg>
+document.querySelectorAll('.sb-icons').forEach((el) => { el.innerHTML = `<svg width="17" height="12" viewBox="0 0 17 12" aria-hidden="true"><rect x="0" y="8" width="3" height="4" rx=".8"/><rect x="4.6" y="5.5" width="3" height="6.5" rx=".8"/><rect x="9.2" y="3" width="3" height="9" rx=".8"/><rect x="13.8" y="0" width="3" height="12" rx=".8"/></svg>
   <svg width="16" height="12" viewBox="0 0 16 12" aria-hidden="true"><path d="M8 2.4c2.3 0 4.4.9 6 2.4l1.2-1.3A10.4 10.4 0 0 0 8 .6 10.4 10.4 0 0 0 .8 3.5L2 4.8a8.6 8.6 0 0 1 6-2.4Zm0 3.5c1.3 0 2.5.5 3.5 1.4l1.2-1.3A6.9 6.9 0 0 0 8 4.1a6.9 6.9 0 0 0-4.7 1.9l1.2 1.3c1-.9 2.2-1.4 3.5-1.4Zm0 3.4c-.7 0-1.3.3-1.8.7L8 12l1.8-2c-.5-.4-1.1-.7-1.8-.7Z"/></svg>
-  <span class="sb-battery"><i></i></span>`;
+  <span class="sb-battery"><i></i></span>`; });
 
 /* ---------------- 첫 실행 ---------------- */
 function onboardingPage() {
@@ -630,7 +644,7 @@ function showLockAlert(lock) {
 }
 
 async function pollLock() {
-  if (!signedIn()) return;
+  if (embedded || !signedIn()) return;
   try {
     const lock = await api('GET', '/v1/lock');
     if (!lock.locked) {
@@ -1067,7 +1081,7 @@ function beep() {
 }
 
 async function pollAlerts() {
-  if (native || !signedIn()) return;
+  if (native || embedded || !signedIn()) return;
   try {
     const known = store.get('lastAlert');
     const { items } = await api('GET', `/v1/alerts?after=${known || 0}`);
@@ -1103,6 +1117,13 @@ render();
 pollAlerts();
 pollLock();
 restoreFolder().then(scanFolder);
+// PC 화면과 미리보기가 같은 로그인과 같은 화면을 보여 주게 합니다.
+window.addEventListener('storage', (e) => { if (e.key === 'guard.token' || e.key === 'guard.consented') render(); });
+window.addEventListener('hashchange', syncPreview);
+window.addEventListener('resize', syncPreview);
+syncPreview();
+previewClock();
+setInterval(previewClock, 15000);
 loadServerInfo();
 loadDemoFamily();
 // 제보 시나리오 주소로 바로 들어온 경우 시나리오를 먼저 불러온 뒤 다시 그립니다.
