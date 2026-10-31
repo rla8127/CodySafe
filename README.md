@@ -50,7 +50,7 @@ flowchart LR
 | 사례 검색 (RAG) | 별도 Elasticsearch 검색 서버를 `GUARD_RAG_URL`로 연결하면 판정 전에 참고 자료로 넣음. 코드와 실행 방법은 [infra/es-server](infra/es-server/codysafe-rag/README.md)에 있음. 원본 데이터는 올리지 않아 재현에 데이터 폴더가 필요. 서버가 없어도 LLM만으로 동작. 내장 검색은 판정 뒤 유형 표시에 쓰며 벡터는 해시 임베딩. 효과 미측정 |
 | 피드백, 사용자 대시보드 | 구현, 자동 테스트와 브라우저로 확인 |
 | 재학습, 검색 색인 갱신 | 추후 과제 |
-| 자체 STT (CPU, `whisper-large-v3-turbo` INT8) + OpenAI 대체 경로 | 앱 연동 구현, 자동 테스트로 확인. 실서버 전사 검증 전 |
+| 자체 STT (CPU, `whisper-large-v3-turbo` INT8) + OpenAI 대체 경로 | 구현. 실제 MP3 1건으로 실서버 전사부터 판정까지 확인. 대체 경로도 확인. 성능은 표본이 적어 근거로 쓰지 않음 |
 | GPU 서빙 | 미구현 |
 | 탐지율, 오탐률 | 미측정. 예시 대본 6건은 동작 확인용이며 성능 근거가 아님 |
 
@@ -84,7 +84,9 @@ cp .env.example .env
 ANTHROPIC_API_KEY=<키>
 OPENAI_API_KEY=<키>
 GUARD_LLM=anthropic
-GUARD_STT=openai
+GUARD_STT=server
+STT_BASE_URL=<자체 STT 서버>
+STT_API_KEY=<키>
 ```
 
 S3 설정과 전체 옵션, APK 빌드는 [실행 문서](docs/family-guard.md)에 있습니다.
