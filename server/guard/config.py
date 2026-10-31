@@ -7,11 +7,14 @@ ROOT = Path(__file__).resolve().parent.parent
 DB_PATH = os.getenv("GUARD_DB", str(ROOT / "data" / "guard.db"))
 LOCAL_AUDIO_DIR = Path(os.getenv("GUARD_LOCAL_AUDIO_DIR", str(ROOT / "data" / "audio")))
 PUBLIC_BASE_URL = os.getenv("GUARD_PUBLIC_BASE_URL", "http://localhost:8091").rstrip("/")
+# 시연 전용. 켜면 접속한 누구나 시연 가족 계정으로 들어올 수 있으니 실제 통화를 올리면 안 됩니다.
+DEMO_FAMILY = os.getenv("GUARD_DEMO_FAMILY", "0") == "1"
 ADMIN_TOKEN = os.getenv("GUARD_ADMIN_TOKEN", "")
 AWS_REGION = os.getenv("GUARD_AWS_REGION", "ap-northeast-2")
 
 STORAGE = os.getenv("GUARD_STORAGE", "local")  # local | s3
 S3_BUCKET = os.getenv("GUARD_S3_BUCKET", "")
+S3_REGION = os.getenv("GUARD_S3_REGION", AWS_REGION)
 STT = os.getenv("GUARD_STT", "text")  # text | openai | transcribe
 OPENAI_STT_MODEL = os.getenv("GUARD_OPENAI_STT_MODEL", "whisper-1")
 LLM = os.getenv("GUARD_LLM", "rule")  # rule | anthropic | openai | bedrock

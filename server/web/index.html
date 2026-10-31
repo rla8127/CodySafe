@@ -3,16 +3,31 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <meta name="theme-color" content="#F3F5FA" />
+  <meta name="theme-color" content="#F2F6FC" />
   <title>CodySafe</title>
-  <link rel="icon" href="assets/logo.svg" type="image/svg+xml" />
+  <link rel="icon" href="assets/brand/favicon-32.png" sizes="32x32" type="image/png" />
+  <link rel="icon" href="assets/brand/favicon.png" sizes="256x256" type="image/png" />
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css" />
   <link rel="stylesheet" href="css/style.css" />
   <link rel="stylesheet" href="web/guard.css" />
 </head>
 <body>
+  <script>try { if (localStorage.getItem('guard.introClosed') === '1') document.body.classList.add('intro-closed'); } catch (e) { }</script>
   <div class="stage">
     <aside class="intro" hidden><ol id="introList"></ol></aside>
+    <button class="intro-toggle" id="introToggle" onclick="toggleIntro()" aria-controls="guardIntro"></button>
+    <aside class="guard-intro" id="guardIntro">
+      <div class="guard-intro-inner">
+        <img src="assets/brand/logo-horizontal.png" alt="Cody Safe" />
+        <h1>사기는 <em>미리 경험</em>하고,<br />가족과 <em>함께</em> 막아요</h1>
+        <p>통화 녹음을 분석해 근거를 보여 주고, 위험할 때 가족과 함께 대응합니다.</p>
+        <ul>
+          <li><b>통화 검사</b>통화에서 실제로 나온 말을 근거로 보여 줍니다.</li>
+          <li><b>가족 보호</b>가족에게는 보이스피싱 의심 여부만 알립니다.</li>
+          <li><b>금융 앱 잠금과 암구호</b>의심될 때 앱을 잠그고, 매일 바뀌는 암구호로 확인합니다.</li>
+        </ul>
+      </div>
+    </aside>
     <div class="phone">
       <div class="screen">
         <div class="statusbar">
@@ -34,6 +49,8 @@
   <script src="https://unpkg.com/lucide@0.460.0/dist/umd/lucide.min.js"></script>
   <script src="js/data.js"></script>
   <script src="js/app.js"></script>
+  <script src="web/sim.js"></script>
+  <script src="web/trends.js"></script>
   <script src="web/guard.js"></script>
 </body>
 </html>

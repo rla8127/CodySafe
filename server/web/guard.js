@@ -30,23 +30,149 @@ if (store.get('token')) native?.setToken(store.get('token'));
 
 /* ---------------- 시안 화면 제거 ---------------- */
 ['image', 'voice', 'call', 'url', 'verify', 'report', 'generate', 'weakness', 'training', 'copilot', 'checkup'].forEach((k) => delete SCREENS[k]);
-Object.assign(TAB_OF, { home: 'home', sim: 'sim', play: 'sim', detect: 'detect', family: 'family', me: 'me', lock: 'home', passphrase: 'family' });
+Object.assign(TAB_OF, { home: 'home', sim: 'sim', play: 'sim', detect: 'detect', family: 'family', me: 'me', lock: 'home', passphrase: 'family', report: 'sim' });
 delete PARENT.family;
 PARENT.passphrase = 'family';
+PARENT.report = 'sim';
 
 renderTabs = function (on) {
   const tabs = [['home', 'house', '홈'], ['sim', 'gamepad-2', '체험'], ['detect', 'shield-check', '검사'], ['family', 'users', '가족'], ['me', 'user-round', 'MY']];
+  // 시작 전에는 아직 쓸 수 없는 탭을 보여 주지 않습니다.
+  if (!signedIn()) {
+    $('#tabbar').classList.add('hidden');
+    view.classList.add('full');
+  }
   $('#tabbar').innerHTML = tabs.map(([k, i, t]) => k === 'detect'
     ? `<button class="tab tab-center ${on === k ? 'on' : ''}" onclick="go('${k}')"><span class="fab">${ic(i)}</span><span>${t}</span></button>`
     : `<button class="tab ${on === k ? 'on' : ''}" onclick="go('${k}')">${ic(i)}<span>${t}</span></button>`).join('');
   icons();
 };
 
+/* ---------------- PC 소개 접기 ---------------- */
+function drawIntroToggle() {
+  const closed = document.body.classList.contains('intro-closed');
+  const button = $('#introToggle');
+  button.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg>${closed ? '소개 펼치기' : '소개 접기'}`;
+  button.setAttribute('aria-expanded', String(!closed));
+}
+
+function toggleIntro() {
+  const closed = document.body.classList.toggle('intro-closed');
+  if (closed) store.set('introClosed', '1');
+  else store.del('introClosed');
+  drawIntroToggle();
+}
+
+drawIntroToggle();
+
+/* ---------------- 가족 역할 ---------------- */
+const ROLE_INFO = {
+  mom: { label: '엄마', icon: '👩' }, dad: { label: '아빠', icon: '👨' }, me: { label: '나', icon: '🙂' },
+  child: { label: '자녀', icon: '🧒' }, son: { label: '아들', icon: '👦' }, daughter: { label: '딸', icon: '👧' },
+  brother: { label: '형', icon: '🧑' }, sister: { label: '언니·누나', icon: '👩' }, uncle: { label: '삼촌', icon: '🧔' }, aunt: { label: '이모·고모', icon: '👩' },
+};
+const DEMO_LABEL = { me: '나', dad: '아빠', mom: '엄마', brother: '형', uncle: '삼촌' };
+let demoMembers = [];
+
+/* 웹 시연에서는 등록된 가족 중 한 명을 고릅니다. 앱은 항상 직접 등록합니다. */
+async function loadDemoFamily() {
+  if (native) return;
+  try {
+    const res = await fetch('/v1/demo/family');
+    if (!res.ok) return;
+    demoMembers = (await res.json()).items;
+    if (accepted() && !signedIn()) render();
+    else if (route().r === 'me') render();
+  } catch (e) { }
+}
+
+function demoPicker() {
+  return `<div class="page">
+    <div class="brand-hero small"><img src="assets/brand/logo-horizontal.png" alt="Cody Safe"></div>
+    <div class="lead-text">누구로<br><em>시연</em>할까요?</div>
+    <div class="demo-list">${demoMembers.map((m) => `<button class="demo-person" onclick="demoEnter('${esc(m.id)}')"><span class="role-av">${ROLE_INFO[m.role].icon}</span><span><b>${esc(m.name)}</b><small>${DEMO_LABEL[m.role]}</small></span>${ic('chevron-right')}</button>`).join('')}</div>
+    <div class="card mt soft-warn">시연용 가족입니다. 접속한 사람 모두 같은 기록을 볼 수 있으니 실제 통화는 올리지 마세요.</div>
+  </div>`;
+}
+
+async function demoEnter(id) {
+  try {
+    const res = await fetch(`/v1/demo/family/${id}/login`, { method: 'POST' });
+    if (!res.ok) throw new Error(res.status);
+    const me = await res.json();
+    store.set('token', me.token);
+    store.set('name', me.name);
+    store.set('role', me.role);
+    ['lastAlert', 'lockSeen', 'seen', 'folderSince'].forEach((k) => store.del(k));
+    go('home');
+    render();
+  } catch (e) {
+    toast('들어가지 못했습니다', 'circle-alert');
+  }
+}
+let pickedRole = '';
+
+function rolePicker(role = '', memo = '') {
+  pickedRole = role;
+  const isChild = ['child', 'son', 'daughter'].includes(role);
+  const main = ['mom', 'dad', 'me', 'child'].map((k) => `<button type="button" class="role-btn ${(k === 'child' ? isChild : role === k) ? 'on' : ''}" data-role="${k}" onclick="pickRole('${k}')"><span>${ROLE_INFO[k].icon}</span>${ROLE_INFO[k].label}</button>`).join('');
+  const sub = ['son', 'daughter'].map((k) => `<button type="button" class="chip role-sub ${role === k ? 'on' : ''}" data-role="${k}" onclick="pickRole('${k}')">${ROLE_INFO[k].icon} ${ROLE_INFO[k].label}</button>`).join('');
+  return `<div class="role-grid">${main}</div>
+    <div class="role-child" id="roleChild" ${isChild ? '' : 'hidden'}>
+      <div class="row" style="gap:8px">${sub}</div>
+      <div class="field" style="margin-top:10px"><label for="roleMemo">메모 (선택)</label><input id="roleMemo" maxlength="20" placeholder="예: 첫째" value="${esc(memo)}"></div>
+    </div>`;
+}
+
+function pickRole(role) {
+  pickedRole = role;
+  const isChild = ['child', 'son', 'daughter'].includes(role);
+  document.querySelectorAll('.role-btn').forEach((b) => b.classList.toggle('on', b.dataset.role === role || (b.dataset.role === 'child' && isChild)));
+  document.querySelectorAll('.role-sub').forEach((b) => b.classList.toggle('on', b.dataset.role === role));
+  $('#roleChild').hidden = !isChild;
+}
+
+function readRole() {
+  const isChild = ['child', 'son', 'daughter'].includes(pickedRole);
+  return { role: pickedRole, memo: isChild ? ($('#roleMemo')?.value.trim() || null) : null };
+}
+
+const roleAvatar = (p) => {
+  const info = ROLE_INFO[p.role];
+  return `<span class="role-av">${info ? info.icon : esc(String(p.name || '?').slice(0, 1))}</span>`;
+};
+
+async function roleSheet() {
+  let me = {};
+  try { me = await api('GET', '/v1/devices/me'); } catch (e) { return toast('불러오지 못했습니다', 'circle-alert'); }
+  openSheet(`<div class="b" style="font-size:18px">가족 안에서의 역할</div>
+    <div style="margin-top:14px">${rolePicker(me.role || '', me.memo || '')}</div>
+    <div class="btn-col"><button class="btn pri block" onclick="saveRole()">저장</button><button class="btn line block" onclick="closeSheet()">취소</button></div>`);
+}
+
+async function saveRole() {
+  const { role, memo } = readRole();
+  if (!role) return toast('역할을 골라 주세요', 'circle-alert');
+  try {
+    await api('PUT', '/v1/devices/me', { role, memo });
+    store.set('role', role);
+    render();
+    toast('저장했습니다');
+  } catch (e) {
+    toast('저장하지 못했습니다', 'circle-alert');
+  }
+}
+
+/* ---------------- 상태 표시줄 (PC 미리보기 전용, 실제 폰에서는 숨김) ---------------- */
+$('.sb-icons').innerHTML = `<svg width="17" height="12" viewBox="0 0 17 12" aria-hidden="true"><rect x="0" y="8" width="3" height="4" rx=".8"/><rect x="4.6" y="5.5" width="3" height="6.5" rx=".8"/><rect x="9.2" y="3" width="3" height="9" rx=".8"/><rect x="13.8" y="0" width="3" height="12" rx=".8"/></svg>
+  <svg width="16" height="12" viewBox="0 0 16 12" aria-hidden="true"><path d="M8 2.4c2.3 0 4.4.9 6 2.4l1.2-1.3A10.4 10.4 0 0 0 8 .6 10.4 10.4 0 0 0 .8 3.5L2 4.8a8.6 8.6 0 0 1 6-2.4Zm0 3.5c1.3 0 2.5.5 3.5 1.4l1.2-1.3A6.9 6.9 0 0 0 8 4.1a6.9 6.9 0 0 0-4.7 1.9l1.2 1.3c1-.9 2.2-1.4 3.5-1.4Zm0 3.4c-.7 0-1.3.3-1.8.7L8 12l1.8-2c-.5-.4-1.1-.7-1.8-.7Z"/></svg>
+  <span class="sb-battery"><i></i></span>`;
+
 /* ---------------- 첫 실행 ---------------- */
 function onboardingPage() {
   if (!accepted()) {
     return `<div class="page">
-      <div class="home-top"><div class="brand"><img src="assets/logo.svg" width="30" height="30" alt="">CodySafe</div></div>
+      <div class="brand-hero"><img src="assets/brand/logo-vertical.png" alt="Cody Safe"></div>
       <div class="lead-text">AI 사기는 <em>미리 경험</em>하고,<br>가족과 <em>함께</em> 막아요</div>
       <div class="card"><ul class="notice">
         ${['앱이 통화를 직접 녹음하지 않고, 이미 저장된 파일만 읽습니다.', '폴더를 연결한 뒤에 생긴 파일만 서버로 보냅니다.', '음성은 분석 후 삭제하고, 일상 통화는 글자 기록도 남기지 않습니다.', '사기로 의심되는 통화의 글자 기록은 검토를 위해 보관합니다.', '분석 내용은 본인만 봅니다. 가족에게는 보이스피싱 의심 여부만 알립니다.']
@@ -56,22 +182,27 @@ function onboardingPage() {
       <button class="btn grad block mt" onclick="store.set('consented','1');render()">동의하고 시작</button>
     </div>`;
   }
+  if (demoMembers.length) return demoPicker();
   return `<div class="page">
-    <div class="home-top"><div class="brand"><img src="assets/logo.svg" width="30" height="30" alt="">CodySafe</div></div>
-    <div class="lead-text">가족에게 보일<br><em>이름</em>을 정해 주세요</div>
-    <div class="card"><div class="field" style="margin-top:0"><label for="regName">이름</label><input id="regName" maxlength="30" placeholder="예: 민수"></div>
+    <div class="brand-hero small"><img src="assets/brand/logo-horizontal.png" alt="Cody Safe"></div>
+    <div class="lead-text">가족 안에서<br><em>누구</em>신가요?</div>
+    <div class="card">${rolePicker()}
+    <div class="field"><label for="regName">가족에게 보일 이름</label><input id="regName" maxlength="30" placeholder="예: 민수"></div>
     <div class="muted small" style="margin-top:10px">계정이나 비밀번호는 필요 없습니다.</div></div>
     <button class="btn grad block mt" onclick="registerDevice()">시작하기</button>
   </div>`;
 }
 
 async function registerDevice() {
-  const name = $('#regName').value.trim();
+  const { role, memo } = readRole();
+  if (!role) return toast('가족 안에서의 역할을 골라 주세요', 'circle-alert');
+  const name = $('#regName').value.trim() || (role !== 'me' ? ROLE_INFO[role].label : '');
   if (!name) return toast('이름을 입력하세요', 'circle-alert');
   try {
-    const r = await api('POST', '/v1/devices', { name });
+    const r = await api('POST', '/v1/devices', { name, role, memo });
     store.set('token', r.token);
     store.set('name', name);
+    store.set('role', role);
     native?.setToken(r.token);
     render();
   } catch (e) {
@@ -104,6 +235,15 @@ function callTitle(r) {
   return `${d.getMonth() + 1}월 ${d.getDate()}일 ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')} 올린 통화`;
 }
 
+// 모델이 스스로 매긴 값이라 통계적 확률로 표현하지 않습니다. 사람이 판정을 고치면 숨깁니다.
+function confidenceBar(r) {
+  if (r.status !== 'done' || r.review_label || !['voice_phishing', 'other_scam'].includes(r.label) || r.confidence == null) return '';
+  const percent = Math.round(r.confidence * 100);
+  return `<div class="confidence"><div class="confidence-top"><span>AI 판단 확신도</span><b>${percent}%</b></div>
+    <div class="confidence-track"><span style="width:${percent}%"></span></div>
+    <div class="confidence-note">실제 사기일 확률이 아니라 AI가 판단에 얼마나 확신하는지를 나타냅니다.</div></div>`;
+}
+
 // AI가 풀어 쓴 요약은 보여 주지 않고, 녹취에서 대조한 발화만 사실로 표시합니다.
 function factBox(r, top) {
   if (!r.evidence.length) {
@@ -126,6 +266,7 @@ function recordingCard(r) {
   return `<div class="card mt">
     ${verdictChip(r, label)}
     <div class="call-title">${callTitle(r)}</div>
+    ${confidenceBar(r)}
     ${r.status === 'failed' ? '<div class="call-text">처리에 실패했습니다. 다시 시도해 주세요.</div>' : ''}
     ${factBox(r, top)}
     <div class="link-row">
@@ -174,12 +315,14 @@ function deleteSheet(id) {
 
 /* ---------------- 홈 ---------------- */
 SCREENS.home = gated(() => `<div class="page">
-  <div class="home-top"><div class="brand"><img src="assets/logo.svg" width="30" height="30" alt="">CodySafe</div></div>
-  <div class="hello" style="margin:0 2px 14px">안녕하세요${store.get('name') ? `, <b>${esc(store.get('name'))}님</b>` : ''} 오늘도 안전한 하루 보내세요</div>
+  <div class="brand-bar"><img src="assets/brand/logo-horizontal.png" alt="Cody Safe">
+    <button class="brand-bell" onclick="go('family')" aria-label="가족 경고">${ic('bell')}</button></div>
+  <div class="home-greeting">${ROLE_INFO[store.get('role')] ? `<span class="role-av big">${ROLE_INFO[store.get('role')].icon}</span>` : ''}안녕하세요${store.get('name') ? `, ${esc(store.get('name'))}님` : ''}</div>
+  <div class="home-sub">오늘도 함께 살펴볼게요.</div>
   <div id="data"></div>
 </div>`);
 
-function homeData({ recordings, recs, family, alerts, lock }) {
+function homeData({ recordings, recs, family, alerts, lock, reports }) {
   const items = recordings.items;
   const flagged = items.filter((r) => ['voice_phishing', 'other_scam'].includes(r.review_label || r.label)).length;
   const reviews = items.filter((r) => r.needs_review).length;
@@ -189,16 +332,122 @@ function homeData({ recordings, recs, family, alerts, lock }) {
       <div class="hero-label">분석한 통화</div>
       <div class="hero-score">${recs.analyzed}<small>건</small></div>
       <div class="hero-meta">사기 의심 <b>${flagged}건</b> · 연결된 가족 <b>${family.guardians.length}명</b></div>
-      <div class="hero-actions"><button class="w" onclick="go('detect')">${ic('shield-check')}통화 검사</button><button onclick="go('sim')">${ic('gamepad-2')}사기 체험</button></div>
+    </div>
+    <div class="quick-grid">
+      ${[['detect', 'shield-check', '통화 검사'], ['passphrase', 'key-round', '가족 암구호'], ['lock', 'lock', '금융 앱 잠금'], ['sim', 'gamepad-2', '사기 체험']]
+        .map(([k, i, t]) => `<button onclick="go('${k}')"><span>${ic(i)}</span>${t}</button>`).join('')}
     </div>
     ${unread.map(alertCard).join('')}
     ${reviews ? `<button class="card mt soft-warn" style="width:100%;text-align:left" onclick="go('detect')"><b>검토가 필요한 통화 ${reviews}건</b><br>판정을 확인해 주시면 탐지 개선에 쓰입니다.</button>` : ''}
-    <div class="sec-title">자주 의심된 사기 유형</div>
-    ${recs.items.length ? recs.items.map((r) => `<div class="card mt"><span class="chip pri">${r.count}회 의심</span>
+    ${recs.items.length ? `<div class="sec-title">자주 의심된 사기 유형</div>
+      ${recs.items.map((r) => `<div class="card mt"><span class="chip pri">${r.count}회 의심</span>
       <div class="call-title">${esc(r.name)}</div><div class="call-text">${esc(r.advice)}</div>
-      <div class="call-text" style="color:var(--pri);font-weight:700;font-size:13px">추천 훈련 · ${esc(r.training)}</div></div>`).join('') : emptyCard('아직 사기로 판정된 통화가 없습니다.')}
-    <div class="sec-title">최근 분석 <button class="more" onclick="go('detect')">전체 보기${ic('chevron-right')}</button></div>
-    ${items.length ? items.slice(0, 3).map(recordingCard).join('') : emptyCard('아직 분석한 통화가 없습니다.')}`;
+      <div class="call-text" style="color:var(--pri);font-weight:700;font-size:13px">추천 훈련 · ${esc(r.training)}</div></div>`).join('')}` : ''}
+    ${items.length ? `<div class="sec-title">최근 분석 <button class="more" onclick="go('detect')">전체 보기${ic('chevron-right')}</button></div>
+      ${items.slice(0, 3).map(recordingCard).join('')}`
+    : `<button class="home-empty" onclick="go('detect')"><span>${ic('sparkles')}</span><span><b>아직 분석한 통화가 없어요</b><small>예시 통화로 어떻게 동작하는지 먼저 볼 수 있어요.</small></span>${ic('chevron-right')}</button>`}
+    ${trendsBlock()}
+    ${reports.some((r) => r.rank) ? `<div class="sec-title">제보 TOP 3 <button class="more" onclick="go('report')">전체 보기${ic('chevron-right')}</button></div>
+      <div class="card trend-list">${reports.filter((r) => r.rank).map((r) => `<button class="trend-row top-row" onclick="go('report')"><time>${r.rank}위</time><span><strong>${esc(r.title)}</strong><small>추천 ${r.votes} · 이용자 제보, 사실 확인 전</small></span>${ic('chevron-right')}</button>`).join('')}</div>` : ''}`;
+}
+
+/* ---------------- 커뮤니티 제보 ---------------- */
+let reportCategories = [];
+
+// 제보로 만든 시나리오는 이용자 글에서 나왔으므로 화면에 넣기 전에 모두 이스케이프합니다.
+function registerReportScenario(r) {
+  if (!r.scenario) return;
+  const s = r.scenario;
+  SCENARIOS['r' + r.id] = {
+    title: esc(s.title), tag: '제보 기반', icon: 'megaphone', color: '#0047AB', soft: '#E8F0FB', difficulty: 'AI 생성', mins: 3,
+    desc: esc(s.desc), generated: true,
+    contact: { name: esc(s.contact), sub: '제보를 바탕으로 만든 가상 대화', av: esc(s.contact.slice(0, 1)) },
+    steps: s.steps.map((st) => ({
+      msgs: st.msgs.map(esc),
+      choices: st.choices.map((c) => ({ t: esc(c.t), ok: c.ok, fb: esc(c.fb), act: c.act })),
+    })),
+    signals: s.signals.map(esc),
+  };
+}
+
+async function loadReportScenarios() {
+  if (!signedIn()) return [];
+  const { items, categories } = await api('GET', '/v1/reports');
+  reportCategories = categories;
+  items.forEach(registerReportScenario);
+  return items;
+}
+
+SCREENS.report = gated(() => `<div class="page">
+  <div class="lead" style="margin-top:6px">사기 제보</div>
+  <div class="lead-sub" style="margin-top:6px">새 수법이 제보될수록 방어 훈련도 함께 늘어납니다. 추천 상위 3개 제보는 체험 시나리오로 만들 수 있어요.</div>
+  <button class="btn grad block mt" onclick="reportSheet()">${ic('pencil')}내가 겪은 수법 제보하기</button>
+  <div class="muted small report-note">이용자 제보이며 사실 확인 전입니다. 추천 수는 공식 피해 통계가 아닙니다.</div>
+  <div id="data"></div>
+</div>`);
+
+function reportCard(r) {
+  const made = !!r.scenario;
+  return `<div class="card mt report-card ${r.rank ? 'top' : ''}">
+    <div class="row between"><div class="row" style="gap:6px">${r.rank ? `<span class="rank-badge">${r.rank}</span>` : ''}<span class="chip">${esc(r.category)}</span>${r.is_demo ? '<span class="chip">시연 예시</span>' : ''}</div>
+      <button class="vote ${r.voted ? 'on' : ''}" onclick="voteReport(${r.id}, ${r.voted})" aria-label="추천">${ic('thumbs-up')}${r.votes}</button></div>
+    <div class="call-title">${esc(r.title)}</div>
+    <div class="call-text">${esc(r.body)}</div>
+    <div class="link-row">
+      ${made ? `<button onclick="go('play/r${r.id}')">${ic('play')}시뮬레이션 체험</button>` : r.rank ? `<button id="mk${r.id}" onclick="makeScenario(${r.id})">${ic('wand-sparkles')}AI 시뮬레이션 만들기</button>` : ''}
+      ${r.mine ? `<button class="quiet" onclick="act('DELETE','/v1/reports/${r.id}')">삭제</button>` : ''}
+    </div>
+  </div>`;
+}
+
+const reportData = ({ reports }) => (reports.length ? reports.map(reportCard).join('') : emptyCard('아직 제보가 없습니다. 첫 제보를 남겨 주세요.'));
+
+function reportSheet() {
+  openSheet(`<div class="b" style="font-size:18px">사기 수법 제보</div>
+    <div class="muted small" style="margin-top:6px">이름과 사진, 내 정보는 쓰지 마세요. 전화번호와 계좌번호, 링크는 자동으로 가립니다. 작성자는 공개되지 않습니다.</div>
+    <div class="field"><label for="repCat">유형</label><select id="repCat">${reportCategories.map((c) => `<option>${esc(c)}</option>`).join('')}</select></div>
+    <div class="field"><label for="repTitle">제목</label><input id="repTitle" maxlength="60" placeholder="예: 건강검진 결과 확인 문자"></div>
+    <div class="field"><label for="repBody">어떤 일이 있었나요?</label><textarea id="repBody" maxlength="1000" placeholder="상대가 무엇을 요구했는지 적어 주세요"></textarea></div>
+    <div class="btn-col"><button class="btn pri block" onclick="sendReport()">제보하기</button><button class="btn line block" onclick="closeSheet()">취소</button></div>`);
+}
+
+async function sendReport() {
+  const title = $('#repTitle').value.trim();
+  const body = $('#repBody').value.trim();
+  if (title.length < 4 || body.length < 10) return toast('제목 4자, 내용 10자 이상 입력해 주세요', 'circle-alert');
+  try {
+    await api('POST', '/v1/reports', { category: $('#repCat').value, title, body });
+    closeSheet();
+    toast('제보를 올렸습니다');
+    lastData = '';
+    refresh();
+  } catch (e) {
+    toast(e.message === '429' ? '제보는 하루 5건까지 가능합니다' : '제보하지 못했습니다', 'circle-alert');
+  }
+}
+
+async function voteReport(id, voted) {
+  try {
+    await api(voted ? 'DELETE' : 'POST', `/v1/reports/${id}/vote`);
+    lastData = '';
+    refresh();
+  } catch (e) {
+    toast('추천하지 못했습니다', 'circle-alert');
+  }
+}
+
+async function makeScenario(id) {
+  const button = $('#mk' + id);
+  if (button) { button.disabled = true; button.textContent = 'AI가 시나리오를 만드는 중입니다'; }
+  try {
+    await api('POST', `/v1/reports/${id}/scenario`);
+    await loadReportScenarios();
+    go('play/r' + id);
+  } catch (e) {
+    toast(e.message === '403' ? '추천 상위 3개만 만들 수 있어요' : '만들지 못했습니다. 다시 시도해 주세요', 'circle-alert');
+    lastData = '';
+    refresh();
+  }
 }
 
 /* ---------------- 가족 암구호 ---------------- */
@@ -448,6 +697,7 @@ function sampleResultHtml(r) {
   const label = r.label;
   const matched = label === r.expected;
   return `<div class="sample-result">${verdictChip(r, label)}
+    ${confidenceBar(r)}
     ${factBox(r, r.matches[0])}
     <div class="sample-expected ${matched ? 'ok' : 'miss'}">${ic(matched ? 'circle-check' : 'circle-alert')}대본의 의도와 ${matched ? '같은 결과입니다' : '다른 결과입니다'}</div></div>`;
 }
@@ -498,11 +748,11 @@ function folderGuide() {
 const detectData = ({ recordings }) => (recordings.items.length ? recordings.items.map(recordingCard).join('') : emptyCard('아직 올린 파일이 없습니다.'));
 
 async function uploadFile(file, clientKey) {
-  const r = await api('POST', '/v1/recordings', { filename: file.name, client_key: clientKey, content_type: 'application/octet-stream' });
+  const r = await api('POST', '/v1/recordings', { filename: file.name, client_key: clientKey, content_type: 'application/octet-stream', direct: false });
   if (r.already_uploaded) return false;
   const url = new URL(r.upload_url);
-  // 로컬 저장 모드는 지금 접속한 주소로 보내 주소 설정과 무관하게 동작하게 합니다.
-  const target = url.pathname.startsWith('/v1/local-upload/') ? url.pathname + url.search : r.upload_url;
+  // 서버의 공개 주소 설정과 무관하게 지금 접속한 주소로 보냅니다.
+  const target = url.pathname + url.search;
   const put = await fetch(target, { method: 'PUT', headers: { 'Content-Type': 'application/octet-stream' }, body: file });
   if (!put.ok) throw new Error(put.status);
   await api('POST', `/v1/recordings/${r.id}/complete`);
@@ -669,7 +919,7 @@ SCREENS.family = gated(() => `<div class="page">
 </div>`);
 
 function familyData({ family, alerts, phrase }) {
-  const person = (p, note, removable) => `<div class="card mt"><div class="row between"><div class="grow"><div class="b">${esc(p.name)}${p.locked ? ` <span class="chip danger">${ic('lock')}금융 앱 잠금 중</span>` : ''}</div><div class="muted small" style="margin-top:2px">${note}</div></div>
+  const person = (p, note, removable) => `<div class="card mt"><div class="row between">${roleAvatar(p)}<div class="grow"><div class="b">${esc(p.name)}${p.memo ? ` <span class="muted small">${esc(p.memo)}</span>` : ''}${p.locked ? ` <span class="chip danger">${ic('lock')}금융 앱 잠금 중</span>` : ''}</div><div class="muted small" style="margin-top:2px">${note}</div></div>
     ${removable ? `<button class="btn line sm" onclick="act('DELETE','/v1/family/guardians/${esc(p.id)}')">해제</button>` : ''}
     ${p.locked ? `<button class="btn danger sm" onclick="unlockSheet('${esc(p.id)}')">잠금 풀기</button>` : ''}</div></div>`;
   return `${phrase.linked ? `<div class="mt">${phraseCard(phrase)}</div><button class="btn ghost block phrase-link" onclick="go('passphrase')">암구호 쓰는 법과 비상 암구호${ic('chevron-right')}</button>` : ''}
@@ -711,6 +961,7 @@ SCREENS.me = gated(() => `<div class="page">
   <div class="lead" style="margin-top:6px">MY</div>
   <div class="card mt">
     <div class="kv"><span>이름</span><span>${esc(store.get('name') || '-')}</span></div>
+    <button class="kv role-kv" onclick="roleSheet()"><span>가족 역할</span><span>${ROLE_INFO[store.get('role')] ? `${ROLE_INFO[store.get('role')].icon} ${ROLE_INFO[store.get('role')].label}` : '선택하기'}${ic('chevron-right')}</span></button>
     <div class="kv"><span>서버</span><span>${esc(location.host)}</span></div>
     <div class="kv"><span>실행 환경</span><span>${native ? '안드로이드 앱' : '브라우저'}</span></div>
   </div>
@@ -720,7 +971,7 @@ SCREENS.me = gated(() => `<div class="page">
     ${['음성은 분석 후 삭제합니다. 실패한 음성은 재시도나 삭제 전까지 남습니다.', '일상 통화는 글자 기록을 남기지 않습니다.', '분석 내용은 본인만 볼 수 있습니다.', '가족에게는 보이스피싱 의심 여부만 전달됩니다.'].map((t) => `<li>${ic('lock')}<span>${t}</span></li>`).join('')}
   </ul></div>
   ${browserNotifyBlock()}
-  <button class="btn line block mt" onclick="signOut()">이 기기 등록 해제</button>
+  <button class="btn line block mt" onclick="signOut()">${demoMembers.length ? '다른 가족으로 보기' : '이 기기 등록 해제'}</button>
 </div>`);
 
 function browserNotifyBlock() {
@@ -734,6 +985,7 @@ function browserNotifyBlock() {
 function signOut() {
   store.del('token');
   store.del('name');
+  store.del('role');
   native?.setToken('');
   go('home');
   render();
@@ -741,9 +993,10 @@ function signOut() {
 
 /* ---------------- 체험: 검증되지 않은 수치와 없는 화면 연결 제거 ---------------- */
 const baseSim = SCREENS.sim;
-SCREENS.sim = () => baseSim()
+SCREENS.sim = () => baseSim().replace('<div class="sec-title">전체 시나리오', `<button class="card report-entry" onclick="go('report')"><span class="icon-box" style="background:var(--pri-soft);color:var(--pri)">${ic('megaphone')}</span><span class="grow"><b>사기 제보</b><small>새 수법을 제보하고, 상위 제보로 훈련을 만들어요</small></span>${ic('chevron-right')}</button><div class="sec-title">전체 시나리오`)
   .replace('🔥 이번 주 가장 많이 당한 수법', '대표 수법 체험')
-  .replace('기관 사칭 · 평균 정답률 41% · 4분', '기관 사칭 · 4분')
+  .replace('기관 사칭 · 평균 정답률 41% · 4분', '기관 사칭 · 3분')
+  .replace('내 선택에 따라 사기범의 대화가 달라집니다.', '선택할 때마다 왜 위험한지 바로 알려 드립니다.')
   .replace(/<span class="featnum">기능 \d+<\/span>/, '');
 
 const baseSimResult = simResult;
@@ -757,7 +1010,8 @@ simResult = function () {
 };
 
 /* ---------------- 데이터 갱신 ---------------- */
-const DATA_VIEWS = { home: homeData, detect: detectData, family: familyData, lock: lockData, passphrase: passphraseData };
+const DATA_VIEWS = { home: homeData, detect: detectData, family: familyData, lock: lockData, passphrase: passphraseData, report: reportData };
+const REPORT_VIEWS = ['home', 'report'];
 const PHRASE_VIEWS = ['family', 'passphrase'];
 let lastData = '';
 
@@ -771,12 +1025,14 @@ async function refresh() {
       api('GET', '/v1/recordings'), api('GET', '/v1/recommendations'), api('GET', '/v1/family'), api('GET', '/v1/alerts'), api('GET', '/v1/lock'),
     ]);
     const phrase = PHRASE_VIEWS.includes(key) ? await api('GET', '/v1/family/passphrase') : null;
+    // 제보를 못 불러와도 홈의 나머지 내용은 보여 줍니다.
+    const reportList = REPORT_VIEWS.includes(key) ? await loadReportScenarios().catch(() => []) : [];
     const shownPhrase = phrase && { ...phrase, seconds_left: Math.ceil((phrase.seconds_left || 0) / 60) };
-    const snapshot = key + JSON.stringify([recordings, recs, family, alerts, lockMinutes(lock), lock.locked, shownPhrase]);
+    const snapshot = key + JSON.stringify([recordings, recs, family, alerts, lockMinutes(lock), lock.locked, shownPhrase, reportList]);
     const host = $('#data');
     if (snapshot === lastData || !host || (route().r || 'home') !== r) return;
     lastData = snapshot;
-    host.innerHTML = draw({ recordings, recs, family, alerts, lock, phrase });
+    host.innerHTML = draw({ recordings, recs, family, alerts, lock, phrase, reports: reportList });
     icons();
   } catch (e) {
     if ($('#data') && !$('#data').innerHTML) $('#data').innerHTML = emptyCard('서버에 연결할 수 없습니다.');
@@ -825,7 +1081,7 @@ async function pollAlerts() {
   }
 }
 
-['home', 'detect', 'family', 'lock', 'passphrase'].forEach((k) => { INIT[k] = () => { lastData = ''; refresh(); if (k === 'detect') loadSamples(); }; });
+['home', 'detect', 'family', 'lock', 'passphrase', 'report'].forEach((k) => { INIT[k] = () => { lastData = ''; refresh(); if (k === 'detect') loadSamples(); }; });
 setInterval(refresh, 5000);
 setInterval(pollAlerts, 5000);
 setInterval(pollLock, 5000);
@@ -834,3 +1090,6 @@ render();
 pollAlerts();
 pollLock();
 restoreFolder().then(scanFolder);
+loadDemoFamily();
+// 제보 시나리오 주소로 바로 들어온 경우 시나리오를 먼저 불러온 뒤 다시 그립니다.
+loadReportScenarios().then(() => { if (route().r === 'play' || route().r === 'sim') render(); }).catch(() => {});

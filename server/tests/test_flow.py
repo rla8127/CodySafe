@@ -308,7 +308,112 @@ def test_samples_show_result_without_touching_records_alerts_or_lock(client):
     assert client.post("/v1/samples/none/analyze", headers=p).status_code == 404
     # 규칙 판정의 정확도가 아니라 기록과 알림에 영향이 없는지 봅니다.
     assert results["prosecutor"]["label"] == "voice_phishing" and results["prosecutor"]["matches"]
+    assert 0 < results["prosecutor"]["confidence"] <= 1
     assert results["dinner"]["label"] == "normal" and results["dinner"]["evidence"] == []
     assert client.get("/v1/recordings", headers=p).json()["items"] == []
     assert client.get("/v1/alerts", headers=g).json()["items"] == []
     assert client.get("/v1/lock", headers=p).json()["locked"] is False
+
+
+def test_s3_mode_keeps_voice_per_device_and_deletes_after_analysis(client, monkeypatch):
+    from guard import providers
+
+    class FakeS3:
+        objects: dict[str, bytes] = {}
+        exceptions = None
+
+        def generate_presigned_url(self, _, Params, ExpiresIn):
+            return f"https://s3.example/{Params['Key']}"
+
+        def upload_file(self, path, bucket, key):
+            assert bucket == "voice-test"
+            self.objects[key] = open(path, "rb").read()
+
+        def head_object(self, Bucket, Key):
+            return {"ContentLength": len(self.objects[Key])}
+
+        def get_object(self, Bucket, Key):
+            from io import BytesIO
+
+            return {"Body": BytesIO(self.objects[Key])}
+
+        def delete_object(self, Bucket, Key):
+            del self.objects[Key]
+
+    fake = FakeS3()
+    monkeypatch.setattr(config, "STORAGE", "s3")
+    monkeypatch.setattr(config, "S3_BUCKET", "voice-test")
+    monkeypatch.setattr(providers, "_s3", fake)
+    h = device(client, "저장")
+    me = client.post("/v1/recordings", headers=h, json={"filename": "app.txt", "client_key": "app"}).json()
+    assert me["upload_url"].startswith("https://s3.example/recordings/")
+    r = client.post("/v1/recordings", headers=h, json={"filename": "web.txt", "client_key": "web", "direct": False}).json()
+    u = urlsplit(r["upload_url"])
+    assert client.put(f"{u.path}?{u.query}", content=NORMAL.encode()).status_code == 200
+    key = next(iter(fake.objects))
+    assert key.startswith("recordings/") and key.endswith(f"/{r['id']}.txt")
+    assert not (config.LOCAL_AUDIO_DIR / key.replace("/", "_")).exists()
+    assert client.post(f"/v1/recordings/{r['id']}/complete", headers=h).status_code == 200
+    assert fake.objects == {}
+
+
+def test_family_role_is_saved_shown_to_family_and_validated(client):
+    assert client.post("/v1/devices", json={"name": "x", "role": "boss"}).status_code == 422
+    token = client.post("/v1/devices", json={"name": "지수", "role": "daughter", "memo": "첫째"}).json()["token"]
+    child = {"Authorization": f"Bearer {token}"}
+    assert client.get("/v1/devices/me", headers=child).json() == {"name": "지수", "role": "daughter", "memo": "첫째"}
+    parent = device(client, "엄마")
+    code = client.post("/v1/family/invite", headers=child).json()["code"]
+    client.post("/v1/family/link", headers=parent, json={"code": code})
+    seen = client.get("/v1/family", headers=parent).json()["protected"][0]
+    assert seen["role"] == "daughter" and seen["memo"] == "첫째"
+    assert client.put("/v1/devices/me", headers=parent, json={"role": "mom"}).status_code == 200
+    assert client.get("/v1/family", headers=child).json()["guardians"][0]["role"] == "mom"
+    assert client.put("/v1/devices/me", headers=parent, json={"role": "x"}).status_code == 422
+
+
+def test_demo_family_is_off_by_default_and_never_logs_in_real_devices(client, monkeypatch):
+    assert client.get("/v1/demo/family").status_code == 404
+    assert client.post("/v1/demo/family/demo-me/login").status_code == 404
+    monkeypatch.setattr(config, "DEMO_FAMILY", True)
+    db.seed_demo_family()
+    db.seed_demo_family()
+    items = client.get("/v1/demo/family").json()["items"]
+    assert [m["name"] for m in items] == ["동현", "상우", "선형", "호연", "병국"]
+    real = client.post("/v1/devices", json={"name": "실사용"}).json()["device_id"]
+    assert client.post(f"/v1/demo/family/{real}/login").status_code == 404
+    me = {"Authorization": "Bearer " + client.post("/v1/demo/family/demo-me/login").json()["token"]}
+    mom = {"Authorization": "Bearer " + client.post("/v1/demo/family/demo-mom/login").json()["token"]}
+    family = client.get("/v1/family", headers=me).json()
+    assert len(family["guardians"]) == 4 and len(family["protected"]) == 4
+    assert client.get("/v1/family/passphrase", headers=me).json()["words"] == client.get("/v1/family/passphrase", headers=mom).json()["words"]
+    send(client, me, PHISHING, "demo")
+    assert client.get("/v1/alerts", headers=mom).json()["items"][0]["title"] == "동현님 보이스피싱 의심 통화"
+
+
+def test_reports_mask_private_data_hide_author_and_only_top_three_generate(client):
+    # 앞선 테스트의 시연 제보가 상위권을 차지하지 않게 비웁니다.
+    with db.connect() as conn:
+        conn.execute("DELETE FROM reports")
+        conn.execute("DELETE FROM report_votes")
+    a, b = device(client, "제보자"), device(client, "독자")
+    made = client.post("/v1/reports", headers=a, json={"category": "문자", "title": "택배 사칭 문자 신고", "body": "010-1234-5678 번호에서 https://evil.example/x 링크, 계좌 110-123-456789 입금 요구"})
+    rid = made.json()["id"]
+    items = client.get("/v1/reports", headers=b).json()["items"]
+    item = next(i for i in items if i["id"] == rid)
+    assert "1234-5678" not in item["body"] and "evil.example" not in item["body"] and "456789" not in item["body"]
+    assert "device_id" not in item and item["mine"] is False
+    assert client.post("/v1/reports", headers=a, json={"category": "없음", "title": "제목입니다", "body": "내용이 열 글자 넘습니다"}).status_code == 400
+    # 투표 0개는 생성할 수 없습니다.
+    fresh = client.post("/v1/reports", headers=a, json={"category": "기타", "title": "표 없는 제보", "body": "아직 아무도 추천하지 않은 제보입니다"}).json()["id"]
+    assert client.post(f"/v1/reports/{fresh}/scenario", headers=a).status_code == 403
+    client.post(f"/v1/reports/{rid}/vote", headers=b)
+    client.post(f"/v1/reports/{rid}/vote", headers=b)
+    assert next(i for i in client.get("/v1/reports", headers=b).json()["items"] if i["id"] == rid)["votes"] == 1
+    made = client.post(f"/v1/reports/{rid}/scenario", headers=b)
+    assert made.status_code == 200 and len(made.json()["steps"]) == 5
+    assert client.delete(f"/v1/reports/{rid}", headers=b).status_code == 404
+    assert client.delete(f"/v1/reports/{rid}", headers=a).status_code == 200
+    for n in range(4):
+        assert client.post("/v1/reports", headers=a, json={"category": "기타", "title": f"반복 제보 {n}", "body": "하루 제한을 확인하는 제보입니다"}).status_code == 200 or n == 3
+    assert client.post("/v1/reports", headers=a, json={"category": "기타", "title": "초과 제보", "body": "하루 제한을 넘는 제보입니다"}).status_code == 429

@@ -70,6 +70,12 @@ GUARD_STORAGE=s3 GUARD_S3_BUCKET=<버킷> GUARD_STT=transcribe GUARD_ADMIN_TOKEN
 3. A의 검사 탭에서 파일을 올립니다.
 4. A에는 분석 결과가, B에는 의심 여부만 나오는지 확인합니다.
 
+기획과 기술 판단은 [family-guard-plan.md](family-guard-plan.md)에 있습니다.
+
+## 웹 시연 가족
+
+`GUARD_DEMO_FAMILY=1`로 서버를 켜면 웹에서 동현, 상우, 선형, 호연, 병국 중 한 명을 골라 들어갑니다. 안드로이드 앱은 직접 등록합니다. 접속한 누구나 이 계정을 쓸 수 있으므로 실제 통화를 올리지 않습니다.
+
 ## 금융 앱 잠금
 
 - 보이스피싱 확신도가 `GUARD_LOCK_THRESHOLD`(기본 0.9) 이상이면 `GUARD_LOCK_SECONDS`(기본 1시간) 동안 잠급니다.

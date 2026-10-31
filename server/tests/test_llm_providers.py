@@ -78,3 +78,21 @@ def test_scam_verdict_without_real_quote_becomes_uncertain(monkeypatch):
 def test_prompt_forbids_identity_and_outside_facts():
     for rule in ("단정하지 않습니다", "최근 사건", "글자 그대로"):
         assert rule in llm.ANALYSIS_SYSTEM
+
+
+def test_generated_scenario_is_validated_and_cleaned():
+    from guard import reports
+
+    good = reports._rule_scenario("제목")
+    good["steps"][0]["messages"] = ["010-1111-2222로 https://real.example/a 접속"]
+    cleaned = reports.validate(good)
+    assert "1111" not in cleaned["steps"][0]["msgs"][0] and "real.example" not in cleaned["steps"][0]["msgs"][0]
+    assert cleaned["steps"][0]["choices"][0]["act"] is True
+    short = reports._rule_scenario("제목")
+    short["steps"].pop()
+    with pytest.raises(ValueError):
+        reports.validate(short)
+    two_safe = reports._rule_scenario("제목")
+    two_safe["steps"][0]["choices"][1]["safe"] = True
+    with pytest.raises(ValueError):
+        reports.validate(two_safe)
