@@ -409,7 +409,7 @@ async function unlockSheet(id) {
 SCREENS.detect = gated(() => `<div class="page">
   <div class="lead" style="margin-top:6px">통화 검사</div>
   <div class="lead-sub" style="margin-top:6px">저장된 통화 녹음을 AI가 분석합니다. 결과는 본인만 볼 수 있습니다.</div>
-  <div class="card mt">${folderBlock()}</div>
+  <div class="card mt">${folderBlock()}<button class="guide-link" onclick="folderGuide('samsung')">${ic('circle-help')}녹음 폴더 설정 가이드${ic('chevron-right')}</button></div>
   <button class="btn grad block mt" onclick="$('#filePick').click()">${ic('upload')}파일 직접 올려 검사</button>
   <div class="sec-title">예시로 체험하기</div>
   <div class="muted small sample-intro">가상의 통화 대본으로 분석 결과를 미리 봅니다. 기록에 남지 않고 가족 알림과 잠금도 일어나지 않습니다.</div>
@@ -469,6 +469,42 @@ async function openSample(id) {
     if ($('#sampleResult')) $('#sampleResult').innerHTML = '<div class="sample-wait">분석에 실패했습니다. 잠시 뒤 다시 시도해 주세요.</div>';
   }
   icons();
+}
+
+/* ---------------- 폴더 설정 가이드 ---------------- */
+function pickCallFolder() {
+  closeSheet();
+  if (native) (native.pickCallFolder || native.pickFolder).call(native);
+  else if (canWatch()) connectFolder();
+  else $('#dirPick').click();
+}
+
+const guideSteps = (steps) => `<div class="phrase-steps guide-steps">${steps.map((t, i) => `<div class="phrase-step"><span class="step-no">${i + 1}</span><span>${t}</span></div>`).join('')}</div>`;
+
+function folderGuide(tab) {
+  const body = tab === 'samsung'
+    ? `${guideSteps([
+        '전화 앱 오른쪽 위 <b>⋮</b>를 눌러 <b>설정 → 통화 녹음</b>으로 들어갑니다.',
+        '<b>통화 자동 녹음</b>을 켜고 녹음할 범위를 고릅니다.',
+        native ? '아래 버튼을 누르고, 폴더 화면 아래쪽의 <b>이 폴더 사용 → 허용</b>을 누릅니다.' : '아래 버튼을 누르고 <b>내장 저장공간 → Recordings → Call</b> 폴더를 고릅니다.',
+        native ? '이제 통화가 끝나면 새 녹음을 자동으로 검사합니다. 바로 검사하려면 <b>지금 동기화</b>를 누릅니다.' : '폴더를 고른 뒤 새로 생긴 녹음은 다시 검사해야 분석됩니다. 자동 검사는 안드로이드 앱에서 동작합니다.',
+      ])}
+      <button class="btn pri block mt" onclick="pickCallFolder()">${ic('folder-open')}녹음 폴더 열기</button>
+      <div class="muted small guide-note">폴더가 바로 열리지 않으면 Recordings 안의 Call을 고르세요. 오래된 기기는 내장 저장공간의 Call 폴더일 수 있습니다. 메뉴 이름은 기기와 버전에 따라 다릅니다.</div>`
+    : `${guideSteps([
+        '카카오톡 통화는 <b>자동 검사 대상이 아닙니다.</b> 폴더를 연결해도 검사되지 않습니다.',
+        '녹음을 파일로 저장할 수 있다면 휴대폰에 저장합니다.',
+        '<b>파일 직접 올려 검사</b>에서 그 파일을 고릅니다.',
+      ])}
+      <button class="btn pri block mt" onclick="closeSheet();$('#filePick').click()">${ic('upload')}파일 직접 올려 검사</button>
+      <div class="muted small guide-note">Download 폴더는 안드로이드 정책상 폴더째 연결할 수 없습니다. 파일을 하나씩 골라 주세요.</div>`;
+  openSheet(`<div class="b" style="font-size:18px">녹음 폴더 설정 가이드</div>
+    <div class="guide-tabs">
+      <button class="${tab === 'samsung' ? 'on' : ''}" onclick="folderGuide('samsung')">삼성 전화 앱</button>
+      <button class="${tab === 'kakao' ? 'on' : ''}" onclick="folderGuide('kakao')">카카오톡</button>
+    </div>
+    ${body}
+    <button class="btn line block" style="margin-top:8px" onclick="closeSheet()">닫기</button>`);
 }
 
 const detectData = ({ recordings }) => (recordings.items.length ? recordings.items.map(recordingCard).join('') : emptyCard('아직 올린 파일이 없습니다.'));
