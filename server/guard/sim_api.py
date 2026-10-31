@@ -8,12 +8,13 @@ import hashlib
 import json
 import logging
 import os
+import threading
 import time
 import uuid
 from datetime import datetime, timedelta, timezone
 from typing import Literal
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request
 from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import JSONResponse, Response
 from pydantic import BaseModel, Field
@@ -190,6 +191,38 @@ def cached_tts(text: str) -> tuple[bytes, str]:
     return audio, kind
 
 
+WARM_EVERY = 300  # 초. 임대 GPU는 한동안 안 쓰면 잠들어 첫 호출이 6–15초 걸린다(CSIT).
+_warm = {"at": 0.0}
+_warm_lock = threading.Lock()
+
+
+def warm_gpu() -> None:
+    """훈련 목록을 열 때 임대 GPU를 미리 깨운다. 5분에 한 번만, 주소가 없으면 아무것도 하지 않고, 실패는 무시한다."""
+    import httpx
+
+    base = os.getenv("SIM_LLM_BASE_URL", "").strip().rstrip("/")
+    tts = os.getenv("SIM_TTS_URL", "").strip()
+    if not base and not tts:
+        return
+    with _warm_lock:
+        if time.time() - _warm["at"] < WARM_EVERY:
+            return
+        _warm["at"] = time.time()
+    started = time.perf_counter()
+    if base:
+        try:
+            key = os.getenv("SIM_LLM_API_KEY", "")
+            httpx.get(f"{base}/models", headers={"Authorization": f"Bearer {key}"} if key else {}, timeout=20)
+        except Exception as exc:
+            log.info("sim GPU 깨우기(LLM) 실패: %s", type(exc).__name__)
+    if tts:
+        try:
+            cached_tts("여보세요.")
+        except Exception as exc:
+            log.info("sim GPU 깨우기(TTS) 실패: %s", type(exc).__name__)
+    log.info("sim GPU 깨우기 %dms", int((time.perf_counter() - started) * 1000))
+
+
 def prerender(profile: dict) -> None:
     """프로필을 저장할 때 전화 훈련 대사를 미리 합성해 둔다. TTS 주소가 없으면 아무것도 하지 않는다."""
     if not os.getenv("SIM_TTS_URL", "").strip():
@@ -228,7 +261,8 @@ def make_router(current_device) -> APIRouter:
     router = APIRouter()
 
     @router.get("/v1/sim/scenarios")
-    def scenarios(device: str = Depends(current_device)):
+    def scenarios(tasks: BackgroundTasks, device: str = Depends(current_device)):
+        tasks.add_task(warm_gpu)  # 훈련을 시작하기 전에 임대 GPU를 깨워 둔다
         with db.connect() as conn:
             profile = load_profile(conn, device)
             items = _ranked(conn, device, profile)

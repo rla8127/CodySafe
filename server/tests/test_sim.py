@@ -311,3 +311,19 @@ def test_tts_and_stt_report_fallback_when_gpu_is_missing_or_broken(client, monke
     monkeypatch.setenv("SIM_STT_URL", BROKEN_LLM)
     assert client.post("/v1/sim/tts", headers=h, json={"text": "여보세요"}).status_code == 502
     assert client.post("/v1/sim/stt", headers={**h, "Content-Type": "audio/webm"}, content=b"\x00" * 10).status_code == 502
+
+
+def test_gpu_is_warmed_once_per_five_minutes_and_never_without_address(monkeypatch):
+    import httpx
+
+    from guard import sim_api
+
+    calls = []
+    monkeypatch.setattr(httpx, "get", lambda url, **kw: calls.append(url))
+    monkeypatch.setattr(sim_api, "_warm", {"at": 0.0})
+    sim_api.warm_gpu()
+    assert calls == []  # 주소가 없으면 부르지 않는다
+    monkeypatch.setenv("SIM_LLM_BASE_URL", "http://gpu.example/v1/")
+    sim_api.warm_gpu()
+    sim_api.warm_gpu()
+    assert calls == ["http://gpu.example/v1/models"]
