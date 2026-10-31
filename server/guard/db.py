@@ -58,6 +58,20 @@ CREATE TABLE IF NOT EXISTS review_dataset (
   recording_id TEXT PRIMARY KEY, transcript TEXT NOT NULL, label TEXT NOT NULL, scam_type TEXT,
   model_label TEXT, note TEXT, created_at REAL NOT NULL
 );
+CREATE TABLE IF NOT EXISTS sim_sessions (
+  id TEXT PRIMARY KEY, device_id TEXT NOT NULL, scenario_id TEXT NOT NULL, scam_type TEXT NOT NULL, mode TEXT NOT NULL,
+  started_at REAL NOT NULL, finished_at REAL, total INTEGER, breakdown_json TEXT, state_json TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS sim_sessions_device ON sim_sessions (device_id, finished_at);
+CREATE TABLE IF NOT EXISTS sim_turns (
+  session_id TEXT NOT NULL, seq INTEGER NOT NULL, node_id TEXT NOT NULL, input_type TEXT NOT NULL, input_text TEXT,
+  grade TEXT NOT NULL, intent TEXT NOT NULL, source TEXT NOT NULL, latency_ms INTEGER, stt_ms INTEGER,
+  created_at REAL NOT NULL, PRIMARY KEY (session_id, seq)
+);
+CREATE TABLE IF NOT EXISTS weakness (
+  device_id TEXT NOT NULL, scam_type TEXT NOT NULL, value REAL NOT NULL, updated_at REAL NOT NULL,
+  PRIMARY KEY (device_id, scam_type)
+);
 """
 
 
@@ -83,7 +97,7 @@ def init() -> None:
         if "lock_until" not in {r["name"] for r in conn.execute("PRAGMA table_info(devices)")}:
             conn.execute("ALTER TABLE devices ADD COLUMN lock_until REAL NOT NULL DEFAULT 0")
         columns = {r["name"] for r in conn.execute("PRAGMA table_info(devices)")}
-        for column in ("role", "memo"):
+        for column in ("role", "memo", "sim_profile"):  # sim_profile: 모의 훈련 프로필(JSON)
             if column not in columns:
                 conn.execute(f"ALTER TABLE devices ADD COLUMN {column} TEXT")
         # 이전 버전 알림에 저장된 요약과 사기 유형을 지웁니다.

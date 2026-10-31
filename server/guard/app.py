@@ -11,9 +11,12 @@ from fastapi.concurrency import run_in_threadpool
 from fastapi import BackgroundTasks, Depends, FastAPI, Header, HTTPException, Query, Request
 from fastapi.responses import FileResponse, PlainTextResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel, Field
+from typing import Literal
 
-from . import config, dashboard, db, llm, passphrase, pipeline, providers, reports, samples
+from pydantic import BaseModel, ConfigDict, Field, field_validator
+
+from . import config, dashboard, db, llm, passphrase, pipeline, providers, reports, samples, sim_api
+from .sim.schema import PRESETS, AgeBand
 from .lock_apps import LOCK_APPS
 from .scam_kb import BY_ID, OTHER_SCAM, VOICE_PHISHING
 
@@ -93,8 +96,33 @@ class DeviceIn(BaseModel):
 
 
 class ProfileIn(BaseModel):
-    role: str = Field(pattern=ROLE_PATTERN)
+    # role·memo는 가족 화면용(기존). 나머지는 모의 훈련 프로필(MVP 4칸 + 입력자 + 프리셋). 실명·전화번호·종교 칸은 두지 않는다.
+    model_config = ConfigDict(extra="forbid")
+    role: str | None = Field(default=None, pattern=ROLE_PATTERN)
     memo: str | None = Field(default=None, max_length=20)
+    age_band: AgeBand | None = None
+    family_terms: list[str] | None = Field(default=None, min_length=1, max_length=4)
+    main_bank: str | None = Field(default=None, min_length=1, max_length=12)
+    region: str | None = Field(default=None, min_length=1, max_length=12)
+    entered_by: Literal["self", "guardian"] | None = None  # 자기 신고. 본인 확인은 하지 않는다
+    preset: str | None = None
+
+    @field_validator("family_terms")
+    @classmethod
+    def _terms(cls, terms):
+        if terms is not None and any(not t.strip() or len(t) > 8 for t in terms):
+            raise ValueError("가족 호칭은 1–8글자")
+        return [t.strip() for t in terms] if terms is not None else None
+
+    @field_validator("preset")
+    @classmethod
+    def _preset(cls, preset):
+        if preset is not None and preset not in PRESETS:
+            raise ValueError("모르는 프리셋")
+        return preset
+
+
+SIM_PROFILE_FIELDS = ("age_band", "family_terms", "main_bank", "region", "entered_by")
 
 
 class LinkIn(BaseModel):
@@ -274,14 +302,26 @@ def demo_login(member_id: str):
 @app.get("/v1/devices/me")
 def my_profile(device: str = Depends(current_device)):
     with db.connect() as conn:
-        row = conn.execute("SELECT name, role, memo FROM devices WHERE id = ?", (device,)).fetchone()
-    return dict(row)
+        row = conn.execute("SELECT name, role, memo, sim_profile FROM devices WHERE id = ?", (device,)).fetchone()
+    body = {"name": row["name"], "role": row["role"], "memo": row["memo"]}
+    if row["sim_profile"]:  # 모의 훈련 프로필은 저장한 기기에만 붙는다(기존 응답 모양 유지)
+        body["sim_profile"] = json.loads(row["sim_profile"])
+    return body
 
 
 @app.put("/v1/devices/me")
-def update_profile(body: ProfileIn, device: str = Depends(current_device)):
+def update_profile(body: ProfileIn, tasks: BackgroundTasks, device: str = Depends(current_device)):
+    sim_fields = {k: getattr(body, k) for k in SIM_PROFILE_FIELDS if k in body.model_fields_set}
     with db.connect() as conn:
-        conn.execute("UPDATE devices SET role = ?, memo = ? WHERE id = ?", (body.role, body.memo, device))
+        if body.role is not None:
+            conn.execute("UPDATE devices SET role = ?, memo = ? WHERE id = ?", (body.role, body.memo, device))
+        if body.preset or sim_fields:
+            try:
+                profile = sim_api.merge_profile(sim_api.load_profile(conn, device), body.preset, sim_fields)
+            except ValueError as exc:
+                raise HTTPException(422, str(exc))
+            conn.execute("UPDATE devices SET sim_profile = ? WHERE id = ?", (json.dumps(profile.model_dump(), ensure_ascii=False), device))
+            tasks.add_task(sim_api.prerender, profile.model_dump())  # TTS 주소가 있을 때만 대사를 미리 합성
     return {"ok": True}
 
 
@@ -687,3 +727,7 @@ def export_dataset(x_admin_token: str = Header(default="")):
     with db.connect() as conn:
         rows = conn.execute("SELECT * FROM review_dataset ORDER BY created_at").fetchall()
     return "\n".join(json.dumps(dict(r), ensure_ascii=False) for r in rows)
+
+
+# ---------- 모의 훈련 v2: 대본 그래프·판정·안심 대응 점수 (server/guard/sim_api.py) ----------
+app.include_router(sim_api.make_router(current_device))
