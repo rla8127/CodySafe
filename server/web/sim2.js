@@ -40,6 +40,17 @@ function s2btn(cls, iconName, text, onclick) {
   if (onclick) b.onclick = onclick;
   return b;
 }
+// 제목 안의 '딥페이크 영상'을 크게·빨갛게 강조한다(글은 textContent로만).
+const S2_HOT = '딥페이크 영상';
+function s2Title(cls, text) {
+  const e = s2el('div', cls);
+  String(text || '').split(S2_HOT).forEach((part, i, all) => {
+    if (i > 0) e.append(s2el('span', 's2-hot', S2_HOT));
+    const t = i < all.length - 1 ? part.replace(/\s*·\s*$/, ' ') : part;
+    if (t) e.append(document.createTextNode(t));
+  });
+  return e;
+}
 const s2age = (v) => (S2_AGE.find(([k]) => k === v) || [, v])[1];
 const s2sid = () => encodeURIComponent(S2.session.session_id);
 
@@ -202,7 +213,7 @@ function s2RenderList() {
     iconBox.style.color = color;
     iconBox.append(s2icon(icon));
     const body = s2el('div', 'grow');
-    body.append(s2el('div', 't', it.title), s2el('div', 's', it.summary));
+    body.append(s2Title('t', it.title), s2el('div', 's', it.summary));
     const meta = s2el('div', 'meta');
     if (it.badge) meta.append(s2el('span', 'chip danger', it.badge));
     const tagChip = s2el('span', 'chip', tag);
@@ -921,7 +932,7 @@ function s2RenderResult(r) {
   const chip = s2el('span', 'chip', tag);
   chip.style.background = soft;
   chip.style.color = color;
-  head.append(chip, s2el('div', 'b mt', r.title));
+  head.append(chip, s2Title('b mt', r.title));
   const ringBox = s2el('div', 'result-ring');
   const colors = s.total >= 70 ? ['#1CC27B', '#0E9F8E'] : s.total >= 50 ? ['#FFA53A', '#F0712C'] : ['#FF5A4E', '#D92D6B'];
   ringBox.innerHTML = ring(Math.max(0, Math.min(100, Number(s.total) || 0)), 150, 14, '#EEF1F7', colors); // 숫자만 들어감
@@ -1052,6 +1063,7 @@ function s2RenderResult(r) {
   .s2-stop { background: rgba(255,255,255,.7); }
   .bubble.s2-sms { background: #FFF8E1; border: 1px dashed #E0B000; }
   .bubble.s2-video { padding: 6px; max-width: 260px; }
+  .s2-hot { display: inline-block; margin-top: 4px; padding: 2px 8px; border-radius: 8px; background: #FDECEC; color: #D92D20; font-size: 1.25em; font-weight: 900; line-height: 1.3; }
   .s2-video video { display: block; width: 100%; max-height: 320px; border-radius: 10px; background: #000; }
   .s2-video .tiny { margin-top: 4px; opacity: .75; }
   .sysmsg.s2-reveal { background: #fff4e5; color: #8a4b00; border: 1px solid #f5c27a; border-radius: 10px; padding: 8px 10px; font-weight: 600; }
