@@ -33,6 +33,22 @@ _SLOT = re.compile(r"[{}<>]")
 MAX_LINE = 90
 
 
+_TAG = re.compile(r"^\[(인용|바꿔씀)\]\s*")  # O-3 사례 표시(인용·바꿔 씀)는 화면·음성에 내보내지 않는다
+_SPEAKER = re.compile(r"^([^:\"']{1,14}):\s*")
+_NOT_SPOKEN = ("문자", "메일", "메시지", "홍보글", "모집글", "영상 후기", "검색 광고", "피싱 화면", "AI 자녀 목소리")
+
+
+def strip_tags(text: str, spoken: bool = False) -> str | None:
+    """'[바꿔씀] 사기범: "..."' → '...'. spoken=True(전화)이면 문자·메일처럼 말이 아닌 줄은 버린다."""
+    text = _TAG.sub("", " ".join(str(text).split()))
+    m = _SPEAKER.match(text)
+    if m:
+        if spoken and any(k in m.group(1) for k in _NOT_SPOKEN):
+            return None
+        text = text[m.end():]
+    return text.strip().strip('"').strip() or None
+
+
 def mask_line(text: str) -> str | None:
     """사례 대사 한 줄을 훈련용으로 바꾼다. 쓸 수 없으면 None."""
     text = " ".join(str(text).split())
@@ -59,8 +75,14 @@ def load_cases(path: str | Path) -> list[dict]:
     return cases
 
 
-def pick_cases(cases: list[dict], scam_type: str, age_band: str | None, limit: int = 5) -> list[dict]:
+CHANNEL_KO = {"call": "전화", "sms": "문자", "chat": "메신저", "messenger": "메신저"}
+
+
+def pick_cases(cases: list[dict], scam_type: str, age_band: str | None, limit: int = 5, channel: str | None = None) -> list[dict]:
     same = [c for c in cases if c.get("scam_type") == scam_type and c.get("source_url") and c.get("sample_lines")]
+    by_channel = [c for c in same if channel and c.get("channel") == channel]
+    if len(by_channel) >= 3:  # 기본 그래프와 같은 경로(전화·문자)의 사례가 충분하면 그것만 쓴다
+        same = by_channel
     # 프리셋 나이대에 맞는 사례를 먼저, 그다음 최근 사례 순
     same.sort(key=lambda c: str(c.get("published_at", "")), reverse=True)
     same.sort(key=lambda c: age_band not in _as_list(c.get("target_age_band")))
@@ -80,7 +102,9 @@ def generate(cases: list[dict], scam_type: str, preset: str = "mother_74_alone",
     if not base_id:
         raise ValueError(f"이 수법은 아직 기본 그래프가 없습니다: {scam_type}")
     age_band = PRESETS[preset]["profile"]["age_band"]
-    chosen = pick_cases(cases, scam_type, age_band)
+    base_channel = engine.get_graph(base_id).model_dump().get("channel")
+    spoken = base_channel == "call"
+    chosen = pick_cases(cases, scam_type, age_band, channel=CHANNEL_KO.get(str(base_channel)))
     if len(chosen) < 3:
         raise ValueError(f"{scam_type} 사례가 {len(chosen)}건이라 3건보다 적습니다")
 
@@ -93,7 +117,8 @@ def generate(cases: list[dict], scam_type: str, preset: str = "mother_74_alone",
             if case.get("stage") and node["stage"] not in _as_list(case.get("stage")):  # 사례의 stage는 목록(plan-ai 5-2절)
                 continue
             for raw in _as_list(case.get("sample_lines")):
-                masked = mask_line(raw)
+                plain = strip_tags(raw, spoken)
+                masked = mask_line(plain) if plain else None
                 if masked and masked not in taken:  # 같은 대사를 두 장면에 쓰지 않는다
                     lines.append(masked)
                     taken.add(masked)
