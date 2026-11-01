@@ -1,0 +1,61 @@
+# 탐지 오탐·미탐 확인 (2026-11-01)
+
+> **합성 표본 30건(사기 10 + 보통 전화 20)으로 한 시연용 확인이며 일반 성능이 아닙니다.** 대사는 모두 AI가 쓴 합성이고 ES 색인에 없는 것입니다. 표본 파일은 저장소에 넣지 않았습니다.
+>
+> **한계:** 보통 전화 대사 중 5건(n01·n02·n03·n09·n10)에 "송금을 요구하지 않습니다" 같은 안심 문구가 들어 있어, 정상 쪽 결과가 실제보다 쉽게 나올 수 있습니다.
+
+- 판정 경로: `GUARD_RAG_FIRST=1`, `GUARD_LLM=rule`(키워드 규칙 = LLM이 안 될 때 쓰는 대체 경로), 사례 검색 꺼짐. LLM 판정 숫자는 아닙니다.
+- 점수: AI 의심 점수(보정 전, 확률 아님). 0–39 기록 / 40–69 주의 / 70–89 위험(가족 알림) / 90+ 매우 위험(잠금). 자동 알림·잠금은 보이스피싱 판정이고 녹취 근거 발화가 있을 때만.
+- 재현: `server/.venv/bin/python scripts/detect_eval.py --scam <사기 txt들> --normal <보통 txt들> --show`
+
+| 구분 | 분모 | 기록 | 주의 | 위험 | 매우 위험 | 판단 어려움 | 판정 실패 |
+|---|---|---|---|---|---|---|---|
+| 사기 | 10 | 8 | 0 | 2 | 0 | 0 | 0 |
+| 정상 | 20 | 19 | 1 | 0 | 0 | 0 | 0 |
+
+- 오탐(정상인데 가족 알림): 0/20 (0%), 그중 잠금 0
+- 정상인데 주의 이상(본인 확인 안내): 1/20 (5%)
+- 미탐(사기인데 가족 알림 없음): 9/10 (90%), 그중 판단 어려움 0
+- 사기 중 잠금까지: 0/10 (0%)
+
+| 파일 | 정답 | 구간 | 점수 | 판정 |
+|---|---|---|---|---|
+| s01.txt | scam | 기록 | 0 | normal |
+| s02.txt | scam | 위험 | 85 | voice_phishing |
+| s03.txt | scam | 기록 | 0 | normal |
+| s04.txt | scam | 기록 | 0 | normal |
+| s05.txt | scam | 위험 | 85 | other_scam |
+| s06.txt | scam | 기록 | 0 | normal |
+| s07.txt | scam | 기록 | 0 | normal |
+| s08.txt | scam | 기록 | 0 | normal |
+| s09.txt | scam | 기록 | 0 | normal |
+| s10.txt | scam | 기록 | 0 | normal |
+| n01.txt | normal | 기록 | 0 | normal |
+| n02.txt | normal | 기록 | 0 | normal |
+| n03.txt | normal | 기록 | 0 | normal |
+| n04.txt | normal | 기록 | 0 | normal |
+| n05.txt | normal | 기록 | 0 | normal |
+| n06.txt | normal | 기록 | 0 | normal |
+| n07.txt | normal | 기록 | 0 | normal |
+| n08.txt | normal | 주의 | 65 | voice_phishing |
+| n09.txt | normal | 기록 | 0 | normal |
+| n10.txt | normal | 기록 | 0 | normal |
+| n11.txt | normal | 기록 | 0 | normal |
+| n12.txt | normal | 기록 | 0 | normal |
+| n13.txt | normal | 기록 | 0 | normal |
+| n14.txt | normal | 기록 | 0 | normal |
+| n15.txt | normal | 기록 | 0 | normal |
+| n16.txt | normal | 기록 | 0 | normal |
+| n17.txt | normal | 기록 | 0 | normal |
+| n18.txt | normal | 기록 | 0 | normal |
+| n19.txt | normal | 기록 | 0 | normal |
+| n20.txt | normal | 기록 | 0 | normal |
+
+## 참고: 같은 규칙 판정으로 본 다른 표본 (숫자만, 원문은 저장소 밖)
+
+| 표본 | 분모 | 기록 | 주의 | 위험 | 매우 위험 | 가족 알림 |
+|---|---|---|---|---|---|---|
+| 실제 사기 통화 전사(금감원 공개 녹음 기반 팀 내부 자료, ES 색인 밖 무작위, 2016–2020년) | 20 | 14 | 5 | 1 | 0 | 1 |
+| 최신 수법 합성 대사(2025–2026 공식 사례 46건만 보고 규칙을 모르는 AI가 씀) | 10 | 9 | 0 | 0 | 1 | 1 |
+
+규칙 판정은 키워드 몇 개만 보는 대체 경로라서 사기 대부분을 놓칩니다. 탐지 성능은 LLM 판정 경로로 따로 재야 합니다.
