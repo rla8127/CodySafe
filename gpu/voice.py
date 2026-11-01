@@ -60,8 +60,10 @@ VOICES = {
                      "speaking standard Seoul Korean on a phone call. ",
     "family": "A Korean man in his late 20s, the listener's son, with a natural, familiar, warm voice, "
               "speaking casual Seoul Korean on a phone call. ",
+    "family_female": "A Korean woman in her early 20s, the listener's daughter, with a natural, familiar, "
+                     "slightly high and soft voice, speaking casual Seoul Korean on a phone call.",
 }
-SEEDS = {"caller_male": 1101, "caller_female": 2202, "family": 3303}  # fixed seed per voice -> steadier timbre
+SEEDS = {"caller_male": 1101, "caller_female": 2202, "family": 3303, "family_female": 4404}  # fixed seed per voice -> steadier timbre
 TONES = {  # O-1 TONE_GUIDE keys -> English style words for the instruct (pace stays natural unless noted)
     "calm": "calm and clear, but at a normal conversational pace",
     "official": "stiff, formal and bureaucratic, slightly low pitch, brisk",
@@ -140,7 +142,7 @@ class Voice:
         # warm the kernels once so the first real request is not the slow one
         self._synth("안녕하세요.", "caller_male", "")
 
-    def _synth(self, text: str, voice: str, style: str, emotion: str = ""):
+    def _synth(self, text: str, voice: str, style: str, emotion: str = "", rate: float = 0.0):
         import io
         import re
         import subprocess
@@ -163,8 +165,11 @@ class Voice:
         dur = len(wav) / sr
         speed = 1.0
         if syllables and dur:
-            speed = min(MAX_STRETCH.get(emotion, 1.6), max(1.0, RATE.get(emotion, RATE[""]) * dur / syllables))
-        if speed > 1.02:  # raw float in/out so the WAV header written below has the right length
+            if rate:  # caller asked for an exact pace (e.g. video lines): allow slowing down too
+                speed = min(1.3, max(0.8, rate * dur / syllables))
+            else:
+                speed = min(MAX_STRETCH.get(emotion, 1.6), max(1.0, RATE.get(emotion, RATE[""]) * dur / syllables))
+        if abs(speed - 1.0) > 0.02:  # raw float in/out so the WAV header written below has the right length
             out = subprocess.run(["ffmpeg", "-nostdin", "-loglevel", "error", "-f", "f32le", "-ar", str(sr),
                                   "-ac", "1", "-i", "-", "-filter:a", f"atempo={speed:.3f}", "-f", "f32le", "-"],
                                  input=wav.tobytes(), capture_output=True)
@@ -255,7 +260,12 @@ class Voice:
             import anyio
 
             t0 = time.perf_counter()
-            audio, speed = await anyio.to_thread.run_sync(self._synth, text, voice, style, emotion)
+            try:
+                rate = float(body.get("rate") or 0)  # optional target syllables per second (3–9)
+            except (TypeError, ValueError):
+                rate = 0.0
+            rate = rate if 3.0 <= rate <= 9.0 else 0.0
+            audio, speed = await anyio.to_thread.run_sync(self._synth, text, voice, style, emotion, rate)
             return Response(content=audio, media_type="audio/wav",
                             headers={"X-Elapsed-S": f"{time.perf_counter() - t0:.3f}", "X-Voice": voice,
                                      "X-Speed": f"{speed:.2f}"})
