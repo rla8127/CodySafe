@@ -1,0 +1,59 @@
+"""예비 자료(백업): 임대 GPU가 꺼지거나 끊겼을 때 미리 GPU로 만들어 둔 결과를 대신 쓴다.
+
+- 대사 음성: server/backup/tts/<key>.mp3, key = sha256("<voice>|<tone>|<text>")[:32]
+  (주소·모델은 키에 넣지 않는다. GPU 주소가 없어도 같은 키로 찾게)
+- 판정: server/backup/judge.json  {"<scenario>|<node>|<정규화한 답>": {"grade","intent","confidence"}}
+  임대 GPU LLM(Kanana 1.5 8B)이 미리 판정한 결과. 정해진 답에는 늘 같은 판정이 나온다.
+- 영상: server/backup/video/<name>.mp4  (합성 얼굴, 'AI 생성' 표시. 실제 사람 아님)
+- 만든 방법·목록: server/backup/manifest.json, 생성 스크립트 gpu/make_backup.py
+
+이 모듈은 파일만 읽는다(네트워크 없음). 못 찾으면 None을 돌려주고, 부르는 쪽이 원래 대체 경로(브라우저 음성·규칙 판정)로 간다.
+"""
+import hashlib
+import json
+import os
+import re
+from functools import lru_cache
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[2]  # server/
+BACKUP = Path(os.getenv("SIM_BACKUP_DIR", str(ROOT / "backup")))
+DEFAULT_VOICE = "caller_male"
+
+
+def tts_key(text: str, tone: str | None = None, voice: str | None = None) -> str:
+    voice = voice or os.getenv("SIM_TTS_VOICE", "") or DEFAULT_VOICE
+    if voice == "default":
+        voice = DEFAULT_VOICE
+    return hashlib.sha256(f"{voice}|{tone or ''}|{text}".encode()).hexdigest()[:32]
+
+
+def tts(text: str, tone: str | None = None, voice: str | None = None) -> tuple[bytes, str] | None:
+    """미리 만든 대사 음성. 없으면 None."""
+    path = BACKUP / "tts" / f"{tts_key(text, tone, voice)}.mp3"
+    return (path.read_bytes(), "audio/mpeg") if path.is_file() else None
+
+
+def norm_answer(text: str) -> str:
+    """판정 찾기용: 공백·문장부호를 지우고 소문자로."""
+    return re.sub(r"[\s\.,!?~…·'\"“”‘’()\-]+", "", (text or "").lower())
+
+
+@lru_cache(maxsize=1)
+def _judge_table() -> dict:
+    path = BACKUP / "judge.json"
+    return json.loads(path.read_text(encoding="utf-8")) if path.is_file() else {}
+
+
+def judge(scenario_id: str, node_id: str, text: str) -> dict | None:
+    """미리 판정해 둔 답이면 그 판정(같은 장면 → 아무 장면 순으로 찾음), 없으면 None."""
+    table, key = _judge_table(), norm_answer(text)
+    if not key:
+        return None
+    hit = table.get(f"{scenario_id}|{node_id}|{key}") or table.get(f"*|*|{key}")
+    return dict(hit) if hit else None
+
+
+def video(name: str) -> Path | None:
+    path = BACKUP / "video" / f"{name}.mp4"
+    return path if path.is_file() else None
