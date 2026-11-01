@@ -125,8 +125,6 @@ class Voice:
         import soundfile as sf
         import torch
 
-        if emotion in MAX_STRETCH:  # "!" endings make the model press harder and faster (08:5x test)
-            text = re.sub(r"[.。](\s|$)", r"!\1", text)
         instruct = VOICES[voice] + (f" Speaking style: {style}." if style else "")
         with self.lock:
             torch.manual_seed(SEEDS[voice])
