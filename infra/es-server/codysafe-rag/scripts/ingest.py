@@ -128,6 +128,46 @@ def collect(src, n_dataset, n_pdf, seed, stats):
     return docs
 
 
+# ----------------------------------------------------------------- 정제된 공식 사례 (--cases)
+# data/clean/*_official_cases.jsonl: 사람이 공식 자료를 요약·태그한 줄. LLM 분류·구조화를 건너뛴다.
+CASE_EXTRA = ["stage", "tactics", "requested_actions", "target_age_band", "published_at", "source_tier", "license"]
+CASE_KEEP = CASE_EXTRA + ["case_id", "source_ref", "synthetic", "sample_lines"]
+
+
+def load_cases(path, stats):
+    out = []
+    for n, line in enumerate(open(path, encoding="utf-8"), 1):
+        if not line.strip():
+            continue
+        r = json.loads(line)
+        if r.get("source_tier") != "official" or r.get("synthetic") is not False:
+            stats["excluded_schema"] += 1
+            print(f"[case {n}] skip: not official/non-synthetic", file=sys.stderr)
+            continue
+        o = {k: r.get(k) for k in FIELDS}
+        o["summary"] = r.get("summary") or r["title"]
+        for k in ("method_steps", "warning_signs", "response_guide"):
+            o[k] = r.get(k) or []
+        try:
+            validate(o)
+        except ValueError as e:
+            stats["excluded_schema"] += 1
+            print(f"[case {n}] schema: {e}", file=sys.stderr)
+            continue
+        o.update({k: r.get(k) for k in CASE_KEEP if k != "case_id"})
+        o["case_id"] = r["id"]
+        o["source_name"], o["source_url"], o["data_period"] = r.get("source_name"), r["source_url"], None
+        out.append(o)
+    return out
+
+
+def build_case_content(o):
+    c = build_content(o)
+    if o.get("sample_lines"):
+        c += "\n대사 예: " + " / ".join(o["sample_lines"])
+    return c
+
+
 # ----------------------------------------------------------------- LLM
 class LLM:
     def __init__(self, model, max_calls):
@@ -188,6 +228,68 @@ def es_client():
                          request_timeout=60)
 
 
+def embed_save_bulk(a, out, stats, today, t0, llm=None, tag=""):
+    """임베딩 -> data/processed 저장(벡터 제외) -> (dry-run 아니면) ES _bulk -> 실행 기록."""
+    if a.no_embed and not a.dry_run:
+        raise SystemExit("--no-embed는 --dry-run과 함께만 쓴다")
+    if out and not a.no_embed:
+        from sentence_transformers import SentenceTransformer
+        m = SentenceTransformer("BAAI/bge-m3", device="cpu")
+        m.max_seq_length = 512
+        vecs = m.encode([o["title"] + "\n" + o["content"] for o in out], normalize_embeddings=True,
+                        batch_size=4, show_progress_bar=False)
+        stats["embedded"] = len(out)
+    else:
+        vecs = []
+    pdir, rdir = ROOT / "data/processed", ROOT / "data/runs"
+    pdir.mkdir(parents=True, exist_ok=True)
+    rdir.mkdir(parents=True, exist_ok=True)
+    suffix = tag + (".dryrun" if a.dry_run else "")
+    with open(pdir / f"{today}{suffix}.jsonl", "w", encoding="utf-8") as f:
+        for o in out:
+            f.write(json.dumps(o, ensure_ascii=False) + "\n")
+    if not a.dry_run and out:
+        from elasticsearch import helpers
+        es = es_client()
+        actions = [dict(_op_type="index", _index=a.alias, _id=o["content_hash"],
+                        _source={**o, "embedding": v.tolist()}) for o, v in zip(out, vecs)]
+        ok, errs = helpers.bulk(es, actions, raise_on_error=False, refresh="wait_for")
+        stats["indexed"], stats["es_errors"] = ok, len(errs)
+        if errs:
+            print("bulk errors:", json.dumps(errs[:2], ensure_ascii=False)[:500], file=sys.stderr)
+    if llm:
+        stats.update(llm_calls=llm.calls, input_tokens=llm.in_tok, output_tokens=llm.out_tok)
+    stats["seconds"] = round(time.time() - t0, 1)
+    with open(rdir / f"{today}{suffix}.json", "w", encoding="utf-8") as f:
+        json.dump(stats, f, ensure_ascii=False, indent=2)
+    print(json.dumps(stats, ensure_ascii=False, indent=2))
+
+
+def ingest_cases(a, stats, today, t0):
+    """--cases: 정제된 공식 사례를 그대로 적재. 이미 적재된 case_id는 건너뛴다(재실행해도 늘지 않음)."""
+    out = load_cases(a.cases, stats)[: a.max]
+    stats["collected"] = len(out)
+    try:
+        es0 = es_client()
+        ids = [o["case_id"] for o in out]
+        r = es0.search(index=a.alias, size=len(ids) or 1, _source=["case_id"], query={"bool": {"should": [
+                            {"terms": {"case_id": ids}}, {"terms": {"case_id.keyword": ids}}]}})  # dynamic mapping -> .keyword
+        found = {h["_source"]["case_id"] for h in r["hits"]["hits"]}
+        stats["skipped_existing"] = len(found)
+        out = [o for o in out if o["case_id"] not in found]
+    except Exception as e:
+        print("existing check failed:", type(e).__name__, file=sys.stderr)
+        stats["skipped_existing"] = None
+    now = datetime.now(timezone.utc).isoformat(timespec="seconds")
+    for o in out:
+        o["content"] = build_case_content(o)
+        o["content_hash"] = sha256(norm_text(o["content"]))
+        o["collected_at"] = now
+    stats["structured"] = len(out)
+    stats["case_fields"] = CASE_EXTRA
+    embed_save_bulk(a, out, stats, today, t0, tag=".cases")
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--dry-run", action="store_true", help="ES에 쓰지 않는다")
@@ -197,6 +299,8 @@ def main():
     ap.add_argument("--model", default=os.environ.get("LLM_MODEL", "claude-haiku-5-5"))
     ap.add_argument("--seed", type=int, default=42)
     ap.add_argument("--alias", default="scam_knowledge")
+    ap.add_argument("--cases", default=None, help="정제된 공식 사례 JSONL (LLM 단계 생략)")
+    ap.add_argument("--no-embed", action="store_true", help="--dry-run 미리보기에서 bge-m3 로드를 건너뛴다(서버 메모리 절약)")
     a = ap.parse_args()
 
     t0 = time.time()
@@ -205,6 +309,9 @@ def main():
                  excluded_no_published_at=0, excluded_unreadable=0, deduped=0, classified={}, excluded_by_class=[],
                  structured=0, excluded_schema=0, excluded_llm_error=0, embedded=0, indexed=0, es_errors=0,
                  llm_calls=0, input_tokens=0, output_tokens=0, seconds=None)
+
+    if a.cases:
+        return ingest_cases(a, stats, today, t0)
 
     n_pdf = a.pdf if a.pdf is not None else min(5, a.max // 10 or 1)
     docs = collect(a.src, a.max - n_pdf, n_pdf, a.seed, stats)[: a.max]
