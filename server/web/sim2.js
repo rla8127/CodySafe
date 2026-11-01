@@ -469,6 +469,7 @@ function s2RevealFake() {
 
 async function s2Answer(payload, shown) {
   if (S2.busy || !S2.session) return;
+  s2UnlockAudio();
   s2CancelStt();
   S2.busy = true;
   const hadVideo = !!(S2.scene && S2.scene.video);
@@ -531,7 +532,31 @@ function s2Status(text) {
   if (st) st.textContent = text;
 }
 
+// 폰 브라우저(iOS Safari·Android Chrome)는 누른 그 순간에만 소리를 허락한다. 받기·답 누를 때 소리 장치를 깨워 둔다.
+function s2UnlockAudio() {
+  try {
+    const AC = window.AudioContext || window.webkitAudioContext;
+    if (AC) {
+      const ctx = S2.audioCtx || (S2.audioCtx = new AC());
+      if (ctx.state === 'suspended') ctx.resume();
+      const s = ctx.createBufferSource();
+      s.buffer = ctx.createBuffer(1, 1, 22050);
+      s.connect(ctx.destination);
+      s.start(0);
+    }
+  } catch (e) { }
+  try {
+    if ('speechSynthesis' in window && !S2.speechUnlocked) {
+      const u = new SpeechSynthesisUtterance(' ');
+      u.volume = 0;
+      speechSynthesis.speak(u);
+      S2.speechUnlocked = true;
+    }
+  } catch (e) { }
+}
+
 function s2Pickup() {
+  s2UnlockAudio();
   $('#c2Avatar')?.classList.remove('s2-ring');
   $('#c2Tr').textContent = '';
   S2.callStart = Date.now();
@@ -759,7 +784,8 @@ async function s2PlayTts(text, token, tone) {
     if (token !== S2.speakToken) return true;
     label(res.headers.get('X-Sim-Voice') === 'backup' ? '미리 만든 음성 · 전화 음질' : '실시간 합성 음성 · 전화 음질');
     const ctx = S2.audioCtx || (S2.audioCtx = new (window.AudioContext || window.webkitAudioContext)());
-    if (ctx.state === 'suspended') await ctx.resume();
+    if (ctx.state === 'suspended') await Promise.race([ctx.resume(), new Promise((r) => setTimeout(r, 500))]);
+    if (ctx.state !== 'running') return false; // 소리 장치가 잠겨 있으면 브라우저 음성으로
     const audio = await ctx.decodeAudioData(buf);
     const src = ctx.createBufferSource();
     src.buffer = audio;
@@ -771,7 +797,11 @@ async function s2PlayTts(text, token, tone) {
     lp.frequency.value = 3400;
     src.connect(hp).connect(lp).connect(ctx.destination);
     S2.source = src;
-    await new Promise((resolve) => { src.onended = resolve; src.start(); });
+    await new Promise((resolve) => {
+      const guard = setTimeout(resolve, audio.duration * 1000 + 1500); // 재생 끝 신호가 안 와도 멈추지 않게
+      src.onended = () => { clearTimeout(guard); resolve(); };
+      src.start();
+    });
     return true;
   } catch (e) {
     if (e && e.name === 'AbortError') label('브라우저 음성(ko-KR) · 합성 음성 준비 중');
