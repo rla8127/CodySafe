@@ -39,6 +39,7 @@
 |---|---|
 | 서비스 | Modal (https://modal.com, 작업 공간 hoykim125, 서버리스 GPU, 약관 https://modal.com/legal/terms ) |
 | GPU | **NVIDIA L40S 48GB** (Ada Lovelace 세대, FP8 지원. nvidia-smi 총 46,068 MiB). Modal 요금 US$1.95/시간 |
+| 쓰는 단계 | **콘텐츠 생성 단계에서만**(호연 결정 11-01 11:1x). 서비스·시연 실행 중에는 GPU를 부르지 않고, 미리 만든 저장 자료만 쓴다. 생성할 때만 앱을 올리고 끝나면 내린다 |
 | 구성 | 앱 4개, 앱마다 컨테이너 최대 1개·GPU 1장. 쓰지 않으면 5분 뒤 꺼짐(비용 0), 부르면 깨어남. 무료 크레딧은 Starter 요금제 월 US$30 |
 | 앱 | `codysafe-llm`(판정 LLM, 상시 주소) · `codysafe-voice`(STT·TTS, 상시 주소) · `codysafe-face`·`codysafe-video`(얼굴·영상, 필요할 때 1회 실행) |
 | 인증 | 모든 주소 Bearer 토큰 1개(Modal Secret과 git 제외 `.env`에만) |
@@ -68,7 +69,7 @@ vLLM 0.21.0(Apache-2.0) · faster-whisper 1.2.1 / CTranslate2(MIT) · qwen-tts 0
 |---|---|---|
 | 탐지 STT | 팀 korean-stt 서버(김동현, EC2 CPU, whisper large-v3-turbo INT8) | 훈련 STT와 같은 모델 계열. 시연 때 훈련 STT도 이 서버를 씀(호연 11-01 10:1x 결정) |
 | 훈련 대사 음성·판정·영상 | 임대 GPU로 **미리** 만들어 `server/backup/`에 저장 | 시연·녹화는 저장 자료로. 대사 49개 mp3(프리셋 3개 × 대본 3개의 108줄을 모두 찾음), 판정 138개(대본 선택지 48 + 미리 판정한 답 90), 영상 2편. 답 판정 순서는 규칙 → 저장 판정 → 기본값(화면에 나오는 시연 답 판정은 대부분 규칙이 정함) |
-| 실시간 GPU | 필요할 때만 깨움(`gpu/warm.sh up`) | 실시간 GPU를 보여 줄 때만. 두 앱 시간당 약 US$4.2(GPU+CPU·메모리)[추정] |
+| 실시간 GPU | 쓰지 않음 | 서비스·시연 중 GPU 호출 없음. 앱은 11-01 11:03에 내려 둠 |
 
 ## 5. 한 줄 설명 (발표용)
 

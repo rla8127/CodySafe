@@ -1,12 +1,12 @@
 # gpu/ — 임대 GPU(Modal) 모델 서빙
 
-CodySafe 모의 훈련의 판정 LLM·음성 인식·음성 합성을 Modal(작업 공간 hoykim125)의 NVIDIA L40S에 올린다.
-실측은 `eval/gpu_latency.md`.
+**GPU는 콘텐츠 생성 단계에서만 쓴다(호연 결정 11-01 11:1x).** 서비스·시연 실행 중에는 GPU를 부르지 않는다. Modal(NVIDIA L40S)에서 판정 LLM·음성 합성·영상 모델을 돌려 대사 음성·판정 표·딥페이크 영상을 **미리 만들어** `server/backup/`에 저장하고, 앱은 그 저장 자료만 쓴다. 말소리 인식(STT)은 팀 STT 서버(CPU)를 쓴다.
+실측은 `eval/gpu_latency.md`, 모델 목록과 고른 이유는 `docs/gpu-models.md`.
 
 | 앱 | 파일 | 주소 | 내용 |
 |---|---|---|---|
-| codysafe-llm | `llm.py` | https://hoykim125--codysafe-llm-serve.us-east.modal.run (`/v1`, `/health`) | vLLM OpenAI 호환, Kanana 1.5 8B fp8, 모델 이름 `codysafe-llm` |
-| codysafe-voice | `voice.py` | https://hoykim125--codysafe-voice-voice-web.us-east.modal.run (`/stt`, `/tts`, `/health`) | faster-whisper large-v3-turbo + Qwen3-TTS 1.7B (VoiceDesign으로 목소리 4개를 1번 설계 → Base가 모든 대사를 그 목소리로) |
+| codysafe-llm | `llm.py` | 배포할 때만 생김(평소 내려 둠) | vLLM OpenAI 호환, Kanana 1.5 8B fp8, 모델 이름 `codysafe-llm` |
+| codysafe-voice | `voice.py` | 배포할 때만 생김(평소 내려 둠) | faster-whisper large-v3-turbo + Qwen3-TTS 1.7B (VoiceDesign으로 목소리 4개를 1번 설계 → Base가 모든 대사를 그 목소리로) |
 | codysafe-face·codysafe-video | `face.py`·`video.py`·`deepfake_presets.py` | 없음(`modal run`으로 필요할 때만) | Z-Image-Turbo로 실존하지 않는 얼굴 → EchoMimicV3로 말하는 영상, 'AI 생성' 표시 |
 
 예비 자료: `server/backup/`(대사 mp3·판정 표·영상), 만드는 법 `gpu/make_backup.py`, 읽는 모듈 `server/guard/sim/backup.py`. GPU·모델 목록은 `docs/gpu-models.md`.
@@ -15,18 +15,21 @@ CodySafe 모의 훈련의 판정 LLM·음성 인식·음성 합성을 Modal(작�
 
 모든 주소는 `Authorization: Bearer <토큰>` 하나로 받는다(`/health`만 토큰 없음). 토큰은 Modal Secret `codysafe-gpu`(키 `GPU_TOKEN`)와 git이 무시하는 `server/.env`·`.env.gpu`에만 있다. 화면·로그·커밋에 쓰지 않는다. vLLM에는 `--api-key` 대신 환경 변수로 넘긴다(vLLM이 시작할 때 명령 인자를 로그에 찍기 때문).
 
-## server/.env 변수
+## server/.env (실행할 때)
+
+GPU 주소·토큰은 넣지 않는다. 예비 자료와 팀 STT만 쓴다.
 
 ```
-SIM_LLM_BASE_URL=https://hoykim125--codysafe-llm-serve.us-east.modal.run/v1
-SIM_LLM_MODEL=codysafe-llm
-SIM_LLM_API_KEY=<토큰>
-SIM_TTS_URL=https://hoykim125--codysafe-voice-voice-web.us-east.modal.run/tts
-SIM_STT_URL=https://hoykim125--codysafe-voice-voice-web.us-east.modal.run/stt
-SIM_TTS_VOICE=caller_male
-SIM_TTS_API_KEY=<같은 토큰>   # 음성 주소의 호스트가 LLM과 달라 O-1 클라이언트가 LLM 토큰을 빌리지 않는다
-SIM_STT_API_KEY=<같은 토큰>
+SIM_BACKUP_FIRST=1                 # 저장 자료(server/backup/)를 쓴다
+SIM_TTS_VOICE=caller_male          # 예비 음성을 이 목소리로 만들었으므로 바꾸지 않는다
+SIM_STT_URL=<팀 STT 서버 주소>/v1/audio/transcriptions
+SIM_STT_API_KEY=<팀 STT 키>
+SIM_STT_TIMEOUT=30
 ```
+
+## 콘텐츠를 다시 만들 때만 (GPU)
+
+`modal deploy gpu/llm.py`·`gpu/voice.py`로 잠시 올려 `gpu/make_backup.py`로 예비 자료를 만들고, 끝나면 `modal app stop`으로 내린다. 그때만 생성용 `.env`에 배포 주소와 토큰(Modal Secret `codysafe-gpu`와 같은 값)을 넣는다.
 
 ## 요청 형식 (O-1 클라이언트에 맞춰 너그럽게 받음)
 
