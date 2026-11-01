@@ -47,12 +47,12 @@ flowchart LR
 | 사용자별 S3 저장 | 구현, 실제 버킷에 시험 파일로 확인 |
 | 폴더 연결, 분석 후 경고, 금융 앱 차단 (Android) | 구현, 실제 폰 1대에서 녹화로 확인 ([영상](server/web/media/demo.mp4)) |
 | 15초 감지 주기, 앱이 꺼진 뒤 주기 실행 (Android) | 구현, 주기와 지연은 미측정 |
-| 사례 검색 (RAG) | 별도 Elasticsearch 검색 서버를 `GUARD_RAG_URL`로 연결하면 판정 전에 참고 자료로 넣음. 코드와 실행 방법은 [infra/es-server](infra/es-server/codysafe-rag/README.md)에 있음. 원본 데이터는 올리지 않아 재현에 데이터 폴더가 필요. 서버가 없어도 LLM만으로 동작. 내장 검색은 판정 뒤 유형 표시에 쓰며 벡터는 해시 임베딩. 효과 미측정 |
+| 사례 검색 (RAG) | 별도 Elasticsearch 검색 서버를 `GUARD_RAG_URL`로 연결하면 판정 전에 참고 자료로 넣음. 코드와 실행 방법은 [infra/es-server](infra/es-server/codysafe-rag/README.md)에 있음. 원본 데이터는 올리지 않아 재현에 데이터 폴더가 필요. 서버가 없어도 LLM만으로 동작. 내장 검색은 판정 뒤 유형 표시에 쓰며 벡터는 해시 임베딩. 합성 통화 60건에서는 판정 차이 없음 |
 | 피드백, 사용자 대시보드 | 구현, 자동 테스트와 브라우저로 확인 |
 | 재학습, 검색 색인 갱신 | 추후 과제 |
 | 자체 STT (CPU, `whisper-large-v3-turbo` INT8) + OpenAI 대체 경로 | 구현. 실제 MP3 1건으로 실서버 전사부터 판정까지 확인. 대체 경로도 확인. 성능은 표본이 적어 근거로 쓰지 않음 |
 | GPU 서빙 | 미구현 |
-| 탐지율, 오탐률 | 미측정. 예시 대본 6건은 동작 확인용이며 성능 근거가 아님 |
+| 판정 평가 | 합성 통화 60건(`server/eval/`): 사기 30건 모두 탐지, 정상 30건 오탐 0건, RAG 유무 차이 없음. 평가셋이 합성이고 작아 95% 신뢰구간은 탐지율 88% 이상, 오탐률 12% 이하. 실제 통화 성능은 미측정 |
 
 ## 실행
 
@@ -60,7 +60,7 @@ flowchart LR
 git clone https://github.com/rla8127/CodySafe.git
 cd CodySafe/server
 python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
-.venv/bin/python -m pytest -q   # 70개, 외부 키 불필요
+.venv/bin/python -m pytest -q   # 71개, 외부 키 불필요
 ```
 
 Python 3.12에서 확인했습니다.
