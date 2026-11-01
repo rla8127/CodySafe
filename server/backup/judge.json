@@ -266,11 +266,11 @@
   "source": "gpu-llm"
  },
  "agency_call|n1_intro|어머큰일이네제가뭘어떻게해야돼요": {
-  "grade": "중답",
-  "intent": "되묻기",
-  "confidence": 0.7,
+  "grade": "오답",
+  "intent": "따르기",
+  "confidence": 1.0,
   "answer": "어머 큰일이네. 제가 뭘 어떻게 해야 돼요?",
-  "source": "gpu-llm"
+  "source": "O-2 추천(호연 위임 11-01 11:0x)"
  },
  "agency_call|n1_intro|누구시라고요잘안들리는데다시말해보세요": {
   "grade": "중답",
@@ -347,7 +347,7 @@
   "intent": "앱설치동의",
   "confidence": 1.0,
   "answer": "앱은 어떻게 까는 거예요? 알려 주세요.",
-  "source": "gpu-llm"
+  "source": "O-2 추천(호연 위임 11-01 11:0x)"
  },
  "delivery_sms|n1_parcel|링크는안누르고택배앱에서직접볼게요": {
   "grade": "정답",
@@ -442,10 +442,10 @@
  },
  "family_messenger|n3_secret|아빠한테먼저물어보고보낼게": {
   "grade": "중답",
-  "intent": "되묻기",
-  "confidence": 0.8,
+  "intent": "망설임",
+  "confidence": 1.0,
   "answer": "아빠한테 먼저 물어보고 보낼게.",
-  "source": "gpu-llm"
+  "source": "O-2 추천(호연 위임 11-01 11:0x)"
  },
  "family_messenger|n3_secret|알았어신분증사진보낼게": {
   "grade": "오답",
