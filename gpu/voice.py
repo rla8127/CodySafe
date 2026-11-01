@@ -21,7 +21,10 @@ import modal
 
 APP_NAME = "codysafe-voice"
 STT_REPO = "dropbox-dash/faster-whisper-large-v3-turbo"
-TTS_REPO = "Qwen/Qwen3-TTS-12Hz-1.7B-VoiceDesign"
+TTS_REPO = "Qwen/Qwen3-TTS-12Hz-1.7B-VoiceDesign"   # designs each voice once from a text description
+CLONE_REPO = "Qwen/Qwen3-TTS-12Hz-1.7B-Base"         # speaks every line in that designed voice (same identity)
+REF_DIR = "/root/.cache/huggingface/codysafe_voice_refs"  # designed reference clips, kept on the Volume
+REF_TEXT = "안녕하세요. 지금부터 몇 가지 확인할 내용이 있어서 연락드렸습니다. 잠시만 시간 괜찮으실까요?"
 GPU = "L40S"
 MINUTES = 60
 
@@ -79,7 +82,7 @@ MAX_AUDIO = 15 * 1024 * 1024
 def download():
     from huggingface_hub import snapshot_download
 
-    for repo in (STT_REPO, TTS_REPO):
+    for repo in (STT_REPO, TTS_REPO, CLONE_REPO):
         print("cached", repo, "->", snapshot_download(repo))
     hf_cache.commit()
 
@@ -101,8 +104,10 @@ def download():
 class Voice:
     @modal.enter()
     def load(self):
+        import os
         import threading
 
+        import soundfile as sf
         import torch
         from faster_whisper import WhisperModel
         from qwen_tts import Qwen3TTSModel
@@ -111,8 +116,27 @@ class Voice:
         self.stt = WhisperModel(STT_REPO, device="cuda", compute_type="float16")
         self.tts = Qwen3TTSModel.from_pretrained(TTS_REPO, device_map="cuda:0", dtype=torch.bfloat16,
                                                  attn_implementation="sdpa")
+        self.clone = Qwen3TTSModel.from_pretrained(CLONE_REPO, device_map="cuda:0", dtype=torch.bfloat16,
+                                                   attn_implementation="sdpa")
         langs = self.tts.get_supported_languages() or []
         self.lang = next((x for x in langs if str(x).lower() in ("korean", "ko")), "Korean")
+        # One designed reference clip per voice (synthetic, no real person), stored on the Volume so the
+        # identity stays the same across container restarts. Every line is then spoken by the Base model
+        # in that voice (11-01 09:1x: designing per line changed the speaker between lines).
+        os.makedirs(REF_DIR, exist_ok=True)
+        self.prompts, made = {}, False
+        for voice in VOICES:
+            path = f"{REF_DIR}/{voice}.wav"
+            if not os.path.exists(path):
+                torch.manual_seed(SEEDS[voice])
+                wavs, sr = self.tts.generate_voice_design(text=REF_TEXT, instruct=VOICES[voice], language=self.lang)
+                sf.write(path, wavs[0], sr, subtype="PCM_16")
+                made = True
+            ref, ref_sr = sf.read(path, dtype="float32")
+            self.prompts[voice] = self.clone.create_voice_clone_prompt(
+                ref_audio=(ref, ref_sr), ref_text=REF_TEXT, x_vector_only_mode=False)
+        if made:
+            hf_cache.commit()
         # warm the kernels once so the first real request is not the slow one
         self._synth("안녕하세요.", "caller_male", "")
 
@@ -125,10 +149,11 @@ class Voice:
         import soundfile as sf
         import torch
 
-        instruct = VOICES[voice] + (f" Speaking style: {style}." if style else "")
+        # Identity first: the Base model has no style instruct, so tone is carried by pace (RATE) only.
         with self.lock:
             torch.manual_seed(SEEDS[voice])
-            wavs, sr = self.tts.generate_voice_design(text=text, instruct=instruct, language=self.lang)
+            wavs, sr = self.clone.generate_voice_clone(text=text, language=self.lang,
+                                                       voice_clone_prompt=self.prompts[voice])
         wav = np.asarray(wavs[0], dtype=np.float32)
         loud = np.flatnonzero(np.abs(wav) > 0.01)
         if loud.size:  # trim leading/trailing silence, keep 0.08 s
@@ -174,12 +199,13 @@ class Voice:
 
         @api.get("/health")
         def health():
-            return {"ok": True, "model": f"stt={STT_REPO}; tts={TTS_REPO}"}
+            return {"ok": True, "model": f"stt={STT_REPO}; tts={CLONE_REPO} (voices designed by {TTS_REPO})"}
 
         @api.post("/stt", dependencies=[Depends(auth)])
         def stt(file: UploadFile = File(...), language: str = Form("ko"), model: str = Form("")):
             data = file.file.read(MAX_AUDIO + 1)
             if not data:
+                print(f"stt reject: empty file name={file.filename!r} type={file.content_type!r}")
                 raise HTTPException(status_code=400, detail="empty file")
             if len(data) > MAX_AUDIO:
                 raise HTTPException(status_code=413, detail="file too large")
@@ -189,9 +215,15 @@ class Voice:
                 f.write(data)
                 f.flush()
                 # decode with ffmpeg ourselves (faster-whisper's PyAV path breaks on new av versions)
-                dec = subprocess.run(["ffmpeg", "-nostdin", "-loglevel", "error", "-i", f.name, "-f", "f32le",
-                                      "-ac", "1", "-ar", "16000", "-"], capture_output=True)
+                dec = None
+                for fmt in ([], ["-f", "webm"], ["-f", "mp4"], ["-f", "ogg"]):
+                    dec = subprocess.run(["ffmpeg", "-nostdin", "-loglevel", "error", *fmt, "-i", f.name,
+                                          "-f", "f32le", "-ac", "1", "-ar", "16000", "-"], capture_output=True)
+                    if dec.returncode == 0 and dec.stdout:
+                        break
             if dec.returncode != 0 or not dec.stdout:
+                print(f"stt reject: decode failed bytes={len(data)} name={file.filename!r} "
+                      f"type={file.content_type!r} head={data[:12].hex()} err={dec.stderr[-300:]!r}")
                 raise HTTPException(status_code=400, detail="cannot decode audio")
             audio = np.frombuffer(dec.stdout, dtype=np.float32)
             with self.lock:
