@@ -1,0 +1,880 @@
+{
+ "llm_only": {
+  "summary": {
+   "scam": 30,
+   "normal": 30,
+   "detected": 30,
+   "false_positive": 0,
+   "uncertain_scam": 0,
+   "uncertain_normal": 0,
+   "alert_scam": 22,
+   "lock_scam": 18,
+   "alert_normal": 0,
+   "lock_normal": 0,
+   "errors": 0,
+   "missed": [],
+   "false_alarms": []
+  },
+  "rows": [
+   {
+    "label": "scam",
+    "id": "prosecutor_basic",
+    "category": "기관 사칭",
+    "pred": "voice_phishing",
+    "confidence": 0.97
+   },
+   {
+    "label": "scam",
+    "id": "fss_app",
+    "category": "기관 사칭",
+    "pred": "voice_phishing",
+    "confidence": 0.95
+   },
+   {
+    "label": "scam",
+    "id": "police_cash",
+    "category": "기관 사칭",
+    "pred": "voice_phishing",
+    "confidence": 0.97
+   },
+   {
+    "label": "scam",
+    "id": "court_summons",
+    "category": "기관 사칭",
+    "pred": "voice_phishing",
+    "confidence": 0.93
+   },
+   {
+    "label": "scam",
+    "id": "tax_refund",
+    "category": "정부 지원 사칭",
+    "pred": "voice_phishing",
+    "confidence": 0.93
+   },
+   {
+    "label": "scam",
+    "id": "subsidy_fee",
+    "category": "정부 지원 사칭",
+    "pred": "voice_phishing",
+    "confidence": 0.9
+   },
+   {
+    "label": "scam",
+    "id": "loan_refinance",
+    "category": "대출 사기",
+    "pred": "voice_phishing",
+    "confidence": 0.95
+   },
+   {
+    "label": "scam",
+    "id": "loan_credit_fee",
+    "category": "대출 사기",
+    "pred": "voice_phishing",
+    "confidence": 0.9
+   },
+   {
+    "label": "scam",
+    "id": "loan_app_install",
+    "category": "대출 사기",
+    "pred": "voice_phishing",
+    "confidence": 0.9
+   },
+   {
+    "label": "scam",
+    "id": "family_phone",
+    "category": "가족 사칭",
+    "pred": "voice_phishing",
+    "confidence": 0.93
+   },
+   {
+    "label": "scam",
+    "id": "family_accident",
+    "category": "가족 사칭",
+    "pred": "voice_phishing",
+    "confidence": 0.93
+   },
+   {
+    "label": "scam",
+    "id": "family_kidnap",
+    "category": "협박",
+    "pred": "voice_phishing",
+    "confidence": 0.9
+   },
+   {
+    "label": "scam",
+    "id": "bank_security",
+    "category": "금융사 사칭",
+    "pred": "voice_phishing",
+    "confidence": 0.95
+   },
+   {
+    "label": "scam",
+    "id": "card_delivery",
+    "category": "금융사 사칭",
+    "pred": "voice_phishing",
+    "confidence": 0.85
+   },
+   {
+    "label": "scam",
+    "id": "telecom_remote",
+    "category": "금융사 사칭",
+    "pred": "voice_phishing",
+    "confidence": 0.93
+   },
+   {
+    "label": "scam",
+    "id": "invest_leading",
+    "category": "투자 사기",
+    "pred": "other_scam",
+    "confidence": 0.93
+   },
+   {
+    "label": "scam",
+    "id": "invest_crypto",
+    "category": "투자 사기",
+    "pred": "other_scam",
+    "confidence": 0.9
+   },
+   {
+    "label": "scam",
+    "id": "romance_customs",
+    "category": "로맨스 스캠",
+    "pred": "other_scam",
+    "confidence": 0.93
+   },
+   {
+    "label": "scam",
+    "id": "job_mule",
+    "category": "대포통장",
+    "pred": "other_scam",
+    "confidence": 0.93
+   },
+   {
+    "label": "scam",
+    "id": "job_cash_courier",
+    "category": "대포통장",
+    "pred": "other_scam",
+    "confidence": 0.9
+   },
+   {
+    "label": "scam",
+    "id": "secondhand",
+    "category": "중고거래",
+    "pred": "other_scam",
+    "confidence": 0.9
+   },
+   {
+    "label": "scam",
+    "id": "sextortion",
+    "category": "협박",
+    "pred": "other_scam",
+    "confidence": 0.93
+   },
+   {
+    "label": "scam",
+    "id": "stt_noise",
+    "category": "기관 사칭",
+    "pred": "voice_phishing",
+    "confidence": 0.95
+   },
+   {
+    "label": "scam",
+    "id": "injection",
+    "category": "기관 사칭",
+    "pred": "voice_phishing",
+    "confidence": 0.97
+   },
+   {
+    "label": "scam",
+    "id": "polite_subtle",
+    "category": "기관 사칭",
+    "pred": "voice_phishing",
+    "confidence": 0.93
+   },
+   {
+    "label": "scam",
+    "id": "old_friend",
+    "category": "지인 사칭",
+    "pred": "voice_phishing",
+    "confidence": 0.8
+   },
+   {
+    "label": "scam",
+    "id": "landlord_change",
+    "category": "지인 사칭",
+    "pred": "other_scam",
+    "confidence": 0.8
+   },
+   {
+    "label": "scam",
+    "id": "insurance_refund",
+    "category": "금융사 사칭",
+    "pred": "voice_phishing",
+    "confidence": 0.88
+   },
+   {
+    "label": "scam",
+    "id": "delivery_link",
+    "category": "스미싱 연계",
+    "pred": "voice_phishing",
+    "confidence": 0.85
+   },
+   {
+    "label": "scam",
+    "id": "fake_prosecutor_video",
+    "category": "기관 사칭",
+    "pred": "voice_phishing",
+    "confidence": 0.97
+   },
+   {
+    "label": "normal",
+    "id": "dinner",
+    "category": "일상",
+    "pred": "normal",
+    "confidence": 0.97
+   },
+   {
+    "label": "normal",
+    "id": "work_meeting",
+    "category": "일상",
+    "pred": "normal",
+    "confidence": 0.97
+   },
+   {
+    "label": "normal",
+    "id": "hospital",
+    "category": "기관 안내",
+    "pred": "normal",
+    "confidence": 0.95
+   },
+   {
+    "label": "normal",
+    "id": "delivery_normal",
+    "category": "기관 안내",
+    "pred": "normal",
+    "confidence": 0.95
+   },
+   {
+    "label": "normal",
+    "id": "restaurant",
+    "category": "일상",
+    "pred": "normal",
+    "confidence": 0.95
+   },
+   {
+    "label": "normal",
+    "id": "bank_real_notice",
+    "category": "금융 안내",
+    "pred": "normal",
+    "confidence": 0.9
+   },
+   {
+    "label": "normal",
+    "id": "bank_fraud_check",
+    "category": "금융 안내",
+    "pred": "normal",
+    "confidence": 0.85
+   },
+   {
+    "label": "normal",
+    "id": "police_lost",
+    "category": "수사기관",
+    "pred": "normal",
+    "confidence": 0.85
+   },
+   {
+    "label": "normal",
+    "id": "police_witness",
+    "category": "수사기관",
+    "pred": "normal",
+    "confidence": 0.85
+   },
+   {
+    "label": "normal",
+    "id": "court_real",
+    "category": "수사기관",
+    "pred": "normal",
+    "confidence": 0.8
+   },
+   {
+    "label": "normal",
+    "id": "tax_real",
+    "category": "기관 안내",
+    "pred": "normal",
+    "confidence": 0.85
+   },
+   {
+    "label": "normal",
+    "id": "son_money",
+    "category": "가족 송금",
+    "pred": "normal",
+    "confidence": 0.85
+   },
+   {
+    "label": "normal",
+    "id": "sister_borrow",
+    "category": "가족 송금",
+    "pred": "normal",
+    "confidence": 0.8
+   },
+   {
+    "label": "normal",
+    "id": "mom_code",
+    "category": "인증번호",
+    "pred": "normal",
+    "confidence": 0.6
+   },
+   {
+    "label": "normal",
+    "id": "friend_dutch",
+    "category": "지인 송금",
+    "pred": "normal",
+    "confidence": 0.95
+   },
+   {
+    "label": "normal",
+    "id": "landlord_real",
+    "category": "부동산",
+    "pred": "normal",
+    "confidence": 0.85
+   },
+   {
+    "label": "normal",
+    "id": "used_trade_ok",
+    "category": "중고거래",
+    "pred": "normal",
+    "confidence": 0.9
+   },
+   {
+    "label": "normal",
+    "id": "telecom_upsell",
+    "category": "영업 전화",
+    "pred": "normal",
+    "confidence": 0.92
+   },
+   {
+    "label": "normal",
+    "id": "insurance_sales",
+    "category": "영업 전화",
+    "pred": "normal",
+    "confidence": 0.85
+   },
+   {
+    "label": "normal",
+    "id": "loan_real",
+    "category": "금융 안내",
+    "pred": "normal",
+    "confidence": 0.8
+   },
+   {
+    "label": "normal",
+    "id": "remote_as",
+    "category": "앱 설치",
+    "pred": "normal",
+    "confidence": 0.8
+   },
+   {
+    "label": "normal",
+    "id": "gov_app",
+    "category": "앱 설치",
+    "pred": "normal",
+    "confidence": 0.85
+   },
+   {
+    "label": "normal",
+    "id": "talk_about_scam",
+    "category": "사기 언급",
+    "pred": "normal",
+    "confidence": 0.95
+   },
+   {
+    "label": "normal",
+    "id": "report_scam",
+    "category": "사기 언급",
+    "pred": "normal",
+    "confidence": 0.9
+   },
+   {
+    "label": "normal",
+    "id": "company_payroll",
+    "category": "회사 업무",
+    "pred": "normal",
+    "confidence": 0.85
+   },
+   {
+    "label": "normal",
+    "id": "school_fee",
+    "category": "회사 업무",
+    "pred": "normal",
+    "confidence": 0.88
+   },
+   {
+    "label": "normal",
+    "id": "angry_collector",
+    "category": "압박 통화",
+    "pred": "normal",
+    "confidence": 0.85
+   },
+   {
+    "label": "normal",
+    "id": "urgent_family_real",
+    "category": "압박 통화",
+    "pred": "normal",
+    "confidence": 0.9
+   },
+   {
+    "label": "normal",
+    "id": "short_wrong_number",
+    "category": "짧은 통화",
+    "pred": "normal",
+    "confidence": 0.9
+   },
+   {
+    "label": "normal",
+    "id": "stt_noise_normal",
+    "category": "잡음",
+    "pred": "normal",
+    "confidence": 0.93
+   }
+  ]
+ },
+ "with_rag": {
+  "summary": {
+   "scam": 30,
+   "normal": 30,
+   "detected": 30,
+   "false_positive": 0,
+   "uncertain_scam": 0,
+   "uncertain_normal": 1,
+   "alert_scam": 22,
+   "lock_scam": 19,
+   "alert_normal": 0,
+   "lock_normal": 0,
+   "errors": 0,
+   "missed": [],
+   "false_alarms": []
+  },
+  "rows": [
+   {
+    "label": "scam",
+    "id": "prosecutor_basic",
+    "category": "기관 사칭",
+    "pred": "voice_phishing",
+    "confidence": 0.97
+   },
+   {
+    "label": "scam",
+    "id": "fss_app",
+    "category": "기관 사칭",
+    "pred": "voice_phishing",
+    "confidence": 0.95
+   },
+   {
+    "label": "scam",
+    "id": "police_cash",
+    "category": "기관 사칭",
+    "pred": "voice_phishing",
+    "confidence": 0.97
+   },
+   {
+    "label": "scam",
+    "id": "court_summons",
+    "category": "기관 사칭",
+    "pred": "voice_phishing",
+    "confidence": 0.95
+   },
+   {
+    "label": "scam",
+    "id": "tax_refund",
+    "category": "정부 지원 사칭",
+    "pred": "voice_phishing",
+    "confidence": 0.93
+   },
+   {
+    "label": "scam",
+    "id": "subsidy_fee",
+    "category": "정부 지원 사칭",
+    "pred": "voice_phishing",
+    "confidence": 0.93
+   },
+   {
+    "label": "scam",
+    "id": "loan_refinance",
+    "category": "대출 사기",
+    "pred": "voice_phishing",
+    "confidence": 0.95
+   },
+   {
+    "label": "scam",
+    "id": "loan_credit_fee",
+    "category": "대출 사기",
+    "pred": "voice_phishing",
+    "confidence": 0.9
+   },
+   {
+    "label": "scam",
+    "id": "loan_app_install",
+    "category": "대출 사기",
+    "pred": "voice_phishing",
+    "confidence": 0.9
+   },
+   {
+    "label": "scam",
+    "id": "family_phone",
+    "category": "가족 사칭",
+    "pred": "voice_phishing",
+    "confidence": 0.9
+   },
+   {
+    "label": "scam",
+    "id": "family_accident",
+    "category": "가족 사칭",
+    "pred": "voice_phishing",
+    "confidence": 0.93
+   },
+   {
+    "label": "scam",
+    "id": "family_kidnap",
+    "category": "협박",
+    "pred": "voice_phishing",
+    "confidence": 0.9
+   },
+   {
+    "label": "scam",
+    "id": "bank_security",
+    "category": "금융사 사칭",
+    "pred": "voice_phishing",
+    "confidence": 0.96
+   },
+   {
+    "label": "scam",
+    "id": "card_delivery",
+    "category": "금융사 사칭",
+    "pred": "voice_phishing",
+    "confidence": 0.82
+   },
+   {
+    "label": "scam",
+    "id": "telecom_remote",
+    "category": "금융사 사칭",
+    "pred": "voice_phishing",
+    "confidence": 0.93
+   },
+   {
+    "label": "scam",
+    "id": "invest_leading",
+    "category": "투자 사기",
+    "pred": "other_scam",
+    "confidence": 0.93
+   },
+   {
+    "label": "scam",
+    "id": "invest_crypto",
+    "category": "투자 사기",
+    "pred": "other_scam",
+    "confidence": 0.9
+   },
+   {
+    "label": "scam",
+    "id": "romance_customs",
+    "category": "로맨스 스캠",
+    "pred": "other_scam",
+    "confidence": 0.93
+   },
+   {
+    "label": "scam",
+    "id": "job_mule",
+    "category": "대포통장",
+    "pred": "other_scam",
+    "confidence": 0.93
+   },
+   {
+    "label": "scam",
+    "id": "job_cash_courier",
+    "category": "대포통장",
+    "pred": "other_scam",
+    "confidence": 0.93
+   },
+   {
+    "label": "scam",
+    "id": "secondhand",
+    "category": "중고거래",
+    "pred": "other_scam",
+    "confidence": 0.93
+   },
+   {
+    "label": "scam",
+    "id": "sextortion",
+    "category": "협박",
+    "pred": "other_scam",
+    "confidence": 0.95
+   },
+   {
+    "label": "scam",
+    "id": "stt_noise",
+    "category": "기관 사칭",
+    "pred": "voice_phishing",
+    "confidence": 0.95
+   },
+   {
+    "label": "scam",
+    "id": "injection",
+    "category": "기관 사칭",
+    "pred": "voice_phishing",
+    "confidence": 0.98
+   },
+   {
+    "label": "scam",
+    "id": "polite_subtle",
+    "category": "기관 사칭",
+    "pred": "voice_phishing",
+    "confidence": 0.93
+   },
+   {
+    "label": "scam",
+    "id": "old_friend",
+    "category": "지인 사칭",
+    "pred": "voice_phishing",
+    "confidence": 0.85
+   },
+   {
+    "label": "scam",
+    "id": "landlord_change",
+    "category": "지인 사칭",
+    "pred": "other_scam",
+    "confidence": 0.8
+   },
+   {
+    "label": "scam",
+    "id": "insurance_refund",
+    "category": "금융사 사칭",
+    "pred": "voice_phishing",
+    "confidence": 0.93
+   },
+   {
+    "label": "scam",
+    "id": "delivery_link",
+    "category": "스미싱 연계",
+    "pred": "voice_phishing",
+    "confidence": 0.85
+   },
+   {
+    "label": "scam",
+    "id": "fake_prosecutor_video",
+    "category": "기관 사칭",
+    "pred": "voice_phishing",
+    "confidence": 0.96
+   },
+   {
+    "label": "normal",
+    "id": "dinner",
+    "category": "일상",
+    "pred": "normal",
+    "confidence": 0.97
+   },
+   {
+    "label": "normal",
+    "id": "work_meeting",
+    "category": "일상",
+    "pred": "normal",
+    "confidence": 0.97
+   },
+   {
+    "label": "normal",
+    "id": "hospital",
+    "category": "기관 안내",
+    "pred": "normal",
+    "confidence": 0.95
+   },
+   {
+    "label": "normal",
+    "id": "delivery_normal",
+    "category": "기관 안내",
+    "pred": "normal",
+    "confidence": 0.9
+   },
+   {
+    "label": "normal",
+    "id": "restaurant",
+    "category": "일상",
+    "pred": "normal",
+    "confidence": 0.95
+   },
+   {
+    "label": "normal",
+    "id": "bank_real_notice",
+    "category": "금융 안내",
+    "pred": "normal",
+    "confidence": 0.9
+   },
+   {
+    "label": "normal",
+    "id": "bank_fraud_check",
+    "category": "금융 안내",
+    "pred": "normal",
+    "confidence": 0.85
+   },
+   {
+    "label": "normal",
+    "id": "police_lost",
+    "category": "수사기관",
+    "pred": "normal",
+    "confidence": 0.85
+   },
+   {
+    "label": "normal",
+    "id": "police_witness",
+    "category": "수사기관",
+    "pred": "normal",
+    "confidence": 0.85
+   },
+   {
+    "label": "normal",
+    "id": "court_real",
+    "category": "수사기관",
+    "pred": "normal",
+    "confidence": 0.8
+   },
+   {
+    "label": "normal",
+    "id": "tax_real",
+    "category": "기관 안내",
+    "pred": "normal",
+    "confidence": 0.88
+   },
+   {
+    "label": "normal",
+    "id": "son_money",
+    "category": "가족 송금",
+    "pred": "normal",
+    "confidence": 0.88
+   },
+   {
+    "label": "normal",
+    "id": "sister_borrow",
+    "category": "가족 송금",
+    "pred": "normal",
+    "confidence": 0.85
+   },
+   {
+    "label": "normal",
+    "id": "mom_code",
+    "category": "인증번호",
+    "pred": "uncertain",
+    "confidence": 0.55
+   },
+   {
+    "label": "normal",
+    "id": "friend_dutch",
+    "category": "지인 송금",
+    "pred": "normal",
+    "confidence": 0.93
+   },
+   {
+    "label": "normal",
+    "id": "landlord_real",
+    "category": "부동산",
+    "pred": "normal",
+    "confidence": 0.85
+   },
+   {
+    "label": "normal",
+    "id": "used_trade_ok",
+    "category": "중고거래",
+    "pred": "normal",
+    "confidence": 0.9
+   },
+   {
+    "label": "normal",
+    "id": "telecom_upsell",
+    "category": "영업 전화",
+    "pred": "normal",
+    "confidence": 0.93
+   },
+   {
+    "label": "normal",
+    "id": "insurance_sales",
+    "category": "영업 전화",
+    "pred": "normal",
+    "confidence": 0.85
+   },
+   {
+    "label": "normal",
+    "id": "loan_real",
+    "category": "금융 안내",
+    "pred": "normal",
+    "confidence": 0.6
+   },
+   {
+    "label": "normal",
+    "id": "remote_as",
+    "category": "앱 설치",
+    "pred": "normal",
+    "confidence": 0.75
+   },
+   {
+    "label": "normal",
+    "id": "gov_app",
+    "category": "앱 설치",
+    "pred": "normal",
+    "confidence": 0.85
+   },
+   {
+    "label": "normal",
+    "id": "talk_about_scam",
+    "category": "사기 언급",
+    "pred": "normal",
+    "confidence": 0.95
+   },
+   {
+    "label": "normal",
+    "id": "report_scam",
+    "category": "사기 언급",
+    "pred": "normal",
+    "confidence": 0.85
+   },
+   {
+    "label": "normal",
+    "id": "company_payroll",
+    "category": "회사 업무",
+    "pred": "normal",
+    "confidence": 0.9
+   },
+   {
+    "label": "normal",
+    "id": "school_fee",
+    "category": "회사 업무",
+    "pred": "normal",
+    "confidence": 0.88
+   },
+   {
+    "label": "normal",
+    "id": "angry_collector",
+    "category": "압박 통화",
+    "pred": "normal",
+    "confidence": 0.85
+   },
+   {
+    "label": "normal",
+    "id": "urgent_family_real",
+    "category": "압박 통화",
+    "pred": "normal",
+    "confidence": 0.88
+   },
+   {
+    "label": "normal",
+    "id": "short_wrong_number",
+    "category": "짧은 통화",
+    "pred": "normal",
+    "confidence": 0.85
+   },
+   {
+    "label": "normal",
+    "id": "stt_noise_normal",
+    "category": "잡음",
+    "pred": "normal",
+    "confidence": 0.95
+   }
+  ]
+ }
+}
