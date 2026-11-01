@@ -5,6 +5,8 @@ is gated (accept-terms), so it is not used.
 
 Run:  modal run gpu/face.py                 -> runs/face_0.png .. runs/face_3.png
       modal run gpu/face.py --n 2 --seed 7
+      modal run gpu/face.py --preset son_accident,daughter_deposit   -> runs/face_<preset>_<i>.png
+      (presets: gpu/deepfake_presets.py — age band x gender x story x expression)
 
 The person does not exist; no real face is used as input. Not deployed (modal run only), scale to zero.
 """
@@ -42,7 +44,7 @@ app = modal.App(APP_NAME)
 
 
 @app.function(image=image, gpu=GPU, volumes=VOLUMES, timeout=30 * MINUTES, min_containers=0, max_containers=1)
-def generate(n: int = 4, seed: int = 20261101, size: int = 1024) -> list[bytes]:
+def generate(n: int = 4, seed: int = 20261101, size: int = 1024, prompts: list[str] | None = None) -> list[bytes]:
     import io
     import time
 
@@ -54,24 +56,35 @@ def generate(n: int = 4, seed: int = 20261101, size: int = 1024) -> list[bytes]:
     hf_cache.commit()
     print(f"loaded {REPO} in {time.time() - t0:.1f}s")
     out = []
-    for i in range(n):
+    jobs = [(p, i) for p in (prompts or [PROMPT]) for i in range(n)]
+    for k, (prompt, i) in enumerate(jobs):
         t1 = time.time()
-        img = pipe(prompt=PROMPT, height=size, width=size, num_inference_steps=9, guidance_scale=0.0,
+        img = pipe(prompt=prompt, height=size, width=size, num_inference_steps=9, guidance_scale=0.0,
                    generator=torch.Generator("cuda").manual_seed(seed + i)).images[0]
         buf = io.BytesIO()
         img.save(buf, format="PNG")
         out.append(buf.getvalue())
-        print(f"image {i} seed {seed + i} in {time.time() - t1:.1f}s")
+        print(f"image {k} seed {seed + i} in {time.time() - t1:.1f}s")
     return out
 
 
 @app.local_entrypoint()
-def main(n: int = 4, seed: int = 20261101, size: int = 1024):
+def main(n: int = 4, seed: int = 20261101, size: int = 1024, preset: str = ""):
+    import sys
     from pathlib import Path
 
-    runs = Path(__file__).resolve().parent.parent / "runs"
+    here = Path(__file__).resolve().parent
+    runs = here.parent / "runs"
     runs.mkdir(exist_ok=True)
-    for i, png in enumerate(generate.remote(n, seed, size)):
-        p = runs / f"face_{i}.png"
+    names = [x for x in preset.split(",") if x]
+    prompts = None
+    if names:
+        sys.path.insert(0, str(here))
+        from deepfake_presets import PRESETS
+        prompts = [PRESETS[x]["face_prompt"] for x in names]
+    pngs = generate.remote(n, seed, size, prompts)
+    labels = [f"face_{x}_{i}" for x in names for i in range(n)] if names else [f"face_{i}" for i in range(n)]
+    for label, png in zip(labels, pngs):
+        p = runs / f"{label}.png"
         p.write_bytes(png)
         print("saved", p)

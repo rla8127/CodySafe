@@ -6,8 +6,10 @@ CodySafe 모의 훈련의 판정 LLM·음성 인식·음성 합성을 Modal(작�
 | 앱 | 파일 | 주소 | 내용 |
 |---|---|---|---|
 | codysafe-llm | `llm.py` | https://hoykim125--codysafe-llm-serve.us-east.modal.run (`/v1`, `/health`) | vLLM OpenAI 호환, Kanana 1.5 8B fp8, 모델 이름 `codysafe-llm` |
-| codysafe-voice | `voice.py` | https://hoykim125--codysafe-voice-voice-web.us-east.modal.run (`/stt`, `/tts`, `/health`) | faster-whisper large-v3-turbo + Qwen3-TTS 1.7B VoiceDesign |
-| codysafe-video | `video.py` (P1, 아직 없음) | — | EchoMimicV3, 동의한 사진만 |
+| codysafe-voice | `voice.py` | https://hoykim125--codysafe-voice-voice-web.us-east.modal.run (`/stt`, `/tts`, `/health`) | faster-whisper large-v3-turbo + Qwen3-TTS 1.7B (VoiceDesign으로 목소리 4개를 1번 설계 → Base가 모든 대사를 그 목소리로) |
+| codysafe-face·codysafe-video | `face.py`·`video.py`·`deepfake_presets.py` | 없음(`modal run`으로 필요할 때만) | Z-Image-Turbo로 실존하지 않는 얼굴 → EchoMimicV3로 말하는 영상, 'AI 생성' 표시 |
+
+예비 자료: `server/backup/`(대사 mp3·판정 표·영상), 만드는 법 `gpu/make_backup.py`, 읽는 모듈 `server/guard/sim/backup.py`. GPU·모델 목록은 `docs/gpu-models.md`.
 
 ## 인증
 
@@ -28,7 +30,7 @@ SIM_STT_API_KEY=<같은 토큰>
 
 ## 요청 형식 (O-1 클라이언트에 맞춰 너그럽게 받음)
 
-- `POST /tts` JSON: `text`(없으면 `input`), `voice` ∈ caller_male·caller_female·family(그 밖은 caller_male), `format` 또는 `response_format` = wav, 선택 `emotion`(calm·official·urgent·threat·tremble·sob·friendly)·`instruct`(말투 설명) → `audio/wav`. 400자까지.
+- `POST /tts` JSON: `text`(없으면 `input`), `voice` ∈ caller_male·caller_female·family·family_female(그 밖은 caller_male), `format` 또는 `response_format` = wav, 선택 `emotion`(calm·official·urgent·threat·tremble·sob·friendly: 지금은 **말 빠르기로만** 반영, Base 모델은 말투 지시를 받지 않음)·`instruct`(지금은 쓰지 않음)·`rate`(목표 음절/초 3–9) → `audio/wav`. 400자까지.
 - `POST /stt` multipart `file`(wav·webm·m4a·mp3, 15MB까지), 선택 `language`(기본 ko), `model`은 무시 → `{"text", "duration_s", "elapsed_s"}`.
 - `GET /health` → `{"ok": true, "model": ...}`. LLM의 `/health`는 vLLM 기본(200, 빈 본문).
 
@@ -44,7 +46,7 @@ python3 -m venv .venv && .venv/bin/pip install modal python-dotenv httpx
 ```
 
 - 최소 컨테이너 0, 유휴 5분 뒤 꺼짐, 최대 1개. 그래서 오래 쉬었다가 처음 부르면 콜드 스타트(LLM 약 2분, 음성 약 25초)가 걸려 O-1의 시간 초과(LLM 6초·TTS 10초·STT 15초)를 넘는다.
-- **시연·리허설 전에 반드시 `gpu/warm.sh up`**, 끝나면 **바로 `gpu/warm.sh down`**. 켜 두는 동안 시간당 크레딧이 나간다(L40S 약 US$1.95/h × 2개 앱 ≈ US$3.9/h). 크레딧은 US$30, 지출 한도 $0이라 다 쓰면 Modal이 앱을 멈춘다. 실행 시각은 호연이 정한다.
+- 시연·녹화는 **저장한 예비 자료**(`server/backup/`)로 한다(호연 11-01 결정). 실시간 GPU를 꼭 보여 줄 때만 직전에 `gpu/warm.sh up`, 끝나면 **바로 `gpu/warm.sh down`**. 켜 두는 동안 시간당 크레딧이 나간다(L40S 약 US$1.95/h × 2개 앱 ≈ US$3.9/h). 크레딧은 US$30, 지출 한도 $0이라 다 쓰면 Modal이 앱을 멈춘다. 실행 시각은 호연이 정한다.
 - 상태: `gpu/warm.sh status` 또는 https://modal.com/apps/hoykim125/main
 - GPU는 ES 서버를 부르지 않는다. 검색은 서비스 서버가 하고 결과만 LLM 요청에 넣는다.
 - 올리는 자료: 공개 자료, 바꿔 쓴 대사, 합성 음성, 동의한 사진만. 실제 사기 통화 원문(KorCCVi 등)·가족 실제 통화는 올리지 않는다.
