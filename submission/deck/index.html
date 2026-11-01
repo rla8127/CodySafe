@@ -41,7 +41,7 @@ section[style*="padding-top:28px"] td{padding:4px 14px;font-size:21px;line-heigh
 <p style="font-weight:700">코디세이 AI 해커톤 2026 · 팀 유레카</p>
 <h1>CodySafe<br><span class="lime">전화를 끊은 뒤,</span><br>가족과 함께 막습니다</h1>
 <p>통화 녹음을 AI로 분석해 근거를 보여 주고, 가족에게 알리고, 금융 앱을 잠그는 보이스피싱 후속 대응 서비스</p>
-<p style="font-size:26px">박병국 · 김동현 · 김호연 · 유상우 · 전선형</p>
+<p style="font-size:26px">김병국 · 김동현 · 김호연 · 유상우 · 전선형</p>
 </section>
 
 <section class="fill">
@@ -149,11 +149,11 @@ def _keep_grounded(result, transcript):
 <div class="row">
 <div class="card" style="flex:1.2"><table>
 <tr><th style="width:26%">구분</th><th>사용 기술</th></tr>
-<tr><td><b>서버</b></td><td>Python 3.12, FastAPI, Uvicorn, SQLite</td></tr>
+<tr><td><b>서버</b></td><td>Python 3, FastAPI, Uvicorn, SQLite</td></tr>
 <tr><td><b>웹</b></td><td>HTML, CSS, JavaScript (프레임워크 없음)</td></tr>
 <tr><td><b>앱</b></td><td>Kotlin, WebView, WorkManager, 접근성 서비스 (minSdk 26, targetSdk 34)</td></tr>
 <tr><td><b>AI</b></td><td>Claude, faster-whisper(대체: OpenAI Whisper), Elasticsearch 8.17 + bge-m3</td></tr>
-<tr><td><b>인프라</b></td><td>AWS EC2, S3 (presigned URL), Terraform·Docker(검색 서버), GitHub Actions</td></tr>
+<tr><td><b>인프라</b></td><td>AWS EC2 3대: 서비스 t4g.large, STT c7i-flex.large, 검색 t4g.medium. S3 (presigned URL), Terraform·Docker(검색 서버), GitHub Actions</td></tr>
 <tr><td><b>관측</b></td><td>Langfuse Cloud: 시간·토큰·판정 라벨만 전송, 통화 내용은 보내지 않음</td></tr>
 <tr><td><b>검증</b></td><td>pytest 71개, 실제 음성 파일, 실제 폰 녹화</td></tr>
 </table></div>
@@ -172,14 +172,14 @@ def _keep_grounded(result, transcript):
 <tr><td><b>김동현</b></td><td>서비스 구현 총괄</td><td>서버 API와 판정 파이프라인, 근거 대조, 가족 알림·잠금·암구호, 웹 화면, 안드로이드 앱, 체험·제보·피드백, S3·RAG·Langfuse 연동, 테스트, 배포</td></tr>
 <tr><td><b>김호연</b></td><td>초기 기획, 시나리오, 데이터</td><td>문제 조사와 경쟁 서비스 비교, 기획 초안과 README 초안, 시뮬레이션 기반 체험 시나리오 13개 작성, 검색 문서 90건 주입, 저장소 비밀값 관리 규칙(.gitignore)</td></tr>
 <tr><td><b>유상우</b></td><td>브랜드 디자인</td><td>CodySafe 브랜드 가이드, 로고 자산</td></tr>
-<tr><td><b>박병국</b></td><td>QA, 기능 기획, 경쟁사 분석</td><td>QA, 기능 기획, 경쟁사 비교 분석. URL 탐지 기능을 개발했으나 통화 후 대응이라는 서비스 목적과 맞지 않아 폐기</td></tr>
+<tr><td><b>김병국</b></td><td>QA, 기능 기획, 경쟁사 분석</td><td>QA, 기능 기획, 경쟁사 비교 분석. URL 탐지 기능을 개발했으나 통화 후 대응이라는 서비스 목적과 맞지 않아 폐기</td></tr>
 <tr><td><b>전선형</b></td><td>데이터셋, 기능 기획, QA</td><td>사기 사례 검색 데이터 90건 제작, 서비스 기능 기획, 품질 검증(QA)</td></tr>
 </table>
 <div class="card" style="flex:none"><h3>협업 방식</h3><p>GitHub 브랜치와 Pull Request로 합치고, 초기 QR 판독 기획과 현재 통화 후 대응 기획을 모두 저장소 문서로 남겼습니다.</p></div>
 <div class="card" style="flex:none;padding:20px 34px;gap:6px"><h3>실제 화면 QA에서 찾아 고친 문제</h3>
 <ul style="font-size:23px"><li style="font-size:23px"><b>전선형</b> 체험 선택지의 행동 설명이 채팅으로 그대로 전달됨 → 행동 선택지 분리 (<code>e352ae7</code>). 체험 대화가 짧음 → 5턴으로 확장 (<code>55c43ac</code>)</li>
-<li style="font-size:23px"><b>박병국</b> 첫 화면과 AI 시뮬레이션, 낮은 창에서 아래 메뉴가 안 보임 → 항상 표시 (<code>f161a70</code>, <code>03524da</code>)</li>
-<li style="font-size:23px"><b>박병국</b> 폰 상태바와 앱 내용이 겹침 → 수정 (<code>55c43ac</code>)</li></ul></div>
+<li style="font-size:23px"><b>김병국</b> 첫 화면과 AI 시뮬레이션, 낮은 창에서 아래 메뉴가 안 보임 → 항상 표시 (<code>f161a70</code>, <code>03524da</code>)</li>
+<li style="font-size:23px"><b>김병국</b> 폰 상태바와 앱 내용이 겹침 → 수정 (<code>55c43ac</code>)</li></ul></div>
 <div class="foot"><span>산출물: github.com/rla8127/CodySafe</span><span>7</span></div></section>
 
 <section style="padding-top:28px;padding-bottom:70px;gap:8px">
@@ -198,6 +198,7 @@ def _keep_grounded(result, transcript):
 <tr><td>오픈소스</td><td>SUIT 2.0.5, 나눔스퀘어 라운드, Lucide 0.460</td><td>폰트, 아이콘</td><td>OFL, OFL, ISC</td></tr>
 <tr><td>외부 API</td><td>Anthropic claude-opus-5-5, claude-haiku-5-5</td><td>판정, 재순위, 시나리오 생성, 문서 구조화</td><td>상용 API</td></tr>
 <tr><td>외부 API</td><td>OpenAI whisper-1, gpt-image-2</td><td>STT 대체 경로, 체험 가상 인물 사진</td><td>상용 API</td></tr>
+<tr><td>기타</td><td>Amazon EC2 t4g.large, c7i-flex.large, t4g.medium 각 1대</td><td>서비스, STT, 검색 서버</td><td>상용 서비스</td></tr>
 <tr><td>외부 API</td><td>Amazon S3, Langfuse Cloud</td><td>음성 저장, 처리 시간·토큰 관측</td><td>상용 서비스</td></tr>
 <tr><td>외부 API</td><td>Amazon Polly, ElevenLabs</td><td>STT 평가용 한국어 데이터셋, 자연스러운 음성 생성</td><td>상용 API</td></tr>
 <tr><td>사전 보유 코드</td><td>웹 화면 코드 index.html, css/, js/, assets/ (2026-10-30 01시경 작성, 주제 공개 전)</td><td>공용 화면 자원과 초기 웹 MVP</td><td>팀 자체 작성</td></tr>

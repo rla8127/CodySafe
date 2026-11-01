@@ -8,7 +8,10 @@
 
 - **대상:** 보이스피싱에 노출된 사용자와 그 가족
 - **범위:** 일반 앱은 통화 음성을 실시간으로 받을 수 없어 통화 후 분석합니다. 이유는 [기획서](docs/family-guard-plan.md#2-왜-실시간-통화-분석을-하지-않는가)에 있습니다.
-- **상태:** 실제 안드로이드 폰에서 녹음 분석부터 금융 앱 차단까지 동작하는 프로토타입입니다. 탐지율은 아직 측정하지 않았습니다. [구현 상태](#구현-상태)를 함께 봐 주세요.
+- **상태:** 실제 안드로이드 폰에서 녹음 분석부터 금융 앱 차단까지 동작하는 프로토타입입니다. 판정은 합성 통화로만 평가했고, 실제 통화 탐지율은 아직 측정하지 않았습니다. [구현 상태](#구현-상태)를 함께 봐 주세요.
+- **시연:** <http://54.116.173.130:8091/> (앱 화면은 [/app/](http://54.116.173.130:8091/app/)). 시연 가족 계정은 누구나 같은 기록을 보므로 실제 통화를 올리지 마세요.
+
+![CodySafe 랜딩 페이지](docs/images/landing.png)
 
 ## 동작 흐름
 
@@ -22,6 +25,14 @@ flowchart LR
   E -->|확신도 0.9 이상| G[금융 앱 잠금]
   G --> H[가족 암구호로 확인 후 해제]
 ```
+
+## 아키텍처
+
+![CodySafe 아키텍처](docs/images/architecture.png)
+
+### Langfuse
+
+![Langfuse 트레이스](docs/images/langfuse.png)
 
 ## 주요 기능
 
@@ -63,7 +74,7 @@ python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
 .venv/bin/python -m pytest -q   # 71개, 외부 키 불필요
 ```
 
-Python 3.12에서 확인했습니다.
+Python 3에서 확인했습니다.
 
 키 없이 규칙 판정으로 실행합니다. `.txt` 파일을 녹취로 간주하는 테스트 모드입니다.
 
@@ -117,7 +128,7 @@ docs/project-plan.md             초기 QR 판독 기획 (이번 제출 범위 �
 
 ## 팀
 
-박병국, 김동현, 김호연, 유상우, 전선형
+김병국, 김동현, 김호연, 유상우, 전선형
 
 ## 외부 자원
 
@@ -129,6 +140,7 @@ docs/project-plan.md             초기 QR 판독 기획 (이번 제출 범위 �
 | OpenAI `whisper-1` | 음성 변환 대체 경로 |
 | Amazon Polly | STT 평가용 한국어 음성 데이터셋 생성 |
 | ElevenLabs | 자연스러운 음성 생성 |
+| Amazon EC2 | 서비스 서버 `t4g.large`, STT 서버 `c7i-flex.large`, 검색 서버 `t4g.medium` 각 1대 |
 | Amazon S3 | 음성 저장 |
 | [Langfuse Cloud](https://us.cloud.langfuse.com/project/cmvwspomu005fad0e5vr8sgrq/traces) | 처리 시간, 토큰, 비용 관측. 통화 내용은 보내지 않음. 프로젝트 권한이 있어야 열림 |
 | OpenAI `gpt-image-2` | 체험의 가상 인물 사진 3장 생성 |
