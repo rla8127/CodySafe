@@ -46,7 +46,7 @@ python3 -m venv .venv && .venv/bin/pip install modal python-dotenv httpx
 ```
 
 - 최소 컨테이너 0, 유휴 5분 뒤 꺼짐, 최대 1개. 그래서 오래 쉬었다가 처음 부르면 콜드 스타트(LLM 약 2분, 음성 약 25초)가 걸려 O-1의 시간 초과(LLM 6초·TTS 10초·STT 15초)를 넘는다.
-- **시연·리허설 전에 반드시 `gpu/warm.sh up`**, 끝나면 **바로 `gpu/warm.sh down`**. 켜 두는 동안 시간당 크레딧이 나간다(L40S 약 US$1.95/h × 2개 앱 ≈ US$3.9/h). 크레딧은 US$30, 지출 한도 $0이라 다 쓰면 Modal이 앱을 멈춘다. 실행 시각은 호연이 정한다.
+- 시연·녹화는 **저장한 예비 자료**(`server/backup/`)로 한다(호연 11-01 결정). 실시간 GPU를 꼭 보여 줄 때만 직전에 `gpu/warm.sh up`, 끝나면 **바로 `gpu/warm.sh down`**. 켜 두는 동안 시간당 크레딧이 나간다(L40S 약 US$1.95/h × 2개 앱 ≈ US$3.9/h). 크레딧은 US$30, 지출 한도 $0이라 다 쓰면 Modal이 앱을 멈춘다. 실행 시각은 호연이 정한다.
 - 상태: `gpu/warm.sh status` 또는 https://modal.com/apps/hoykim125/main
 - GPU는 ES 서버를 부르지 않는다. 검색은 서비스 서버가 하고 결과만 LLM 요청에 넣는다.
 - 올리는 자료: 공개 자료, 바꿔 쓴 대사, 합성 음성, 동의한 사진만. 실제 사기 통화 원문(KorCCVi 등)·가족 실제 통화는 올리지 않는다.

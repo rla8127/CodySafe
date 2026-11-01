@@ -195,7 +195,9 @@ class Voice:
         from fastapi import Depends, FastAPI, File, Form, HTTPException, Request, UploadFile
         from fastapi.responses import Response
 
-        token = os.environ["GPU_TOKEN"]
+        token = os.environ["GPU_TOKEN"].strip()
+        if len(token) < 32:
+            raise RuntimeError("GPU_TOKEN missing or too short")  # never accept an empty Bearer
         api = FastAPI(title="codysafe-voice", docs_url=None, redoc_url=None, openapi_url=None)
 
         def auth(request: Request):
@@ -246,6 +248,8 @@ class Voice:
                 body = await request.json()
             except Exception:
                 raise HTTPException(status_code=400, detail="JSON body required")
+            if not isinstance(body, dict):
+                raise HTTPException(status_code=400, detail="JSON object required")
             text = str(body.get("text") or body.get("input") or "").strip()
             if not text:
                 raise HTTPException(status_code=400, detail="text required")
@@ -255,7 +259,7 @@ class Voice:
             if fmt != "wav":
                 raise HTTPException(status_code=400, detail="only wav")
             voice = body.get("voice")
-            voice = voice if voice in VOICES else "caller_male"
+            voice = voice if isinstance(voice, str) and voice in VOICES else "caller_male"
             emotion = str(body.get("emotion") or "")
             style = TONES.get(emotion) or str(body.get("instruct") or "")[:200]
             import anyio

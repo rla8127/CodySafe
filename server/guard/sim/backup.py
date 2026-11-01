@@ -19,6 +19,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]  # server/
 BACKUP = Path(os.getenv("SIM_BACKUP_DIR", str(ROOT / "backup")))
 DEFAULT_VOICE = "caller_male"
+_GRADES = ("정답", "중답", "오답")
 
 
 def tts_key(text: str, tone: str | None = None, voice: str | None = None) -> str:
@@ -31,7 +32,11 @@ def tts_key(text: str, tone: str | None = None, voice: str | None = None) -> str
 def tts(text: str, tone: str | None = None, voice: str | None = None) -> tuple[bytes, str] | None:
     """미리 만든 대사 음성. 없으면 None."""
     path = BACKUP / "tts" / f"{tts_key(text, tone, voice)}.mp3"
-    return (path.read_bytes(), "audio/mpeg") if path.is_file() else None
+    try:
+        data = path.read_bytes()
+    except OSError:
+        return None
+    return (data, "audio/mpeg") if len(data) > 1000 else None  # empty/broken file -> not a backup
 
 
 # STT가 숫자를 한글로 적거나 흔한 소리 나는 대로 적은 것을 맞춘다(Argon 검토 11-01).
@@ -57,7 +62,7 @@ def _judge_table() -> dict:
     path = BACKUP / "judge.json"
     try:
         return _judge_table_at(path.stat().st_mtime)
-    except (FileNotFoundError, json.JSONDecodeError):
+    except (OSError, ValueError):  # missing, unreadable or half-written file -> no backup, never an exception
         return {}
 
 
@@ -67,9 +72,18 @@ def judge(scenario_id: str, node_id: str, text: str) -> dict | None:
     if not key:
         return None
     hit = table.get(f"{scenario_id}|{node_id}|{key}")
-    return dict(hit) if hit else None
+    if not isinstance(hit, dict) or hit.get("grade") not in _GRADES or not isinstance(hit.get("intent"), str):
+        return None
+    try:
+        conf = min(1.0, max(0.0, float(hit.get("confidence", 0))))
+    except (TypeError, ValueError):
+        conf = 0.0
+    return {"grade": hit["grade"], "intent": hit["intent"], "confidence": conf}
 
 
 def video(name: str) -> Path | None:
+    """저장한 영상(이름은 영문 소문자·숫자·밑줄만, 폴더 밖 경로 차단)."""
+    if not re.fullmatch(r"[a-z0-9_]{1,64}", name or ""):
+        return None
     path = BACKUP / "video" / f"{name}.mp4"
     return path if path.is_file() else None
