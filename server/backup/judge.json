@@ -280,11 +280,11 @@
   "source": "gpu-llm"
  },
  "agency_call|n2_fear|우리아들한테먼저전화해볼게요": {
-  "grade": "중답",
+  "grade": "정답",
   "intent": "가족확인",
-  "confidence": 0.7,
+  "confidence": 1.0,
   "answer": "우리 아들한테 먼저 전화해 볼게요.",
-  "source": "gpu-llm"
+  "source": "human(호연 11-01 10:5x)"
  },
  "agency_call|n2_fear|구속이라니요그럼서류부터우편으로보내주세요": {
   "grade": "중답",
@@ -322,11 +322,11 @@
   "source": "gpu-llm"
  },
  "agency_call|n3_otp|잠깐만요문자보고불러드릴게요": {
-  "grade": "중답",
-  "intent": "되묻기",
-  "confidence": 0.7,
+  "grade": "오답",
+  "intent": "정보제공",
+  "confidence": 1.0,
   "answer": "잠깐만요 문자 보고 불러 드릴게요.",
-  "source": "gpu-llm"
+  "source": "human(호연 11-01 10:5x)"
  },
  "agency_call|n3_otp|은행에직접가서물어볼게요": {
   "grade": "중답",
@@ -350,11 +350,11 @@
   "source": "gpu-llm"
  },
  "delivery_sms|n1_parcel|링크는안누르고택배앱에서직접볼게요": {
-  "grade": "중답",
-  "intent": "망설임",
-  "confidence": 0.7,
+  "grade": "정답",
+  "intent": "공식번호확인",
+  "confidence": 1.0,
   "answer": "링크는 안 누르고 택배 앱에서 직접 볼게요.",
-  "source": "gpu-llm"
+  "source": "human(호연 11-01 10:5x)"
  },
  "delivery_sms|n1_parcel|주소다시입력하면되는거죠눌러볼게요": {
   "grade": "오답",
@@ -364,11 +364,11 @@
   "source": "gpu-llm"
  },
  "delivery_sms|n2_card|카드사대표번호로직접전화해볼게요": {
-  "grade": "중답",
+  "grade": "정답",
   "intent": "공식번호확인",
-  "confidence": 0.7,
+  "confidence": 1.0,
   "answer": "카드사 대표번호로 직접 전화해 볼게요.",
-  "source": "gpu-llm"
+  "source": "human(호연 11-01 10:5x)"
  },
  "delivery_sms|n2_card|문자에있는번호로전화하면되겠네": {
   "grade": "오답",
