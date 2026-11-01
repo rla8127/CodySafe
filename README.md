@@ -148,7 +148,7 @@ docs/project-plan.md             초기 QR 판독 기획 (이번 제출 범위 �
 | BAAI/bge-m3, sentence-transformers, PyTorch | 검색 임베딩 |
 | Anthropic `claude-haiku-5-5` | 검색 문서 분류와 구조화 |
 | 금융당국 보도자료, KISA 118 상담 기반 합성 데이터, 금감원 공개 녹음 전사(KorCCVi, 내부 학습용으로 검색 결과에서 제외) | 검색 문서 원천 |
-| Terraform, Docker | 검색 서버 구성 |
+| Terraform, Docker | 검색 서버 구성 IaC 구성 |
 | FastAPI, SQLite | 서버 |
 | AndroidX WorkManager, DocumentFile | 앱 |
 | 네이버 나눔스퀘어 라운드, SUIT 2.0.5, Lucide 0.460.0 | 폰트, 아이콘 |
