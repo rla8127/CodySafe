@@ -15,7 +15,7 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-from . import config, dashboard, db, llm, passphrase, pet, pipeline, providers, reports, samples, sim_api, stt_client, tracing
+from . import config, dashboard, db, llm, passphrase, pet, pipeline, providers, rag_first, reports, samples, sim_api, stt_client, tracing
 from .sim.schema import PRESETS, AgeBand
 from .lock_apps import LOCK_APPS
 from .scam_kb import BY_ID, OTHER_SCAM, VOICE_PHISHING
@@ -401,7 +401,7 @@ def _analyze_sample(sample_id: str) -> dict:
         if sample_id not in _sample_results:
             with tracing.trace("예시 통화 분석", metadata={"sample": sample_id}):
                 text = samples.transcript(sample)
-                result = llm.analyze(text)
+                result = rag_first.analyze(text) if rag_first.enabled() else llm.analyze(text)
                 _sample_results[sample_id] = {
                     "status": "done",
                     "label": result["label"],
@@ -412,6 +412,8 @@ def _analyze_sample(sample_id: str) -> dict:
                     "matches": pipeline.public_matches(pipeline.find_matches(result, text)),
                     "expected": sample["expected"],
                 }
+                if rag_first.enabled():
+                    _sample_results[sample_id]["detect"] = rag_first.extra(result, _sample_results[sample_id]["matches"])
         return _sample_results[sample_id]
 
 
@@ -433,6 +435,9 @@ def _record_sample(device: str, sample_id: str, result: dict) -> None:
                 json.dumps(result["evidence"], ensure_ascii=False), json.dumps(result["matches"], ensure_ascii=False), db.now(),
             ),
         )
+        row = conn.execute("SELECT id FROM recordings WHERE device_id = ? AND client_key = ?", (device, f"{db.SAMPLE_KEY_PREFIX}{sample_id}")).fetchone()
+    if result.get("detect"):
+        rag_first.save(row["id"], result["detect"])
 
 
 @app.post("/v1/samples/{sample_id}/analyze")
@@ -644,10 +649,19 @@ def delete_recording(rec_id: str, device: str = Depends(current_device)):
         conn.execute("DELETE FROM alerts WHERE recording_id = ?", (rec_id,))
         conn.execute("DELETE FROM recording_feedback WHERE recording_id = ?", (rec_id,))
         conn.execute("DELETE FROM review_dataset WHERE recording_id = ?", (rec_id,))
+    rag_first.delete(rec_id)
     # 예시 통화는 음성 파일이 없습니다.
     if row["s3_key"]:
         providers.delete_audio(row["s3_key"])
     return {"ok": True}
+
+
+@app.get("/v1/detect/extra")
+def detect_extra(ids: str = "", device: str = Depends(current_device)):
+    """GUARD_RAG_FIRST=1일 때 결과 카드에 덧붙일 점수 구간·근거 사례·훈련 링크(rag_first.py)."""
+    if not rag_first.enabled():
+        return {"enabled": False, "items": {}}
+    return {"enabled": True, "items": rag_first.load(device, [i for i in ids.split(",") if i][:100])}
 
 
 @app.get("/v1/recommendations")

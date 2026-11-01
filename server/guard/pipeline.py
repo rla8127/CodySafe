@@ -2,7 +2,7 @@
 import json
 import logging
 
-from . import config, db, llm, providers, rag, tracing
+from . import config, db, llm, providers, rag, rag_first, tracing
 from .scam_kb import BY_ID, OTHER_SCAM, VOICE_PHISHING
 
 log = logging.getLogger("guard.pipeline")
@@ -61,7 +61,8 @@ def _process(rec_id: str, trace) -> None:
             return
 
         _set(rec_id, status="analyzing")
-        result = llm.analyze(transcript)
+        # GUARD_RAG_FIRST=1이면 사례 검색을 판정 앞에 두고 AI 의심 점수 구간으로 정합니다(rag_first.py).
+        result = rag_first.analyze(transcript) if rag_first.enabled() else llm.analyze(transcript)
         label, confidence = result["label"], result["confidence"]
         is_scam = label in (VOICE_PHISHING, OTHER_SCAM)
 
@@ -70,6 +71,8 @@ def _process(rec_id: str, trace) -> None:
             tracing.update(search, metadata={"matches": len(matches)})
 
         alert = label == VOICE_PHISHING and confidence >= config.ALERT_THRESHOLD
+        if rag_first.enabled():
+            alert = rag_first.auto_actions(result)[0]
         needs_review = label in (OTHER_SCAM, "uncertain") or (label == VOICE_PHISHING and not alert)
         _set(
             rec_id,
@@ -85,6 +88,9 @@ def _process(rec_id: str, trace) -> None:
             transcript=transcript if is_scam or needs_review else None,
         )
         locked = label == VOICE_PHISHING and confidence >= config.LOCK_THRESHOLD
+        if rag_first.enabled():
+            locked = rag_first.auto_actions(result)[1]
+            rag_first.save(rec_id, rag_first.extra(result, matches))
         tracing.update(trace, metadata={"label": label, "confidence": confidence, "scam_type": result["scam_type"], "family_alert": alert, "lock": locked, "evidence": len(result["evidence"])})
         if alert:
             _notify_family(rec_id, row["device_id"])
