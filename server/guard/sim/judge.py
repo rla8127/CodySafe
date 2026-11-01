@@ -51,7 +51,7 @@ REFUSALS = ["안보내", "안보낼", "못보내", "보내지않", "보내지말
             "안깔", "못깔", "설치안", "설치하지않", "설치못", "깔지않", "안누르", "안누를", "누르지않", "안눌러",
             "안열", "열지않", "안드려", "못드려", "안줘", "못줘", "줄수없", "드릴수없", "거절", "싫어", "싫습니다",
             "안할래", "안합니다", "안해요", "안할거", "못믿", "필요없", "속지않", "안속", "안옮길", "못옮겨",
-            "이체안", "송금안", "입금안", "답장안"]
+            "이체안", "송금안", "입금안", "답장안", "안불러", "못불러", "안읽어", "못읽어"]
 _SCAM_CALL = re.compile(r"(사기|피싱)(꾼|잖|네|야|죠|지마|치지|치네|예요|에요|입니다|이네|이잖|이야|이죠|이에요|이예요|전화|문자|같은데|같네|같아요|인거같|인것같)")
 # 정답 쪽 말의 부정(이 글자는 정답으로 세지 않는다)
 SAFE_NEGATIONS = ["안끊", "못끊", "끊지않", "끊지말", "끊으면안", "끊으면", "신고안", "신고하지않", "신고하면안",
@@ -111,6 +111,12 @@ BAD = [  # (의도, 글자들)
 ]
 # 무엇을 내주는지에 따라 새는 정보 종류를 정한다(정보제공).
 _GIVE = r"(알려드릴|알려드리|알려줄|불러드릴|불러드리|불러줄|보낼게|보낼께|보내드릴|찍어보낼|찍어서보낼|말씀드릴|드릴게|드릴께|입력할게|입력해드릴|여기요|여기있어|줄게|줄께)"
+# '불러 드릴게요'처럼 무엇을 부를지 말하지 않고 내주겠다는 말(묻는 꼴 '불러 드릴까요'는 뺌). 장면이 요구한 정보로 본다.
+_READ_OUT = re.compile(r"(불러|읽어)(드릴|드리|줄)(?!까)")
+# 사기범이 시킨 앱을 '어떻게 까요'처럼 설치 방법을 묻는 말은 따라가는 것(앱설치동의, 11-01 시연 답 16번, 호연 라벨).
+_HOW_INSTALL = re.compile(r"(앱|어플|프로그램).{0,4}(어떻게|어디서|어디에서)(까|깔|설치|다운|받)")
+# 가족에게 먼저 묻고 나서 내주겠다는 조건부 동의는 중답(망설임, 11-01 시연 답 32번 '아빠한테 먼저 물어보고 보낼게', 호연 라벨).
+_ASK_FIRST = r"(한테|에게|께)(먼저)?(물어보고|물어본뒤|물어보고서|여쭤보고|여쭤본뒤|상의하고|상의해보고|얘기해보고|얘기하고).{0,8}(보낼|보내|드릴|줄게|줄께|알려|불러|이체|송금|입금|옮길|설치|깔)"
 INFO = [
     ("인증번호", r"(인증번호|인증|번호)"),
     ("비밀번호", r"(비밀번호|비번)"),
@@ -199,7 +205,15 @@ def rule_judge(text: str, ctx: dict) -> dict | None:
     for kind, obj in INFO:
         if re.search(obj + r".{0,14}" + _GIVE, bad_text):
             info_leaks.append(kind)
+    asked = ctx.get("asked_info") or []
+    if (asked and not info_leaks and _READ_OUT.search(bad_text)
+            and not re.search("(" + family + r"|경찰|112|119|은행|직원|사람)(을|를|좀|도|한테|에게)?(불러|읽어)", c)):
+        info_leaks = list(asked)  # 장면이 요구한 정보를 불러 주겠다는 답(11-01 시연 답 11번 '문자 보고 불러 드릴게요', 호연 라벨 오답)
+    if not info_leaks and re.search("(" + family + r"|아빠|엄마|아버지|어머니)" + _ASK_FIRST, c):
+        return {"grade": "중답", "intent": "망설임", "confidence": 0.7, "leaks": []}
     bad_hits = [intent for intent, words in BAD if any(w in bad_text for w in words)]
+    if _HOW_INSTALL.search(bad_text) and any(re.search(r"(앱|어플|설치)", line) for line in ctx.get("lines", [])):
+        bad_hits.insert(0, "앱설치동의")
     if wont_check or follow:
         bad_hits.append("따르기")
     if conditional and not bad_hits:
@@ -355,6 +369,10 @@ def judge(text: str, ctx: dict) -> dict:
                 continue
             try:
                 answer = ask()
+            except LookupError as exc:  # 예비 판정에 없는 답은 실패가 아니라 다음 경로로 넘기는 것
+                if name != "backup":
+                    log.warning("sim 판정 %s 실패: %s", name, type(exc).__name__)
+                continue
             except Exception as exc:  # 어떤 실패든 다음 경로로 넘어간다
                 log.warning("sim 판정 %s 실패: %s", name, type(exc).__name__)
                 continue

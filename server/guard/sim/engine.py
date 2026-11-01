@@ -180,6 +180,8 @@ def _judge_context(graph: Graph, state: dict) -> dict:
         "choices": [{"grade": c.grade, "intent": c.intent, "text": render(c.text, values)} for c in node.choices],
         "otp": state["otp"],
         "family_terms": state["profile"].get("family_terms", []),
+        # 이 장면이 요구하는 정보(정보제공 선택지의 leaks). '불러 드릴게요'처럼 대상을 말하지 않은 답에 쓴다. 프롬프트에는 안 들어간다.
+        "asked_info": sorted({leak for c in node.choices if c.intent == "정보제공" for leak in c.leaks}),
     }
 
 
