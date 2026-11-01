@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # CodySafe GPU warm-up for rehearsal/demo.
-#   gpu/warm.sh up     -> keep 1 container warm in each app (codysafe-llm, codysafe-voice[, codysafe-video])
+#   gpu/warm.sh up     -> keep 1 container warm in codysafe-llm and codysafe-voice
 #   gpu/warm.sh down   -> back to 0 (scale to zero after the 5-minute idle window)
 #   gpu/warm.sh status -> list running containers
 #
@@ -22,7 +22,7 @@ import sys
 import modal
 
 n = int(sys.argv[1])
-targets = [("codysafe-llm", "serve", None), ("codysafe-voice", None, "Voice"), ("codysafe-video", None, "Video")]
+targets = [("codysafe-llm", "serve", None), ("codysafe-voice", None, "Voice")]  # video/face are one-off runs, never kept warm
 for app, fn, cls in targets:
     try:
         obj = modal.Function.from_name(app, fn) if fn else modal.Cls.from_name(app, cls)()

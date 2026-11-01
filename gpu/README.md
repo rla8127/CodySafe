@@ -6,8 +6,10 @@ CodySafe 모의 훈련의 판정 LLM·음성 인식·음성 합성을 Modal(작�
 | 앱 | 파일 | 주소 | 내용 |
 |---|---|---|---|
 | codysafe-llm | `llm.py` | https://hoykim125--codysafe-llm-serve.us-east.modal.run (`/v1`, `/health`) | vLLM OpenAI 호환, Kanana 1.5 8B fp8, 모델 이름 `codysafe-llm` |
-| codysafe-voice | `voice.py` | https://hoykim125--codysafe-voice-voice-web.us-east.modal.run (`/stt`, `/tts`, `/health`) | faster-whisper large-v3-turbo + Qwen3-TTS 1.7B VoiceDesign |
-| codysafe-video | `video.py` (P1, 아직 없음) | — | EchoMimicV3, 동의한 사진만 |
+| codysafe-voice | `voice.py` | https://hoykim125--codysafe-voice-voice-web.us-east.modal.run (`/stt`, `/tts`, `/health`) | faster-whisper large-v3-turbo + Qwen3-TTS 1.7B (VoiceDesign으로 목소리 4개를 1번 설계 → Base가 모든 대사를 그 목소리로) |
+| codysafe-face·codysafe-video | `face.py`·`video.py`·`deepfake_presets.py` | 없음(`modal run`으로 필요할 때만) | Z-Image-Turbo로 실존하지 않는 얼굴 → EchoMimicV3로 말하는 영상, 'AI 생성' 표시 |
+
+예비 자료: `server/backup/`(대사 mp3·판정 표·영상), 만드는 법 `gpu/make_backup.py`, 읽는 모듈 `server/guard/sim/backup.py`. GPU·모델 목록은 `docs/gpu-models.md`.
 
 ## 인증
 
@@ -28,7 +30,7 @@ SIM_STT_API_KEY=<같은 토큰>
 
 ## 요청 형식 (O-1 클라이언트에 맞춰 너그럽게 받음)
 
-- `POST /tts` JSON: `text`(없으면 `input`), `voice` ∈ caller_male·caller_female·family(그 밖은 caller_male), `format` 또는 `response_format` = wav, 선택 `emotion`(calm·official·urgent·threat·tremble·sob·friendly)·`instruct`(말투 설명) → `audio/wav`. 400자까지.
+- `POST /tts` JSON: `text`(없으면 `input`), `voice` ∈ caller_male·caller_female·family·family_female(그 밖은 caller_male), `format` 또는 `response_format` = wav, 선택 `emotion`(calm·official·urgent·threat·tremble·sob·friendly: 지금은 **말 빠르기로만** 반영, Base 모델은 말투 지시를 받지 않음)·`instruct`(지금은 쓰지 않음)·`rate`(목표 음절/초 3–9) → `audio/wav`. 400자까지.
 - `POST /stt` multipart `file`(wav·webm·m4a·mp3, 15MB까지), 선택 `language`(기본 ko), `model`은 무시 → `{"text", "duration_s", "elapsed_s"}`.
 - `GET /health` → `{"ok": true, "model": ...}`. LLM의 `/health`는 vLLM 기본(200, 빈 본문).
 

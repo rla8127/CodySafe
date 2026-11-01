@@ -409,20 +409,20 @@
   "seconds": 434
  },
  "judge": {
-  "made_at": "2026-11-01 10:31 KST",
-  "count": 126,
+  "made_at": "2026-11-01 10:32 KST",
+  "count": 138,
   "model": "kakaocorp/kanana-1.5-8b-instruct-2505 fp8 (vLLM)",
   "gpu": "Modal NVIDIA L40S",
+  "new_this_run": 0,
+  "agree_with_label_this_run": "0/0",
   "sources": [
-   "graph choice texts (36)",
-   "eval/demo_answers.csv (37)",
-   "eval/judge_holdout.csv (60)"
+   "graph choice texts × 3 presets → the graph's own grade/intent (48, source=graph-choice)",
+   "eval/demo_answers.csv (37) and eval/judge_holdout.csv (60) → GPU LLM (90 unique, source=gpu-llm)"
   ],
   "agree_with_label": {
-   "judge_holdout": "48/60",
-   "graph_choices": "35/36"
-  },
-  "note": "LLM only (no rules). Unknown answers are not in the table and fall back to rules/default."
+   "judge_holdout_llm_only": "48/60",
+   "graph_choices_llm_only_before_replacing": "35/36"
+  }
  },
  "video": {
   "files": [
@@ -433,6 +433,7 @@
   "models": "Z-Image-Turbo face + EchoMimicV3 flash-pro, Qwen3-TTS voice (family/family_female, rate 5.0)",
   "gpu": "Modal NVIDIA L40S",
   "faces": "synthetic, not real people",
-  "code": "gpu/face.py, gpu/video.py, gpu/deepfake_presets.py"
+  "code": "gpu/face.py, gpu/video.py, gpu/deepfake_presets.py",
+  "committed": false
  }
 }

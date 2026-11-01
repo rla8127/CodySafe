@@ -64,7 +64,8 @@ VOICES = {
                      "slightly high and soft voice, speaking casual Seoul Korean on a phone call.",
 }
 SEEDS = {"caller_male": 1101, "caller_female": 2202, "family": 3303, "family_female": 4404}  # fixed seed per voice -> steadier timbre
-TONES = {  # O-1 TONE_GUIDE keys -> English style words for the instruct (pace stays natural unless noted)
+TONES = {  # O-1 TONE_GUIDE keys -> style words. NOTE (v5, 09:1x): the Base reader ignores these; tone = pace (RATE) only.
+    # Kept so the request format stays the same and VoiceDesign can be used again if needed.
     "calm": "calm and clear, but at a normal conversational pace",
     "official": "stiff, formal and bureaucratic, slightly low pitch, brisk",
     # urgent/threat: pace comes from the instruct itself (tested 08:5x: 6.8 syl/s without stretching)

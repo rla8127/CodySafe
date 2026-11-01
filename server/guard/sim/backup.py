@@ -34,23 +34,39 @@ def tts(text: str, tone: str | None = None, voice: str | None = None) -> tuple[b
     return (path.read_bytes(), "audio/mpeg") if path.is_file() else None
 
 
+# STT가 숫자를 한글로 적거나 흔한 소리 나는 대로 적은 것을 맞춘다(Argon 검토 11-01).
+_SPOKEN = [("일일이", "112"), ("일삼공일", "1301"), ("일삼삼이", "1332"), ("일삼구사", "1394"),
+           ("할께", "할게"), ("볼께", "볼게"), ("줄께", "줄게"), ("갈께", "갈게"), ("드릴께", "드릴게")]
+
+
 def norm_answer(text: str) -> str:
-    """판정 찾기용: 공백·문장부호를 지우고 소문자로."""
-    return re.sub(r"[\s\.,!?~…·'\"“”‘’()\-]+", "", (text or "").lower())
+    """판정 찾기용: 공백·문장부호를 지우고 소문자로, 숫자 읽기·흔한 철자를 한 가지로."""
+    out = re.sub(r"[\s\.,!?~…·'\"“”‘’()\-]+", "", (text or "").lower())
+    for spoken, canon in _SPOKEN:
+        out = out.replace(spoken, canon)
+    return out
 
 
-@lru_cache(maxsize=1)
+@lru_cache(maxsize=4)
+def _judge_table_at(mtime: float) -> dict:
+    return json.loads((BACKUP / "judge.json").read_text(encoding="utf-8"))
+
+
 def _judge_table() -> dict:
+    """파일이 바뀌면 다시 읽고, 파일이 없을 때의 빈 결과는 캐시하지 않는다."""
     path = BACKUP / "judge.json"
-    return json.loads(path.read_text(encoding="utf-8")) if path.is_file() else {}
+    try:
+        return _judge_table_at(path.stat().st_mtime)
+    except (FileNotFoundError, json.JSONDecodeError):
+        return {}
 
 
 def judge(scenario_id: str, node_id: str, text: str) -> dict | None:
-    """미리 판정해 둔 답이면 그 판정(같은 장면 → 아무 장면 순으로 찾음), 없으면 None."""
+    """같은 장면에서 미리 판정해 둔 답이면 그 판정, 없으면 None(부르는 쪽이 규칙·기본값으로)."""
     table, key = _judge_table(), norm_answer(text)
     if not key:
         return None
-    hit = table.get(f"{scenario_id}|{node_id}|{key}") or table.get(f"*|*|{key}")
+    hit = table.get(f"{scenario_id}|{node_id}|{key}")
     return dict(hit) if hit else None
 
 

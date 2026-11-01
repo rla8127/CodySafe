@@ -23,6 +23,12 @@ GPU_ROOT = Path(__file__).resolve().parents[1]
 OUT = GPU_ROOT / "server" / "backup"
 
 
+def _atomic_write(path: Path, text: str) -> None:
+    tmp = path.with_suffix(path.suffix + ".tmp")
+    tmp.write_text(text, encoding="utf-8")
+    os.replace(tmp, path)  # readers never see a half-written file
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--sim", required=True, help="path to the training server folder (hoyeon/sim server/)")
@@ -83,19 +89,25 @@ def main():
                            "format": "mp3 64 kbps mono", "seed": 0, "presets": list(PRESETS),
                            "model": "Qwen/Qwen3-TTS-12Hz-1.7B-Base (voice designed by Qwen3-TTS-12Hz-1.7B-VoiceDesign)",
                            "gpu": "Modal NVIDIA L40S", "items": items, "seconds": round(time.time() - t0)}
-        manifest_path.write_text(json.dumps(manifest, ensure_ascii=False, indent=1))
+        _atomic_write(manifest_path, json.dumps(manifest, ensure_ascii=False, indent=1))
 
     if a.judge:
         os.environ["SIM_LLM_TIMEOUT"] = "60"
         table_path = OUT / "judge.json"
         table = json.loads(table_path.read_text()) if table_path.exists() else {}
         jobs = []  # (scenario, node, answer, label or None)
-        for graph in graphs.values():
-            prof = SimProfile(**PRESETS["mother_74_alone"]["profile"])
-            state = engine.start(graph, prof, seed=0)
-            for node_id, node in graph.nodes.items():
-                for ch in node.choices:
-                    jobs.append((graph.id, node_id, engine.render(ch.text, state["values"]), ch.grade))
+        # Choice sentences: use the graph's own grade/intent (authoritative, no LLM) for every preset.
+        # The OTP digits in a choice change per session, so those keys only match seed-0 sessions.
+        for preset in PRESETS.values():
+            prof = SimProfile(**preset["profile"])
+            for graph in graphs.values():
+                state = engine.start(graph, prof, seed=0)
+                for node_id, node in graph.nodes.items():
+                    for ch in node.choices:
+                        text = engine.render(ch.text, state["values"])
+                        table[f"{graph.id}|{node_id}|{backup.norm_answer(text)}"] = {
+                            "grade": ch.grade, "intent": ch.intent, "confidence": 1.0, "answer": text,
+                            "source": "graph-choice"}
         for path in a.answers:
             with open(path, encoding="utf-8-sig") as f:
                 for row in csv.DictReader(f):
@@ -117,11 +129,11 @@ def main():
                 labelled += 1
                 agree += res["grade"] == label
             print(f"judge {made}/{len(jobs)} {scenario}/{node_id} -> {res['grade']}", flush=True)
-        table_path.write_text(json.dumps(table, ensure_ascii=False, indent=1))
+        _atomic_write(table_path, json.dumps(table, ensure_ascii=False, indent=1))
         manifest["judge"] = {"made_at": time.strftime("%Y-%m-%d %H:%M %Z"), "count": len(table),
                              "model": "kakaocorp/kanana-1.5-8b-instruct-2505 fp8 (vLLM)", "gpu": "Modal NVIDIA L40S",
                              "new_this_run": made, "agree_with_label_this_run": f"{agree}/{labelled}"}
-        manifest_path.write_text(json.dumps(manifest, ensure_ascii=False, indent=1))
+        _atomic_write(manifest_path, json.dumps(manifest, ensure_ascii=False, indent=1))
     print("manifest", manifest_path)
 
 
