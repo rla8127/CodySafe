@@ -68,7 +68,7 @@ Amazon Polly로 합성한 한국어 음성 20개로 5개 설정을 비교해 `wh
 | 피드백, 사용자 대시보드 | 구현, 자동 테스트와 브라우저로 확인 |
 | 재학습, 검색 색인 갱신 | 추후 과제 |
 | 자체 STT (CPU, `whisper-large-v3-turbo` INT8) + OpenAI 대체 경로 | 구현. 실제 MP3 1건으로 실서버 전사부터 판정까지 확인. 대체 경로도 확인. 성능은 표본이 적어 근거로 쓰지 않음 |
-| GPU 서빙 | 미구현 |
+| 실시간 GPU 서빙 | 미구현. GPU는 콘텐츠 사전 생성에만 사용 |
 | 판정 평가 | 합성 통화 60건(`server/eval/`): 사기 30건 모두 탐지, 정상 30건 오탐 0건, RAG 유무 차이 없음. 평가셋이 합성이고 작아 95% 신뢰구간은 탐지율 88% 이상, 오탐률 12% 이하. 실제 통화 성능은 미측정 |
 
 ## 실행
@@ -147,6 +147,7 @@ docs/project-plan.md             초기 QR 판독 기획 (이번 제출 범위 �
 | Amazon Polly | STT 평가용 한국어 음성 데이터셋 생성 |
 | ElevenLabs | 자연스러운 음성 생성 |
 | Amazon EC2 | 서비스 서버 `t4g.large`, STT 서버 `c7i-flex.large`, 검색 서버 `t4g.medium` 각 1대 |
+| Modal 서버리스 GPU, NVIDIA L40S 48GB | 판정·음성·영상 콘텐츠 사전 생성. 서비스 실행 중에는 호출하지 않음 |
 | Amazon S3 | 음성 저장 |
 | [Langfuse Cloud](https://us.cloud.langfuse.com/project/cmvwspomu005fad0e5vr8sgrq/traces) | 처리 시간, 토큰, 비용 관측. 통화 내용은 보내지 않음. 프로젝트 권한이 있어야 열림 |
 | OpenAI `gpt-image-2` | 체험의 가상 인물 사진 3장 생성 |
