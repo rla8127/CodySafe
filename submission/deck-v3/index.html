@@ -1,0 +1,228 @@
+<!doctype html><html lang="ko"><head><meta charset="utf-8"><title>CodySafe 발표자료 v3</title>
+<style>
+@page{size:1920px 1080px;margin:0}
+:root{--ink:#10203F;--mid:#46536B;--cobalt:#0047AB;--pale:#E6EEFA;--green:#1F9D7A;--mint:#E2F5EE;--bg:#F5F7FB;--line:#D9E0EC;--red:#C8282D}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:"Noto Sans KR",sans-serif;color:var(--ink);word-break:keep-all}
+section{width:1920px;height:1080px;padding:72px 100px 84px;background:var(--bg);position:relative;page-break-after:always;overflow:hidden;display:flex;flex-direction:column;gap:36px}
+h1{font-size:62px;line-height:1.25;font-weight:800;letter-spacing:-1.5px}
+h2{font-size:36px;line-height:1.3;font-weight:800;letter-spacing:-.5px}
+p,li{font-size:29px;line-height:1.5;color:var(--mid)}
+b{color:var(--ink)}
+.foot{position:absolute;left:100px;right:100px;bottom:30px;display:flex;justify-content:space-between;gap:40px;font-size:20px;color:#5B6880}
+.row{display:flex;gap:32px;flex:1;min-height:0}
+.card{background:#fff;border-radius:22px;padding:36px 40px;display:flex;flex-direction:column;gap:14px;flex:1;min-width:0}
+.tint{background:var(--pale)}.mint{background:var(--mint)}
+.big{font-size:118px;font-weight:900;color:var(--cobalt);line-height:1;letter-spacing:-4px}
+.ph{display:flex;flex-direction:column;gap:14px;min-width:0}
+.ph img{height:560px;border-radius:26px;border:6px solid var(--ink);display:block;background:#fff}
+.ph p{font-size:25px;line-height:1.38}
+.ph b{display:block;font-size:29px}
+table{border-collapse:collapse;width:100%;background:#fff;border-radius:16px;overflow:hidden}
+th{background:var(--ink);color:#fff;text-align:left;padding:12px 20px;font-size:25px}
+td{padding:12px 20px;border-top:1px solid var(--line);font-size:25px;line-height:1.4;vertical-align:top;color:var(--mid)}
+.steps{display:flex;gap:14px}
+.step{flex:1;border-radius:18px;background:#fff;padding:24px 20px;font-size:29px;font-weight:800;text-align:center;line-height:1.3}
+.step small{display:block;font-size:22px;font-weight:400;color:var(--mid);margin-top:8px}
+.step.on{background:var(--cobalt);color:#fff}.step.on small{color:#DCE7FA}
+.xp{display:flex;justify-content:space-between;gap:20px;font-size:28px;color:var(--mid);padding:13px 0}
+.lg h2{font-size:42px}.lg p{font-size:34px}.lg .card{justify-content:center;gap:24px}
+.team td{font-size:28px;padding:16px 20px}
+.xp b{color:var(--green);white-space:nowrap}
+.cover{background:var(--cobalt);justify-content:center;padding-left:130px}
+.cover h1{font-size:104px;color:#fff;line-height:1.2;letter-spacing:-3px}
+.cover p{color:#DCE7FA;font-size:32px}
+.cody-big{position:absolute;right:90px;bottom:150px;width:560px;background:#fff;border-radius:50%;padding:70px}
+.ext{padding:30px 70px 62px;gap:10px}
+.ext h2{font-size:32px}
+.ext th{padding:7px 14px;font-size:22px}.ext td{padding:4px 14px;font-size:21px;line-height:1.24}
+</style></head><body>
+
+<section class="cover">
+<p style="font-weight:700">코디세이 AI 해커톤 2026 · 주제 02 AI 기반 정보보호 서비스 · 팀 유레카</p>
+<h1>전화를 끊은 뒤,<br>가족과 함께<br>막습니다</h1>
+<p style="max-width:1000px">사기는 백신처럼 미리 겪어 보고, 의심 통화가 오면<br>가족과 함께 돈부터 멈추는 서비스 CodySafe</p>
+<p style="font-size:26px">김병국 · 김동현 · 김호연 · 유상우 · 전선형</p>
+<img class="cody-big" src="../../server/web/media/cody.png" alt="">
+</section>
+
+<section>
+<h1>사기범은 “아무에게도 말하지 마세요”라고 합니다</h1>
+<div class="row">
+<div class="card tint" style="flex:1.05;justify-content:center;gap:24px"><div class="big">5,384만 원</div>
+<h2>2025년 보이스피싱 건당 피해액</h2>
+<p>1년 전에는 2,500만 원이었습니다. 피해액의 <b>78.6%</b>는 검사나 금융기관을 사칭한 수법입니다.</p></div>
+<div class="card" style="gap:40px;justify-content:center">
+<div><h2>혼자 결정하게 만듭니다</h2><p>끊지 말라고 몰아붙이면 옆 사람에게 물어볼 틈이 없습니다.</p></div>
+<div><h2>가족은 돈이 나간 뒤에 압니다</h2><p>걱정돼도 부모님 통화 내용을 들여다볼 수는 없습니다.</p></div>
+<div><h2>목소리도 믿을 수 없습니다</h2><p>AI가 목소리를 흉내 내는 시대에는 “내 아들 목소리”가 확인이 되지 않습니다.</p></div>
+</div></div>
+<div class="card mint" style="flex:none;padding:24px 40px"><p><b>누구를 위한 서비스인가</b> &nbsp; 삼성 휴대폰으로 통화를 녹음하는 사람과, 그 사람의 금융 피해를 걱정하는 가족</p></div>
+<div class="foot"><span>출처: 국회 제출 자료, 매일신문 2026-09-23</span><span>1</span></div></section>
+
+<section>
+<h1>미리 맞는 백신, 당할 뻔하면 잠금, 곁에는 가족</h1>
+<div class="steps">
+<div class="step on">사기 백신 맞기<small>시뮬레이션으로 미리 겪기</small></div>
+<div class="step">의심 통화 찾기<small>통화 녹음 자동 분석</small></div>
+<div class="step">가족에게 알리기<small>의심 여부만 전달</small></div>
+<div class="step on">금융 앱 잠그기<small>돈이 나가는 길을 막음</small></div>
+<div class="step on">암구호로 확인<small>목소리 대신 오늘의 단어</small></div>
+</div>
+<div class="row lg">
+<div class="card"><h2>사기 백신</h2><p>대화형 시뮬레이션으로 수법을 미리 겪습니다. 새 수법이 제보되면 <b>AI가 새 훈련을 만듭니다</b>.</p></div>
+<div class="card"><h2>돈부터 멈춥니다</h2><p>강한 의심이 들면 금융·원격제어 앱 <b>47개</b>를 1시간 잠급니다. 그 사이 가족과 통화할 시간이 생깁니다.</p></div>
+<div class="card"><h2>사생활은 그대로입니다</h2><p>가족에게는 <b>의심 여부와 잠금 상태만</b> 갑니다. 통화 내용이 안 보이니 부모님도 편하게 씁니다.</p></div>
+</div>
+<div class="foot"><span>에이닷 전화, 피싱아이즈는 가족 알림을 제공합니다. 금융 앱 잠금과 암구호까지 잇는 서비스는 공개 자료에서 찾지 못했습니다(2026-11 조사).</span><span>2</span></div></section>
+
+<section style="gap:28px">
+<h1>사기 수법이 바뀌면, 백신도 바뀝니다</h1>
+<div class="row" style="gap:40px">
+<div class="ph"><img src="shots/sim-kidnap.png" alt=""><p><b>기본 접종</b>13개 수법을 대화로 겪어 봅니다</p></div>
+<div class="ph"><img src="shots/report.png" alt=""><p><b>변이 대응</b>제보를 AI 시뮬레이션으로 만듭니다</p></div>
+<div style="flex:1;display:flex;flex-direction:column;gap:24px;min-width:0;margin-bottom:10px">
+<div class="card tint" style="flex:none;gap:10px"><h2>약한 사기를 미리 겪는 백신</h2><p>진짜 사기처럼 대화하고, 고를 때마다 무엇이 위험한지 알려 줍니다. 여기서는 속아도 돈이 나가지 않습니다.</p></div>
+<div class="card" style="flex:none;gap:14px"><h2>새 수법이 훈련이 되기까지</h2>
+<div class="steps">
+<div class="step" style="background:var(--bg);font-size:25px;padding:18px 10px">흩어진 경험 제보</div>
+<div class="step" style="background:var(--bg);font-size:25px;padding:18px 10px">추천 상위 3건</div>
+<div class="step" style="background:var(--bg);font-size:25px;padding:18px 10px">번호·계좌·링크 가림</div>
+<div class="step on" style="font-size:25px;padding:18px 10px">AI가 5턴 체험 생성</div>
+</div></div>
+<div class="row" style="gap:24px">
+<div class="card mint" style="justify-content:center;gap:8px;padding:26px 30px"><h2>AI 시대 수법까지</h2><p style="font-size:26px">AI 사진 로맨스 스캠, AI 주식 리딩방, 우는 소리로 협박하는 납치 전화</p></div>
+<div class="card mint" style="justify-content:center;gap:8px;padding:26px 30px"><h2>다시 맞는 접종</h2><p style="font-size:26px">퀴즈에서 틀린 수법의 체험을 다시 추천합니다</p></div>
+</div>
+</div></div>
+<div class="foot"><span>실제 구동 화면(시연 계정). 제보는 사실 확인 전 내용입니다. 학습 효과와 피해 예방 효과는 아직 측정하지 않았습니다.</span><span>3</span></div></section>
+
+<section style="gap:28px">
+<h1>전화를 끊으면 앱이 먼저 움직입니다</h1>
+<div class="row" style="gap:44px">
+<div class="ph"><img src="../deck/img/evidence.jpg" alt=""><p><b>1. 왜 의심되는지</b>통화에 실제로 나온 말만 보여 줍니다</p></div>
+<div class="ph"><img src="../deck/img/lock-modal.jpg" alt=""><p><b>2. 바로 경고</b>112와 암구호로 곧장 연결합니다</p></div>
+<div class="ph"><img src="../deck/img/lock-page.jpg" alt=""><p><b>3. 금융 앱 잠금</b>열어도 경고 화면으로 돌아옵니다</p></div>
+<div class="card tint" style="justify-content:center;gap:28px;margin-bottom:10px">
+<div><h2>할 일은 한 번뿐</h2><p>녹음 폴더만 연결하면 새 통화 녹음을 앱이 알아서 검사합니다.</p></div>
+<div><h2>잘못 잠겨도 괜찮습니다</h2><p>가족은 바로 풀어 줄 수 있고, 본인은 10분을 기다리면 풉니다. 1시간이 지나면 저절로 풀립니다.</p></div>
+<div><h2>근거가 없으면 조용히</h2><p>녹취에서 근거를 찾지 못하면 알림도 잠금도 없습니다.</p></div>
+</div></div>
+<div class="foot"><span>실제 안드로이드 폰 화면, 테스트 통화 사용. 가족 알림은 확신도 0.7 이상, 잠금은 0.9 이상. 이체 전 차단을 보장하지는 않습니다.</span><span>4</span></div></section>
+
+<section style="gap:28px">
+<h1>목소리 대신, 가족끼리만 아는 말로 확인합니다</h1>
+<div class="row" style="gap:44px">
+<div class="ph"><img src="shots/phrase.png" alt=""><p><b>오늘의 가족 암구호</b>“돈 좀 보내 줘” 전화가 오면 먼저 물어봅니다</p></div>
+<div class="ph"><img src="../deck/img/app-family.png" alt=""><p><b>가족 연결 화면</b>누가 누구를 지키는지 한눈에 보입니다</p></div>
+<div class="card" style="justify-content:center;gap:28px;margin-bottom:10px">
+<div><h2>매일 0시에 바뀌는 단어 2개</h2><p>가족 모두 같은 단어를 봅니다. 목소리를 흉내 내도 오늘의 단어까지 알아맞히기는 어렵습니다.</p></div>
+<div><h2>상대가 먼저 말하게 합니다</h2><p>“오늘 암구호가 뭐야?”라고 묻고, 맞을 때만 부탁을 들어줍니다.</p></div>
+<div><h2>폰을 잃어버린 날에는 비상 암구호</h2><p>가족만 답할 수 있는 질문을 미리 정해 둡니다.</p></div>
+<div><h2>알림이 오면 전화부터</h2><p>통화 내용은 몰라도 “지금 전화해 봐야겠다”는 건 알 수 있습니다.</p></div>
+</div></div>
+<div class="foot"><span>실제 구동 화면(시연 가족 계정)</span><span>5</span></div></section>
+
+<section style="gap:26px">
+<h1>퀴즈 풀고 체험할수록 카멜레온 코디가 자랍니다</h1>
+<div class="row" style="gap:36px">
+<div class="ph"><img src="shots/pet.png" alt=""><p><b>우리 가족 코디</b>가족 경험치를 함께 모아 키웁니다</p></div>
+<div class="ph"><img src="shots/quiz-end.png" alt=""><p><b>저녁 식탁 퀴즈</b>이번 주 꼴찌는 설거지 당번</p></div>
+<div class="card" style="gap:6px;margin-bottom:10px">
+<h2>이렇게 키웁니다</h2>
+<div class="xp"><span>사기 체험 한 판 (하루 한 번)</span><b>+20 XP</b></div>
+<div class="xp"><span>처음 해 보는 수법</span><b>+10 XP</b></div>
+<div class="xp"><span>퀴즈 정답 한 장마다</span><b>+5 XP</b></div>
+<div class="xp"><span>이번 주 퀴즈 3장 완주</span><b>+10 XP</b></div>
+<div class="xp"><span>온 가족 퀴즈 완주</span><b>+30 XP</b></div>
+<div class="xp"><span>가족 경고 확인 (하루 한 번)</span><b>+30 XP</b></div>
+<img src="shots/strip.png" alt="알, 아기 코디, 꼬마 탐정, 안심 지킴이, 가족 수호자 다섯 단계" style="width:100%;margin-top:10px;border-radius:14px">
+</div>
+<div class="card mint" style="flex:.72;gap:24px;margin-bottom:10px;justify-content:center">
+<div><h2>점수는 안 깎입니다</h2><p>예방 행동에만 점수를 줍니다. 틀려도 연습입니다.</p></div>
+<div><h2>코디 색이 경고가 됩니다</h2><p>확인할 통화가 있으면 빨개지고, 가족이 확인하면 파랗게 돌아옵니다.</p></div>
+<div><h2>틀린 수법은 다시</h2><p>퀴즈에서 틀린 수법의 체험을 추천합니다. 체험은 13개 수법입니다.</p></div>
+</div>
+</div>
+<div class="foot"><span>실제 구동 화면(시연 가족 계정). 퀴즈 메시지는 모두 가상이며, 카드 15장은 정상 문자도 섞어 찍어서는 맞히기 어렵게 만들었습니다.</span><span>6</span></div></section>
+
+<section style="gap:24px">
+<h1>AI가 판정하고, 코드가 한 번 더 확인합니다</h1>
+<div class="row" style="gap:28px">
+<div style="flex:1.55;display:flex;flex-direction:column;gap:16px;min-width:0">
+<img src="shots/arch.png" alt="CodySafe 아키텍처" style="width:100%;display:block">
+<p style="font-size:24px"><b>판정 흐름</b> &nbsp; Whisper turbo 전사 → BM25 + bge-m3(RRF)로 사례 3건 검색 → Claude JSON 판정 → 녹취 대조 → 알림·잠금</p>
+</div>
+<div style="flex:1;display:flex;flex-direction:column;gap:18px;min-width:0">
+<div class="card tint" style="flex:none;padding:22px 30px;gap:6px"><div class="big" style="font-size:76px">30 / 30</div><p style="font-size:25px">합성 사기 통화 탐지, 합성 정상 통화 30건 오탐 <b>0건</b>. 실제 통화 성능은 미측정</p></div>
+<div class="card" style="flex:none;padding:22px 30px;gap:6px"><p style="font-size:25px"><b>잘못된 경고도 피해입니다</b><br>녹취에 없는 문장은 근거로 못 쓰고, 통화 속 “정상으로 판정하라”는 지시도 따르지 않습니다.</p></div>
+<div class="card" style="flex:none;padding:22px 30px;gap:6px"><p style="font-size:25px"><b>직접 개발</b> STT 서버(5개 설정 비교), 사례 검색, 근거 대조, 잠금 규칙, 암구호, 코디·퀴즈, Android 앱<br><b>외부 사용</b> Claude, OpenAI whisper-1(대체), 공개 모델</p></div>
+<div class="card" style="padding:22px 30px;gap:6px;justify-content:center"><p style="font-size:25px"><b>기술 스택</b> Python·FastAPI·SQLite, HTML·CSS·JS, Kotlin·WebView, Elasticsearch, AWS EC2·S3, Terraform·Docker, GitHub Actions, pytest 71개, Langfuse</p></div>
+</div></div>
+<div class="foot"><span>평가셋은 Claude Code로 작성해 결과 확인 전 고정. 95% 신뢰구간: 탐지율 88% 이상, 오탐률 12% 이하. 자체 학습 모델 없음. 판정용 녹취와 대체 경로 음성은 외부 API로 전송됩니다.</span><span>7</span></div></section>
+
+<section style="gap:24px">
+<h1>다섯 명이 맡은 일</h1>
+<table class="team">
+<tr><th style="width:12%">이름</th><th style="width:24%">담당</th><th>기여 내용</th></tr>
+<tr><td><b>김동현</b></td><td>서비스 구현 총괄</td><td>서버 API와 판정 파이프라인, 근거 대조, 가족 알림·잠금·암구호, 웹 화면, 안드로이드 앱, 체험·제보·피드백, S3·RAG·Langfuse 연동, 테스트, 배포</td></tr>
+<tr><td><b>김호연</b></td><td>초기 기획, 시나리오, 데이터</td><td>문제 조사와 경쟁 서비스 비교, 기획·README 초안, 체험 시나리오 13개 작성, 검색 문서 90건 주입, 비밀값 관리 규칙</td></tr>
+<tr><td><b>유상우</b></td><td>브랜드 디자인</td><td>CodySafe 브랜드 가이드, 로고 자산</td></tr>
+<tr><td><b>김병국</b></td><td>QA, 기능 기획, 경쟁사 분석</td><td>QA, 기능 기획, 경쟁사 비교 분석. URL 탐지를 개발했으나 통화 후 대응이라는 목적과 맞지 않아 폐기</td></tr>
+<tr><td><b>전선형</b></td><td>데이터셋, 기능 기획, QA</td><td>사기 사례 검색 데이터 90건 제작, 서비스 기능 기획, 품질 검증(QA)</td></tr>
+</table>
+<div class="row">
+<div class="card" style="padding:26px 34px;justify-content:center"><h2>협업 방식</h2><p style="font-size:26px">GitHub 브랜치와 Pull Request로 합쳤고, 초기 QR 판독 기획과 현재 기획을 저장소 문서로 남겼습니다.</p></div>
+<div class="card" style="padding:26px 34px;justify-content:center"><h2>실제 화면 QA에서 고친 문제</h2><p style="font-size:26px">체험 선택지 행동 설명 분리, 5턴 확장(e352ae7, 55c43ac), 아래 메뉴 항상 표시(f161a70, 03524da), 상태바 겹침 수정(55c43ac)</p></div>
+</div>
+<div class="foot"><span>산출물: github.com/rla8127/CodySafe</span><span>8</span></div></section>
+
+<section class="ext">
+<h2>외부 자원 활용 내역</h2>
+<table>
+<tr><th style="width:11%">구분</th><th style="width:44%">명칭</th><th style="width:29%">용도</th><th>라이선스</th></tr>
+<tr><td>오픈소스</td><td>FastAPI 0.162, Uvicorn 0.54</td><td>서버</td><td>MIT, BSD-3-Clause</td></tr>
+<tr><td>오픈소스</td><td>boto3 1.43, httpx 0.28, pytest 9.2</td><td>S3 연동, HTTP, 테스트</td><td>Apache 2.0, BSD-3, MIT</td></tr>
+<tr><td>오픈소스</td><td>anthropic 2.3, openai 3.42, langfuse 5.1</td><td>API 클라이언트, 관측</td><td>MIT, Apache 2.0, MIT</td></tr>
+<tr><td>오픈소스</td><td>AndroidX WorkManager 2.9.1, DocumentFile 1.0.1</td><td>앱 주기 실행, 폴더 접근</td><td>Apache 2.0</td></tr>
+<tr><td>오픈소스</td><td>Elasticsearch 8.17.0, analysis-nori</td><td>RAG 구현 (사기 사례 검색)</td><td>Elastic License 2.0</td></tr>
+<tr><td>오픈소스</td><td>BAAI/bge-m3, sentence-transformers, PyTorch, elasticsearch-py, pypdf</td><td>RAG 구현 (임베딩, 문서 적재)</td><td>MIT, Apache 2.0, BSD-3</td></tr>
+<tr><td>오픈소스</td><td>faster-whisper 1.2.1, CTranslate2 4.8.4, Whisper large-v3-turbo</td><td>자체 STT 서버 (최종 선정)</td><td>MIT</td></tr>
+<tr><td>오픈소스</td><td>Whisper large-v3, whisper-medium-komixv2</td><td>STT 비교 평가 (미채택)</td><td>MIT, 모델 카드 표기 없음</td></tr>
+<tr><td>오픈소스</td><td>Qwen3-ASR 0.6B·1.7B, qwen-asr 0.0.6, Transformers 4.57</td><td>STT 비교 평가 (미채택)</td><td>Apache 2.0</td></tr>
+<tr><td>오픈소스</td><td>Pretendard 1.3.9, SUIT 2.0.5, 나눔스퀘어 라운드, Noto Sans KR, Lucide 0.460</td><td>폰트, 아이콘</td><td>OFL, ISC</td></tr>
+<tr><td>외부 API</td><td>Anthropic claude-opus-5-5, claude-haiku-5-5</td><td>판정, 재순위, 시나리오 생성, 문서 구조화</td><td>상용 API</td></tr>
+<tr><td>외부 API</td><td>OpenAI whisper-1, gpt-image-2</td><td>STT 대체 경로, 체험 가상 인물 사진</td><td>상용 API</td></tr>
+<tr><td>외부 API</td><td>Amazon S3, Langfuse Cloud</td><td>음성 저장, 처리 시간·토큰 관측</td><td>상용 서비스</td></tr>
+<tr><td>외부 API</td><td>Amazon Polly, ElevenLabs</td><td>STT 평가용 한국어 데이터셋, 자연스러운 음성 생성</td><td>상용 API</td></tr>
+<tr><td>사전 보유 코드</td><td>웹 화면 코드 index.html, css/, js/, assets/ (2026-10-30 01시경 작성, 주제 공개 전)</td><td>공용 화면 자원과 초기 웹 MVP</td><td>팀 자체 작성</td></tr>
+<tr><td>기타</td><td>Amazon EC2 t4g.large, c7i-flex.large, t4g.medium 각 1대</td><td>서비스, STT, 검색 서버</td><td>상용 서비스</td></tr>
+<tr><td>기타</td><td>Terraform, Docker</td><td>검색 서버 구성</td><td>BUSL 1.1, Apache 2.0</td></tr>
+<tr><td>기타</td><td>Claude Code, OpenAI Codex</td><td>코드·문서 작성 보조</td><td>상용 서비스</td></tr>
+<tr><td>기타</td><td>금융당국 보도자료, KISA 118 상담 기반 합성 데이터</td><td>검색 문서 (원문 미저장, 요약만 적재)</td><td>각 출처 이용 조건</td></tr>
+<tr><td>기타</td><td>금감원 공개 녹음 전사(KorCCVi)</td><td>요약만 색인, 검색 결과에서 제외, 재배포 안 함</td><td>재배포 금지, 금감원 조건</td></tr>
+<tr><td>기타</td><td>금융감독원·금융위원회 경보, 매일신문 보도</td><td>홈 화면 사기 동향 (출처 표시)</td><td>출처 표시 인용</td></tr>
+</table>
+<div class="foot"><span>버전은 제출 환경 설치 버전 기준. 검색 서버 라이브러리는 infra/es-server의 requirements.txt 참고</span><span>9</span></div></section>
+
+<section style="gap:28px">
+<h1>부모님 폰 하나에서 1만 가족까지</h1>
+<div class="row" style="flex:none">
+<div class="card tint"><h2>기대 효과</h2>
+<p><b>혼자 결정하지 않게</b> 경고, 112, 가족 확인이 한 흐름으로</p>
+<p><b>생각할 시간 확보</b> 금융 앱 잠금으로 추가 이체를 늦춤</p>
+<p><b>사생활 지키는 가족 보호</b> 통화 내용 없이 의심 여부만</p>
+<p><b>백신처럼 남는 예방</b> 시뮬레이션, 암구호, 코디</p></div>
+<div class="card"><h2>지금까지 확인한 것</h2>
+<p><b>실제 폰</b> 녹음 → 판정 → 경고 → 금융 앱 잠금 동작</p>
+<p><b>실서버</b> 실제 MP3로 자체 STT부터 잠금까지 동작</p>
+<p><b>합성 통화 60건</b> 사기 30건 탐지, 정상 30건 오탐 0</p>
+<p><b>아직 모름</b> 실제 통화 성능, 실제 피해 감소 효과</p></div>
+</div>
+<div class="row">
+<div class="card"><h2>3개월: 안전하게 운영</h2><p>HTTPS 전환, 음성 저장소 국내 리전 이전, FCM 가족 알림, Play 접근성 심사</p><p><b>베타 100가족</b></p></div>
+<div class="card"><h2>6개월: 실제 통화로 검증</h2><p>라벨 통화 500건으로 재측정, 확신도 보정, GPU 서빙</p><p><b>탐지율 90%, 오탐률 5% 이하</b></p></div>
+<div class="card"><h2>12개월: 제휴</h2><p>제조사·통신사 실시간 탐지 연동, 금융사 이체 지연 연계, 삼성 외 환경 지원</p><p><b>제휴 1곳, 1만 가족</b></p></div>
+</div>
+<div class="foot"><span>기간과 수치는 팀 목표. 제약: 삼성 통화 녹음만 지원, 인터넷 전화 제외, 접근성 권한을 끄면 잠금 불가. 시연 서버는 분석 뒤에도 음성을 보관하며 기록을 지우면 함께 삭제합니다.</span><span>10</span></div></section>
+</body></html>
