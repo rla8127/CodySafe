@@ -16,7 +16,7 @@
 | 오픈 모델 | Qwen/Qwen3-TTS-12Hz-1.7B-VoiceDesign | 글 설명으로 목소리 4개(사기범 남·여, 아들, 딸)를 1번씩 설계 | Apache-2.0 |
 | 오픈 모델 | Qwen/Qwen3-TTS-12Hz-1.7B-Base | 모든 대사를 설계한 목소리로 읽음(같은 목소리 유지). 실제 사람 목소리 복제 없음 | Apache-2.0 |
 | 오픈소스(GPU) | antgroup/echomimic_v3 (커밋 7e89489) | 가족 사칭 영상통화 장면의 말하는 얼굴 영상 생성 | Apache-2.0 |
-| 오픈 모델 | BadToBest/EchoMimicV3 (echomimicv3-flash-pro) + alibaba-pai/Wan2.1-Fun-V1.1-1.3B-InP + TencentGameMate/chinese-wav2vec2-base | 사진 1장과 합성 음성으로 말하는 영상 1편(27초, 'AI 생성' 표시) | Apache-2.0 / Apache-2.0 / MIT |
+| 오픈 모델 | BadToBest/EchoMimicV3 (echomimicv3-flash-pro) + alibaba-pai/Wan2.1-Fun-V1.1-1.3B-InP + TencentGameMate/chinese-wav2vec2-base | 사진 1장과 합성 음성으로 말하는 영상 2편(아들·딸, 약 28초, 768px, 'AI 생성' 표시) | Apache-2.0 / Apache-2.0 / MIT |
 | 오픈 모델 | Tongyi-MAI/Z-Image-Turbo | 영상에 쓸 **실존하지 않는** 얼굴 사진 생성 | Apache-2.0 |
 
 ## 2. 외부 API (기존 '확인 중' 두 줄을 바꿈)
