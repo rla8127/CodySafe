@@ -75,6 +75,13 @@ class Media(_Strict):
     text: str
 
 
+class Video(_Strict):
+    # 예비 자료의 합성 얼굴 영상 이름(server/backup/video/<이름>.mp4, O-2). 자녀 호칭에 '딸'이 있으면 daughter를 쓴다.
+    son: str = Field(pattern=r"^[a-z0-9_]{1,40}$")
+    daughter: str = Field(pattern=r"^[a-z0-9_]{1,40}$")
+    caption: str = Field(min_length=1)
+
+
 class Node(_Strict):
     stage: Stage
     tactics: list[Tactic]
@@ -87,6 +94,7 @@ class Node(_Strict):
     pressure_tone: Tone = "threat"  # 한 번 더 미는 말의 말투
     debrief: str
     media: Media | None = None
+    video: Video | None = None  # 대사·문자와 함께 보이는 영상 메시지(대사 음성 열쇠와는 무관)
 
 
 class Terminal(_Strict):

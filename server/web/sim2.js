@@ -94,7 +94,7 @@ async function s2LoadHome(arg) {
     S2.list = list.items;
     S2.profile = list.profile;
     S2.presets = list.presets;
-    S2.caps = { tts: list.tts, stt: list.stt, llm: list.llm };
+    S2.caps = { tts: list.tts, stt: list.stt, llm: list.llm, backup: list.backup || null };
     S2.pick = s2resolve(arg ? decodeURIComponent(arg) : null) || S2.pick || list.default;
     if (!S2.list.some((i) => i.id === S2.pick)) S2.pick = list.default;
     s2RenderProfile();
@@ -340,11 +340,24 @@ function s2Progress(turn) {
   document.querySelectorAll('#simProg i').forEach((e, k) => e.classList.toggle('on', k < turn));
 }
 
-function s2Bubble(who, text, kind) {
+function s2Video(src, caption) {
+  const box = s2el('div', 'bubble s2-video');
+  const v = document.createElement('video');
+  v.src = src;
+  v.controls = true;
+  v.playsInline = true;
+  v.preload = 'metadata';
+  v.onerror = () => (box.closest('.msg') || box).remove(); // 예비 영상 파일이 없으면 말풍선을 지운다
+  box.append(v, s2el('div', 'tiny', caption));
+  return box;
+}
+
+function s2Bubble(who, text, kind, src) {
   const chat = $('#chat');
   if (!chat) return;
   const row = s2el('div', 'msg' + (who === 'me' ? ' me' : ''));
   if (who !== 'me') row.append(s2el('span', 'av', $('#s2Av')?.textContent || '?'));
+  if (kind === 'video') { row.append(s2Video(src, text)); chat.append(row); view.scrollTop = view.scrollHeight; return; }
   row.append(s2el('div', 'bubble' + (kind === 'link' ? ' link' : kind === 'sms' ? ' s2-sms' : ''), text));
   chat.append(row);
   view.scrollTop = view.scrollHeight;
@@ -366,6 +379,7 @@ function s2Typing(on) {
 function s2Items(scene) {
   const items = scene.lines.map((t) => ({ text: t, kind: /^https?:\/\//.test(t) ? 'link' : '' }));
   if (scene.media) items.push({ text: scene.media.text, kind: scene.media.kind === 'link' ? 'link' : 'sms' });
+  if (scene.video) items.unshift({ text: scene.video.caption, kind: 'video', src: scene.video.src }); // 영상 메시지를 먼저
   return items;
 }
 
@@ -376,7 +390,7 @@ function s2ChatScene(scene, reask) {
   const items = s2Items(scene);
   items.forEach((m, k) => {
     later(() => s2Typing(true), k * 900 + 150);
-    later(() => { s2Typing(false); s2Bubble('them', m.text, m.kind); }, k * 900 + 750);
+    later(() => { s2Typing(false); s2Bubble('them', m.text, m.kind, m.src); }, k * 900 + 750);
   });
   later(() => s2ChatChoices(scene, reask), items.length * 900 + 250);
 }
@@ -487,7 +501,7 @@ SCREENS.sim2call = gated(() => `<div class="callscreen s2-call">
 INIT.sim2call = async (sid) => {
   if (!signedIn() || !sid) return;
   if ((await s2Resume(sid, 'call')) !== 'active') return;
-  $('#c2Voice').textContent = S2.caps.tts ? '임대 GPU 음성 · 전화 음질' : '브라우저 음성(ko-KR)';
+  $('#c2Voice').textContent = !S2.caps.tts ? '브라우저 음성(ko-KR)' : S2.caps.backup && S2.caps.backup.first ? '미리 만든 GPU 음성 · 전화 음질' : '임대 GPU 음성 · 전화 음질';
   vibrate([300, 200, 300]);
   const started = S2.scene && S2.scene.turn > 1;
   if (started) return s2Pickup();
@@ -550,6 +564,7 @@ async function s2CallScene(scene, reask) {
   for (const m of items) {
     if (token !== S2.speakToken || !$('#c2Tr')) return;
     if (m.kind === 'sms' || m.kind === 'link') { s2CallLine('them', `[문자로 온 것] ${m.text}`); continue; }
+    if (m.kind === 'video') { s2CallLine('them', '[영상으로 온 것]'); $('#c2Tr')?.append(s2Video(m.src, m.text)); continue; }
     s2CallLine('them', m.text);
     await s2Speak(m.text, token, scene.tone);
   }
@@ -726,7 +741,7 @@ async function s2PlayTts(text, token, tone) {
     const buf = await res.arrayBuffer();
     clearTimeout(timer);
     if (token !== S2.speakToken) return true;
-    label('임대 GPU 음성 · 전화 음질');
+    label(res.headers.get('X-Sim-Voice') === 'backup' ? '미리 만든 GPU 음성 · 전화 음질' : '임대 GPU 음성 · 전화 음질');
     const ctx = S2.audioCtx || (S2.audioCtx = new (window.AudioContext || window.webkitAudioContext)());
     if (ctx.state === 'suspended') await ctx.resume();
     const audio = await ctx.decodeAudioData(buf);
@@ -990,6 +1005,9 @@ function s2RenderResult(r) {
   .s2-chat .choice { font-size: 16px; }
   .s2-stop { background: rgba(255,255,255,.7); }
   .bubble.s2-sms { background: #FFF8E1; border: 1px dashed #E0B000; }
+  .bubble.s2-video { padding: 6px; max-width: 260px; }
+  .s2-video video { display: block; width: 100%; max-height: 320px; border-radius: 10px; background: #000; }
+  .s2-video .tiny { margin-top: 4px; opacity: .75; }
   .s2-term.s2-ok, .card.s2-ok { background: var(--safe-soft); }
   .s2-term.s2-bad, .card.s2-bad { background: var(--danger-soft); }
   .s2-row { display: grid; grid-template-columns: 1fr 34% 48px; align-items: center; gap: 10px; padding: 9px 0; }

@@ -66,6 +66,8 @@ def _texts(graph: Graph):
         yield f"{nid}.goal", node.goal
         for i, flag in enumerate(node.red_flags):
             yield f"{nid}.red_flags[{i}]", flag
+        if node.video is not None:
+            yield f"{nid}.video.caption", node.video.caption
         for i, line in enumerate(node.lines):
             yield f"{nid}.lines[{i}]", line
         for i, line in enumerate(node.pressure):

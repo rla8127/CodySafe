@@ -16,11 +16,11 @@ from typing import Literal
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request
 from fastapi.concurrency import run_in_threadpool
-from fastapi.responses import JSONResponse, Response
+from fastapi.responses import FileResponse, JSONResponse, Response
 from pydantic import BaseModel, Field
 
 from . import config, db
-from .sim import engine
+from .sim import backup_use, engine
 from .sim import score as sim_score
 from .sim.schema import DEFAULT_PRESET, PRESETS, TONE_GUIDE, SimProfile, Tone, preset_profile
 
@@ -210,7 +210,29 @@ def _read_cached(path) -> tuple[bytes, str]:
     return path.read_bytes(), (kind_path.read_text() if kind_path.exists() else "audio/wav")
 
 
+class TtsUnavailable(Exception):
+    """임대 GPU 주소도 없고 예비 음성에도 없는 대사. 화면은 이 대사만 브라우저 음성으로 읽는다."""
+
+
 def cached_tts(text: str, tone: str | None = None) -> tuple[bytes, str]:
+    """대사 음성. SIM_BACKUP_FIRST=1이면 예비 음성(mp3) → 임대 GPU, 아니면 임대 GPU(캐시) → 실패·주소 없음이면 예비 음성."""
+    backup_first = backup_use.first()
+    if backup_first and (hit := backup_use.tts(text, tone)):
+        return hit
+    if not os.getenv("SIM_TTS_URL", "").strip():
+        if not backup_first and (hit := backup_use.tts(text, tone)):
+            return hit
+        raise TtsUnavailable(text[:20])
+    try:
+        return _gpu_tts(text, tone)
+    except Exception:
+        if not backup_first and (hit := backup_use.tts(text, tone)):
+            log.info("sim TTS: 임대 GPU 실패, 예비 음성 사용")
+            return hit
+        raise
+
+
+def _gpu_tts(text: str, tone: str | None = None) -> tuple[bytes, str]:
     """같은 대사는 한 번만 합성한다. 미리 만들기와 화면 요청이 겹치면 뒤의 것은 앞의 합성을 기다렸다가 캐시를 읽는다
     (임대 GPU 실측 11-01 08:53: 대사 하나 합성에 7–16초라, 겹쳐 두 번 만들면 GPU가 더 밀린다)."""
     path = _tts_path(text, tone)
@@ -241,7 +263,7 @@ def warm_gpu() -> None:
 
     base = os.getenv("SIM_LLM_BASE_URL", "").strip().rstrip("/")
     tts = os.getenv("SIM_TTS_URL", "").strip()
-    if not base and not tts:
+    if (not base and not tts) or backup_use.first():  # 예비 자료를 먼저 쓰는 시연에서는 GPU를 깨우지 않는다(크레딧)
         return
     with _warm_lock:
         if time.time() - _warm["at"] < WARM_EVERY:
@@ -270,7 +292,7 @@ def prerender(profile: dict) -> None:
     """전화 훈련 대사를 미리 합성해 둔다(프로필을 저장할 때, 훈련 목록을 열 때). 모든 대본이 '전화로 연습하기'를 열 수 있어
     셋 다 만들되 고정 대본(기관 사칭)부터 한다. 이미 만든 대사는 건너뛰고, 같은 프로필을 이미 만드는 중이면 하지 않는다.
     TTS 주소가 없으면 아무것도 하지 않는다."""
-    if not os.getenv("SIM_TTS_URL", "").strip():
+    if not os.getenv("SIM_TTS_URL", "").strip() or backup_use.first():
         return
     prof = SimProfile(**profile)
     key = prof.model_dump_json()
@@ -288,7 +310,7 @@ def prerender(profile: dict) -> None:
                     if _tts_path(text, tone).exists():
                         continue
                     try:
-                        cached_tts(text, tone)
+                        _gpu_tts(text, tone)
                         made += 1
                     except Exception as exc:
                         log.warning("sim 음성 미리 만들기 실패: %s", type(exc).__name__)
@@ -312,6 +334,22 @@ def call_stt(audio: bytes, content_type: str) -> str:
     return str(r.json().get("text", "")).strip()
 
 
+def caps() -> dict:
+    """화면이 고를 경로. 예비 음성이 있으면 GPU 주소가 없어도 tts=True(화면은 /v1/sim/tts를 부르고, 없는 대사만 브라우저 음성)."""
+    ready = backup_use.ready()
+    return {
+        "llm": "gpu" if os.getenv("SIM_LLM_BASE_URL", "").strip() else "rule",
+        "tts": bool(os.getenv("SIM_TTS_URL", "").strip()) or ready["tts"],
+        "stt": bool(os.getenv("SIM_STT_URL", "").strip()),
+        "backup": {"first": backup_use.first(), **ready},
+    }
+
+
+def session_seed() -> int | None:
+    """예비 음성은 seed 0으로 만든 대사라, 예비 자료를 먼저 쓰거나 GPU 음성이 없으면 seed 0으로 시작한다(인증번호 숫자가 음성과 같게)."""
+    return 0 if backup_use.first() or not os.getenv("SIM_TTS_URL", "").strip() else None
+
+
 def fallback(code: int, reason: str) -> JSONResponse:
     return JSONResponse({"fallback": "browser", "reason": reason}, status_code=code)
 
@@ -332,10 +370,20 @@ def make_router(current_device) -> APIRouter:
             "default": PINNED,
             "profile": profile.model_dump() if profile else None,
             "presets": [{"id": k, "label": v["label"], "profile": v["profile"]} for k, v in PRESETS.items()],
-            "llm": "gpu" if os.getenv("SIM_LLM_BASE_URL", "").strip() else "rule",
-            "tts": bool(os.getenv("SIM_TTS_URL", "").strip()),
-            "stt": bool(os.getenv("SIM_STT_URL", "").strip()),
+            **caps(),
         }
+
+    @router.get("/v1/sim/caps")
+    def sim_caps():
+        return caps()
+
+    @router.get("/v1/sim/video/{name}")
+    def sim_video(name: str):
+        # <video src>는 인증 머리를 못 보내므로 기기 인증 없이 연다. 합성 얼굴 영상(예비 자료)만, 이름은 영문 소문자·숫자·_ 만.
+        path = backup_use.video(name)
+        if path is None:
+            raise HTTPException(404, "영상이 없습니다")
+        return FileResponse(path, media_type="video/mp4")
 
     @router.post("/v1/sim/sessions")
     def create_session(body: SessionIn, device: str = Depends(current_device)):
@@ -343,7 +391,7 @@ def make_router(current_device) -> APIRouter:
         with db.connect() as conn:
             stored = load_profile(conn, device)
             profile = stored or preset_profile(DEFAULT_PRESET)
-            state = engine.start(graph, profile, body.mode)
+            state = engine.start(graph, profile, body.mode, seed=session_seed())
             sid = uuid.uuid4().hex
             conn.execute(
                 "INSERT INTO sim_sessions (id, device_id, scenario_id, scam_type, mode, started_at, state_json)"
@@ -450,15 +498,19 @@ def make_router(current_device) -> APIRouter:
 
     @router.post("/v1/sim/tts")
     def tts(body: TtsIn, _: str = Depends(current_device)):
-        if not os.getenv("SIM_TTS_URL", "").strip():
+        if not caps()["tts"]:
             return fallback(501, "tts_not_configured")
         started = time.perf_counter()
         try:
             audio, kind = cached_tts(body.text, body.tone)
+        except TtsUnavailable:
+            return fallback(404, "tts_line_not_in_backup")  # 이 대사만 브라우저 음성(화면은 GPU 음성을 끄지 않음)
         except Exception as exc:
             log.warning("sim TTS 실패: %s", type(exc).__name__)
             return fallback(502, "tts_failed")
-        return Response(audio, media_type=kind, headers={"X-Sim-Ms": str(int((time.perf_counter() - started) * 1000))})
+        # 화면이 '미리 만든 GPU 음성'과 '임대 GPU 음성'을 구분해 표시하게(예비 음성은 mp3, 임대 GPU는 wav).
+        voice = "backup" if kind == "audio/mpeg" else "gpu"
+        return Response(audio, media_type=kind, headers={"X-Sim-Ms": str(int((time.perf_counter() - started) * 1000)), "X-Sim-Voice": voice})
 
     @router.post("/v1/sim/stt")
     async def stt(request: Request, _: str = Depends(current_device)):
