@@ -14,6 +14,9 @@
 | 오픈 모델 | kakaocorp/kanana-1.5-8b-instruct-2505 (fp8 동적 양자화) | 규칙으로 정하지 못한 답의 판정(등급·의도 JSON) | Apache-2.0 |
 | 오픈 모델 | openai/whisper-large-v3-turbo (변환본 dropbox-dash/faster-whisper-large-v3-turbo) | 음성 인식(팀 korean-stt와 같은 모델) | MIT |
 | 오픈 모델 | Qwen/Qwen3-TTS-12Hz-1.7B-VoiceDesign | 한국어 음성 합성. 목소리 3개는 글 설명으로 설계, 실제 사람 목소리 복제 없음 | Apache-2.0 |
+| 오픈소스(GPU) | antgroup/echomimic_v3 (커밋 7e89489) | 가족 사칭 영상통화 장면의 말하는 얼굴 영상 생성 | Apache-2.0 |
+| 오픈 모델 | BadToBest/EchoMimicV3 (echomimicv3-flash-pro) + alibaba-pai/Wan2.1-Fun-V1.1-1.3B-InP + TencentGameMate/chinese-wav2vec2-base | 사진 1장과 합성 음성으로 말하는 영상 1편(27초, 'AI 생성' 표시) | Apache-2.0 / Apache-2.0 / MIT |
+| 오픈 모델 | Tongyi-MAI/Z-Image-Turbo | 영상에 쓸 **실존하지 않는** 얼굴 사진 생성 | Apache-2.0 |
 
 ## 2. 외부 API (기존 '확인 중' 두 줄을 바꿈)
 
@@ -26,4 +29,4 @@
 
 | 구분 | 명칭 | 용도 | 비고 |
 |---|---|---|---|
-| GPU | Modal의 NVIDIA L40S 48GB (앱마다 1장, 쓸 때만 켜짐) | 판정 LLM·음성 합성·음성 인식 | 실측 `eval/gpu_latency.md`. 대회 L4는 쓰지 않았다 |
+| GPU | Modal의 NVIDIA L40S 48GB (앱마다 1장, 쓸 때만 켜짐) | 판정 LLM·음성 합성·음성 인식·영상 생성 | 실측 `eval/gpu_latency.md`. 대회 L4는 쓰지 않았다 |
