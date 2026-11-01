@@ -703,20 +703,30 @@ async function s2Speak(text, token, tone) {
   await s2SpeakBrowser(text, token, tone);
 }
 
+// 임대 GPU는 처음 만드는 대사 하나에 7–16초가 걸린다(11-01 실측). 이만큼 기다려도 안 오면 이번 대사만 브라우저 음성으로 읽는다.
+// 서버는 하던 합성을 끝내 캐시에 두므로 다음 훈련부터는 GPU 음성이 바로 나온다.
+const S2_TTS_WAIT_MS = 3500;
+
 async function s2PlayTts(text, token, tone) {
+  const ctrl = window.AbortController ? new AbortController() : null;
+  const timer = ctrl ? setTimeout(() => ctrl.abort(), S2_TTS_WAIT_MS) : null;
+  const label = (t) => { $('#c2Voice') && ($('#c2Voice').textContent = t); };
   try {
     const res = await fetch('/v1/sim/tts', {
       method: 'POST',
       headers: { Authorization: 'Bearer ' + store.get('token'), 'Content-Type': 'application/json' },
       body: JSON.stringify({ text, tone }),
+      signal: ctrl ? ctrl.signal : undefined,
     });
     if (!res.ok) {
       if (res.status === 501 || res.status === 502) S2.caps.tts = false;
-      $('#c2Voice') && ($('#c2Voice').textContent = '브라우저 음성(ko-KR)');
+      label('브라우저 음성(ko-KR)');
       return false;
     }
     const buf = await res.arrayBuffer();
+    clearTimeout(timer);
     if (token !== S2.speakToken) return true;
+    label('임대 GPU 음성 · 전화 음질');
     const ctx = S2.audioCtx || (S2.audioCtx = new (window.AudioContext || window.webkitAudioContext)());
     if (ctx.state === 'suspended') await ctx.resume();
     const audio = await ctx.decodeAudioData(buf);
@@ -733,7 +743,10 @@ async function s2PlayTts(text, token, tone) {
     await new Promise((resolve) => { src.onended = resolve; src.start(); });
     return true;
   } catch (e) {
+    if (e && e.name === 'AbortError') label('브라우저 음성(ko-KR) · GPU 음성 준비 중');
     return false;
+  } finally {
+    clearTimeout(timer);
   }
 }
 

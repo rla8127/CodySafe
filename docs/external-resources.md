@@ -1,7 +1,7 @@
 # 외부 자원 목록 (가이드 ⓕ 양식)
 
 이 표는 쓰는 대로 고쳐 씁니다. 실제로 쓴 것만 적고, 확인하지 못한 칸은 '확인 중'으로 둡니다.
-마지막 확인: 2026-11-01 06:00 KST (모의 훈련 v2 작업 기준)
+마지막 확인: 2026-11-01 08:5x KST (모의 훈련 v2 작업 기준, 임대 GPU 칸은 O-2 `gpu/external-resources_gpu.md` 반영)
 
 ## 1. 오픈소스
 
@@ -17,6 +17,13 @@
 | 오픈소스(서버) | boto3 | 기존 탐지 기능의 AWS 연동 | Apache-2.0 |
 | 오픈소스(화면) | Lucide 아이콘 0.460.0 | 화면 아이콘 | ISC |
 | 오픈소스(화면) | SUIT 글꼴 2.0.5 | 화면 글꼴 | SIL OFL 1.1 |
+| 오픈소스(GPU) | vLLM 0.21.0 | 판정 LLM을 OpenAI 호환 주소로 서빙 | Apache-2.0 |
+| 오픈소스(GPU) | faster-whisper 1.2.1 (CTranslate2) | 전화 훈련 답 음성 인식 | MIT |
+| 오픈소스(GPU) | qwen-tts 0.1.1 | 전화 훈련 대사 음성 합성 | Apache-2.0 |
+| 오픈소스(GPU) | Modal Python 클라이언트 | 배포·자동 크기 조절 | Apache-2.0 |
+| 오픈 모델 | kakaocorp/kanana-1.5-8b-instruct-2505 (fp8 동적 양자화) | 규칙으로 정하지 못한 답의 판정(등급·의도 JSON) | Apache-2.0 |
+| 오픈 모델 | openai/whisper-large-v3-turbo (변환본 dropbox-dash/faster-whisper-large-v3-turbo) | 음성 인식(팀 korean-stt와 같은 모델) | MIT |
+| 오픈 모델 | Qwen/Qwen3-TTS-12Hz-1.7B-VoiceDesign | 한국어 음성 합성. 목소리 3개는 글 설명으로 설계, 실제 사람 목소리 복제 없음 | Apache-2.0 |
 | 오픈소스(도구) | FFmpeg | 합성 통화 녹음을 전화 음질(300–3400Hz)·16kHz로 변환 | LGPL-2.1 이상(빌드에 따라 GPL) |
 
 ## 2. 외부 API·브라우저 기능
@@ -26,8 +33,8 @@
 | 브라우저 기능 | Web Speech API `speechSynthesis` | 전화 훈련에서 임대 GPU 음성이 없을 때 대사를 ko-KR로 읽음 | 브라우저 내장 기능 |
 | 브라우저 기능 | Web Speech API `webkitSpeechRecognition` | 전화 훈련에서 임대 GPU 음성 인식이 없을 때 답을 글자로 바꿈. Chrome은 말소리를 Google 서버로 보내므로 화면에서 먼저 알린 뒤 사용 | Google 서비스 약관(Chrome) |
 | 브라우저 기능 | Web Audio API | 대사 음성에 전화 음질(300–3400Hz) 필터 적용 | 브라우저 내장 기능 |
-| 외부 API | 임대 GPU의 OpenAI 호환 LLM 주소(`SIM_LLM_BASE_URL`) | 규칙으로 정하지 못한 답만 판정 | 확인 중 (CSIT/O-2가 알려 줄 때까지) |
-| 외부 API | 임대 GPU 음성 합성·인식 주소(`SIM_TTS_URL`·`SIM_STT_URL`) | 전화 훈련 대사 합성, 답 음성 인식 | 확인 중 (CSIT/O-2가 알려 줄 때까지) |
+| 외부 서비스 | Modal (https://modal.com) — LLM 주소 `SIM_LLM_BASE_URL` | 팀이 고른 오픈 모델을 임대 GPU에서 직접 서빙, 규칙으로 정하지 못한 답만 판정. 토큰 인증(주소·토큰 값은 `server/.env`에만 둠) | Modal 이용 약관 https://modal.com/legal/terms , 무료 크레딧 US$30 |
+| 외부 서비스 | Modal — 음성 주소 `SIM_TTS_URL`·`SIM_STT_URL` | 전화 훈련 대사 합성, 답 음성 인식 | 위와 같음 |
 | 외부 API | OpenAI·Anthropic API (`SIM_FALLBACK`) | 판정기 대체 경로. `server/.env`에 켰을 때만 부르며 기본은 꺼짐 | 각 회사 이용 약관 |
 
 ## 3. 데이터·자료
@@ -43,13 +50,13 @@
 | 구분 | 명칭 | 용도 | 라이선스·조건 |
 |---|---|---|---|
 | 코딩 도우미 | Claude Code (Claude Opus 5.5) | 모의 훈련 v2 코드·시험·문서 초안 작성. 커밋 메시지에 'AI 도구로 초안 작성'을 적음 | Anthropic 이용 약관 |
-| 음성 합성 도구 | macOS `say` 음성 Yuna·Grandma | 탐지 시연용 **합성** 사기 통화 `eval/synthetic_call.wav` 임시 제작(실제 사람 목소리 아님). 임대 GPU TTS가 오면 바꿀 수 있음 | macOS 소프트웨어 사용권 |
+| 음성 합성 도구 | macOS `say` 음성 Yuna·Grandma | 탐지 시연용 **합성** 사기 통화 `eval/synthetic_call.wav` 임시 제작, 임대 GPU 리허설에서 사용자 답 음성 합성(실제 사람 목소리 아님) | macOS 소프트웨어 사용권 |
 
 ## 5. GPU
 
 | 구분 | 명칭 | 용도 | 비고 |
 |---|---|---|---|
-| GPU | 확인 중 | 판정 LLM·음성 합성·음성 인식 | 실제로 쓴 임대 GPU 서비스와 GPU 이름만 적습니다. CSIT/O-2가 알려 주면 고칩니다 |
+| GPU | Modal의 NVIDIA L40S 48GB (앱마다 1장, 쓸 때만 켜짐) | 판정 LLM·음성 합성·음성 인식 | 실측 `eval/gpu_latency.md`(O-2), 훈련 차례별 지연 `eval/latency.md`(O-1). 대회 L4는 쓰지 않았다 |
 
 ## 6. 사전 보유 코드
 

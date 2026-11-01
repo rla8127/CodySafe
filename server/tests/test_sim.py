@@ -374,6 +374,103 @@ def test_scene_carries_tone_and_tts_sends_emotion(client, monkeypatch, tmp_path)
     assert client.post("/v1/sim/tts", headers=h, json={"text": "x", "tone": "angry"}).status_code == 422
 
 
+# 임대 GPU 실측(11-01 08:53): 처음 만드는 대사 하나에 7–16초. 같은 대사는 한 번만 만들고, 목록을 열면 대사를 미리 만든다.
+def test_cached_tts_synthesizes_a_line_once_even_when_requests_overlap(monkeypatch, tmp_path):
+    import threading
+    import time as _time
+
+    from guard import sim_api
+
+    calls = []
+
+    def slow_tts(text, tone=None):
+        calls.append(text)
+        _time.sleep(0.2)
+        return b"RIFF-audio", "audio/wav"
+
+    monkeypatch.setattr(sim_api, "call_tts", slow_tts)
+    monkeypatch.setattr(sim_api, "TTS_CACHE", tmp_path)
+    monkeypatch.setenv("SIM_TTS_URL", "http://gpu.example/tts")
+    got = []
+    threads = [threading.Thread(target=lambda: got.append(sim_api.cached_tts("여보세요", "official"))) for _ in range(4)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+    assert calls == ["여보세요"] and got == [(b"RIFF-audio", "audio/wav")] * 4
+    assert not list(tmp_path.glob("*.part"))
+
+
+def test_opening_the_list_prerenders_every_script_for_the_default_preset(client, monkeypatch, tmp_path):
+    from guard import sim_api
+
+    made = []
+    monkeypatch.setattr(sim_api, "call_tts", lambda text, tone=None: made.append((text, tone)) or (b"RIFF", "audio/wav"))
+    monkeypatch.setattr(sim_api, "TTS_CACHE", tmp_path)
+    monkeypatch.setattr(sim_api, "_warm", {"at": 0.0})
+    monkeypatch.setenv("SIM_TTS_URL", "http://gpu.example/tts")
+    h = device(client, "미리")  # 프로필을 저장하지 않은 기기 → 기본 프리셋 대사
+    assert client.get("/v1/sim/scenarios", headers=h).status_code == 200  # 배경 작업은 TestClient 안에서 끝난다
+    prof = preset_profile("mother_74_alone")
+    expected = set()
+    for g in engine.graphs().values():
+        values = engine.start(g, prof, seed=0)["values"]
+        for n in g.nodes.values():
+            expected |= {(engine.render(x, values), n.tone) for x in n.lines} | {(engine.render(x, values), n.pressure_tone) for x in n.pressure}
+    assert expected <= set(made) and len(made) == len(set(made))  # 세 대본 모두, 같은 대사는 한 번
+    agency = engine.get_graph("agency_call")
+    first = (engine.render(agency.nodes["n1_intro"].lines[0], engine.start(agency, prof, seed=0)["values"]), agency.nodes["n1_intro"].tone)
+    assert made[0] == ("여보세요.", "official") and made[1] == first  # 깨우기 다음은 고정 대본(기관 사칭)부터
+    before = len(made)
+    client.get("/v1/sim/scenarios", headers=h)
+    assert len(made) == before  # 다시 열면 이미 만든 대사는 건너뛴다
+
+
+def test_call_screen_uses_browser_voice_when_gpu_tts_is_slow_or_broken(tmp_path):
+    import re
+    import shutil
+    import subprocess
+
+    node = shutil.which("node")
+    if not node:
+        pytest.skip("node 없음")
+    src = (engine.GRAPH_DIR.parents[2] / "web" / "sim2.js").read_text(encoding="utf-8")
+    assert "const S2_TTS_WAIT_MS = 3500;" in src
+    fn = re.search(r"async function s2PlayTts\(.*?\n}\n", src, re.S).group(0)
+    harness = """
+const window = globalThis;
+const S2_TTS_WAIT_MS = 50;
+const S2 = { caps: { tts: true }, speakToken: 1 };
+const labels = [];
+const el = { set textContent(v) { labels.push(v); } };
+const $ = (sel) => (sel === '#c2Voice' ? el : null);
+const store = { get: () => 't' };
+let signal = null;
+""" + fn + """
+(async () => {
+  const out = {};
+  globalThis.fetch = (url, opts) => new Promise((resolve, reject) => {
+    signal = opts.signal;
+    opts.signal.addEventListener('abort', () => reject(new DOMException('aborted', 'AbortError')));
+  });
+  const t0 = Date.now();
+  out.slow = [await s2PlayTts('여보세요', 1, 'calm'), S2.caps.tts, signal.aborted, Date.now() - t0 >= 40];
+  globalThis.fetch = async () => ({ ok: false, status: 502 });
+  out.broken = [await s2PlayTts('여보세요', 1, 'calm'), S2.caps.tts];
+  out.labels = labels;
+  console.log(JSON.stringify(out));
+})();
+"""
+    script = tmp_path / "tts.js"
+    script.write_text(harness, encoding="utf-8")
+    result = subprocess.run([node, str(script)], capture_output=True, text=True, timeout=20)
+    assert result.returncode == 0, result.stderr
+    out = json.loads(result.stdout)
+    assert out["slow"] == [False, True, True, True]  # 늦으면 이번 대사만 브라우저 음성, GPU 음성은 계속 씀
+    assert out["broken"] == [False, False]  # 502면 이번 훈련은 브라우저 음성으로
+    assert out["labels"] == ["브라우저 음성(ko-KR) · GPU 음성 준비 중", "브라우저 음성(ko-KR)"]
+
+
 # ---------- GAF 검토(11-01) 필수 수정 회귀 시험 ----------
 # 1번: 위험한 답이 안전 낱말 때문에 정답으로 판정되던 예문. 보류셋(judge_holdout.csv)과 따로 둔다.
 @pytest.mark.parametrize("text, expected", [

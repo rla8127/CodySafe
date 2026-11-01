@@ -201,15 +201,32 @@ def call_tts(text: str, tone: str | None = None) -> tuple[bytes, str]:
     return base64.b64decode(data["audio"]), data.get("content_type", "audio/wav")
 
 
+_tts_locks: dict[str, threading.Lock] = {}
+_tts_locks_guard = threading.Lock()
+
+
+def _read_cached(path) -> tuple[bytes, str]:
+    kind_path = path.with_suffix(".type")
+    return path.read_bytes(), (kind_path.read_text() if kind_path.exists() else "audio/wav")
+
+
 def cached_tts(text: str, tone: str | None = None) -> tuple[bytes, str]:
+    """같은 대사는 한 번만 합성한다. 미리 만들기와 화면 요청이 겹치면 뒤의 것은 앞의 합성을 기다렸다가 캐시를 읽는다
+    (임대 GPU 실측 11-01 08:53: 대사 하나 합성에 7–16초라, 겹쳐 두 번 만들면 GPU가 더 밀린다)."""
     path = _tts_path(text, tone)
     if path.exists():
-        kind = (path.with_suffix(".type").read_text() if path.with_suffix(".type").exists() else "audio/wav")
-        return path.read_bytes(), kind
-    audio, kind = call_tts(text, tone)
-    TTS_CACHE.mkdir(parents=True, exist_ok=True)
-    path.write_bytes(audio)
-    path.with_suffix(".type").write_text(kind)
+        return _read_cached(path)
+    with _tts_locks_guard:
+        lock = _tts_locks.setdefault(path.name, threading.Lock())
+    with lock:
+        if path.exists():
+            return _read_cached(path)
+        audio, kind = call_tts(text, tone)
+        TTS_CACHE.mkdir(parents=True, exist_ok=True)
+        path.with_suffix(".type").write_text(kind)
+        tmp = path.with_suffix(".part")
+        tmp.write_bytes(audio)
+        os.replace(tmp, path)  # .audio가 보이면 내용이 다 쓰인 것이다
     return audio, kind
 
 
@@ -245,22 +262,42 @@ def warm_gpu() -> None:
     log.info("sim GPU 깨우기 %dms", int((time.perf_counter() - started) * 1000))
 
 
+_prerendering: set[str] = set()
+_prerender_lock = threading.Lock()
+
+
 def prerender(profile: dict) -> None:
-    """프로필을 저장할 때 전화 훈련 대사를 미리 합성해 둔다. TTS 주소가 없으면 아무것도 하지 않는다."""
+    """전화 훈련 대사를 미리 합성해 둔다(프로필을 저장할 때, 훈련 목록을 열 때). 모든 대본이 '전화로 연습하기'를 열 수 있어
+    셋 다 만들되 고정 대본(기관 사칭)부터 한다. 이미 만든 대사는 건너뛰고, 같은 프로필을 이미 만드는 중이면 하지 않는다.
+    TTS 주소가 없으면 아무것도 하지 않는다."""
     if not os.getenv("SIM_TTS_URL", "").strip():
         return
     prof = SimProfile(**profile)
-    for graph in engine.graphs().values():
-        if graph.channel != "call":
-            continue
-        values = engine.start(graph, prof, seed=0)["values"]
-        for node in graph.nodes.values():
-            for line, tone in [(x, node.tone) for x in node.lines] + [(x, node.pressure_tone) for x in node.pressure]:
-                try:
-                    cached_tts(engine.render(line, values), tone)
-                except Exception as exc:
-                    log.warning("sim 음성 미리 만들기 실패: %s", type(exc).__name__)
-                    return
+    key = prof.model_dump_json()
+    with _prerender_lock:
+        if key in _prerendering:
+            return
+        _prerendering.add(key)
+    started, made = time.perf_counter(), 0
+    try:
+        for graph in sorted(engine.graphs().values(), key=lambda g: (g.id != PINNED, g.channel != "call", g.id)):
+            values = engine.start(graph, prof, seed=0)["values"]
+            for node in graph.nodes.values():
+                for line, tone in [(x, node.tone) for x in node.lines] + [(x, node.pressure_tone) for x in node.pressure]:
+                    text = engine.render(line, values)
+                    if _tts_path(text, tone).exists():
+                        continue
+                    try:
+                        cached_tts(text, tone)
+                        made += 1
+                    except Exception as exc:
+                        log.warning("sim 음성 미리 만들기 실패: %s", type(exc).__name__)
+                        return
+    finally:
+        with _prerender_lock:
+            _prerendering.discard(key)
+        if made:
+            log.info("sim 음성 미리 만들기 %d개 %dms", made, int((time.perf_counter() - started) * 1000))
 
 
 def call_stt(audio: bytes, content_type: str) -> str:
@@ -288,6 +325,8 @@ def make_router(current_device) -> APIRouter:
         with db.connect() as conn:
             profile = load_profile(conn, device)
             items = _ranked(conn, device, profile)
+        # 프로필을 저장하지 않은 기기도 기본 프리셋 대사로 훈련하므로, 목록을 열 때 그 대사를 미리 만든다.
+        tasks.add_task(prerender, (profile or preset_profile(DEFAULT_PRESET)).model_dump())
         return {
             "items": items,
             "default": PINNED,
