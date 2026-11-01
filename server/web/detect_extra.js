@@ -65,7 +65,7 @@
       box.append(link('가족에게 물어보기', '#/family'));
     }
     if (x.band === 'alert' || x.band === 'lock') {
-      box.append(el('b', '', x.family_alert ? '가족에게 알림을 보냈습니다' : '가족 알림은 보내지 않았습니다(판정 확인 필요)'));
+      box.append(el('b', '', x.sample ? '예시 통화라 가족 알림·잠금은 하지 않았습니다' : x.family_alert ? '가족에게 알림을 보냈습니다' : '가족 알림은 보내지 않았습니다(판정 확인 필요)'));
       if (x.lock) box.append(el('div', 'dx-note', '금융앱을 잠갔습니다. 가족은 바로 풀 수 있고, 본인은 10분 기다린 뒤 풀 수 있으며, 1시간 뒤 저절로 풀립니다.'));
       const row = el('div', 'dx-links');
       [['112 경찰', 'tel:112'], ['1394 지급정지', 'tel:1394'], ['1332 금융감독원', 'tel:1332']].forEach(([t, h]) => row.append(link(t, h)));
