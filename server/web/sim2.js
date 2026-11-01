@@ -77,10 +77,14 @@ window.addEventListener('hashchange', (e) => {
 const s2BaseSim = SCREENS.sim;
 SCREENS.sim = (a) => s2BaseSim(a).replace('<div class="page">', `<div class="page">
   <button class="hero s2-banner" onclick="go('sim2')">
-    <div class="hero-label">${ic('sparkles')}새 훈련 · 내 상황에 맞춘 대본</div>
-    <div style="font-size:21px;font-weight:800;margin-top:8px;line-height:1.3;position:relative;z-index:1">답에 따라 달라지는<br/>사기 대응 훈련</div>
-    <div class="hero-meta" style="margin-top:8px">문자 훈련 · 전화 훈련 · 안심 대응 점수</div>
-    <div class="hero-actions"><span class="btn sm" style="background:#fff;color:#1E3A8A">${ic('play')}시작하기</span></div>
+    <span class="s2-banner-eyebrow">${ic('sparkles')}새 훈련 · 내 상황에 맞춘 대본</span>
+    <span class="s2-banner-title">답에 따라 달라지는<br/>사기 대응 훈련</span>
+    <span class="s2-banner-tags">
+      <span>${ic('message-square')}문자 훈련</span>
+      <span>${ic('phone')}전화 훈련</span>
+      <span>${ic('shield-check')}안심 대응 점수</span>
+    </span>
+    <span class="s2-banner-cta">시작하기${ic('arrow-right')}</span>
   </button>`);
 
 /* ---------------- ①② 프로필과 시나리오 목록 ---------------- */

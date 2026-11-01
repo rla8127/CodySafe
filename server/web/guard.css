@@ -482,3 +482,14 @@ body, input, textarea, select, button { font-family: "NanumRound", "SUIT Variabl
 .sim-gallery em { position: absolute; left: 4px; top: 4px; padding: 2px 5px; border-radius: 5px; background: #D92D20; color: #fff; font-size: 10px; font-style: normal; font-weight: 800; opacity: 0; transition: opacity .3s ease; }
 .sim-gallery.revealed em { opacity: 1; }
 .feedback a { color: inherit; font-weight: 800; text-decoration: underline; }
+
+/* 체험 탭의 새 훈련 배너 */
+.s2-banner { display: flex; flex-direction: column; align-items: stretch; gap: 14px; width: 100%; margin-bottom: 20px; padding: 22px; border: 0; text-align: left; cursor: pointer; color: #fff; }
+.s2-banner > span { position: relative; z-index: 1; }
+.s2-banner-eyebrow { display: inline-flex; align-items: center; align-self: flex-start; gap: 6px; padding: 6px 11px; border-radius: 999px; background: rgba(255, 255, 255, .12); color: var(--lime); font-size: 12.5px; font-weight: 700; }
+.s2-banner-title { font-size: 25px; font-weight: 800; line-height: 1.3; letter-spacing: -0.03em; }
+.s2-banner-tags { display: flex; flex-wrap: wrap; gap: 6px 14px; color: rgba(255, 255, 255, .82); font-size: 13px; font-weight: 600; }
+.s2-banner-tags > span { display: inline-flex; align-items: center; gap: 5px; }
+.s2-banner-cta { display: flex; align-items: center; justify-content: center; gap: 6px; height: 46px; margin-top: 2px; border-radius: 14px; background: var(--lime); color: var(--navy); font-size: 15px; font-weight: 800; }
+.s2-banner svg.lucide { width: 15px; height: 15px; flex: none; }
+.s2-banner-cta svg.lucide { width: 18px; height: 18px; }
