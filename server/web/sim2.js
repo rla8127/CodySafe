@@ -455,16 +455,28 @@ function s2CancelStt() {
   S2.sttAbort = null;
 }
 
+// R-009: 영상 장면에 답한 뒤 'AI가 만든 가짜'였음을 알린다(재생 → 선택 → 공개). 글은 textContent로만 넣는다.
+function s2RevealFake() {
+  const host = $('#chat') || $('#c2Tr');
+  if (!host) return;
+  host.append(s2el('div', 'sysmsg s2-reveal', '방금 본 영상은 AI가 만든 가짜(딥페이크)예요. 얼굴도 목소리도 실제 사람이 아니에요. ' +
+    '영상통화로 얼굴이 보여도 돈·인증번호를 말하기 전에 원래 번호로 직접 전화해 확인하세요.'));
+  const view = $('#chatView') || host.parentElement;
+  if (view) view.scrollTop = view.scrollHeight;
+}
+
 async function s2Answer(payload, shown) {
   if (S2.busy || !S2.session) return;
   s2CancelStt();
   S2.busy = true;
+  const hadVideo = !!(S2.scene && S2.scene.video);
   const isCall = !!$('#c2Tr');
   if (isCall) s2CallLine('me', shown); else s2Bubble('me', shown);
   if (!isCall) s2ChatChoices(S2.scene, false, true);
   else { $('#c2Ans').hidden = true; s2Status('상대가 듣는 중…'); }
   try {
     const r = await api('POST', `/v1/sim/sessions/${s2sid()}/turn`, payload);
+    if (hadVideo) s2RevealFake();
     if (r.status !== 'active') {
       s2StopAudio();
       later(() => s2ClosingPage(r.terminal, r.closing), 600);
@@ -1008,6 +1020,7 @@ function s2RenderResult(r) {
   .bubble.s2-video { padding: 6px; max-width: 260px; }
   .s2-video video { display: block; width: 100%; max-height: 320px; border-radius: 10px; background: #000; }
   .s2-video .tiny { margin-top: 4px; opacity: .75; }
+  .sysmsg.s2-reveal { background: #fff4e5; color: #8a4b00; border: 1px solid #f5c27a; border-radius: 10px; padding: 8px 10px; font-weight: 600; }
   .s2-term.s2-ok, .card.s2-ok { background: var(--safe-soft); }
   .s2-term.s2-bad, .card.s2-bad { background: var(--danger-soft); }
   .s2-row { display: grid; grid-template-columns: 1fr 34% 48px; align-items: center; gap: 10px; padding: 9px 0; }
