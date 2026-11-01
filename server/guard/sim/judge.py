@@ -11,6 +11,7 @@ import os
 import re
 import time
 
+from . import backup_use
 from .schema import GRADE_OF_INTENT, GRADES, INTENTS
 
 log = logging.getLogger("guard.sim.judge")
@@ -320,21 +321,36 @@ def _ask_fallback(kind: str, text: str, ctx: dict) -> dict:
     raise RuntimeError("대체 경로 없음")
 
 
+def _ask_backup(text: str, ctx: dict) -> dict:
+    """예비 자료: 임대 GPU LLM이 미리 판정해 둔 답(O-2 judge.json). 없으면 LookupError로 다음 경로에 넘긴다."""
+    hit = backup_use.judge(ctx.get("scenario_id", "*"), ctx.get("node_id", "*"), text)
+    if not hit:
+        raise LookupError("예비 판정 없음")
+    return _parse(json.dumps(hit, ensure_ascii=False))  # LLM 답과 같은 검사(목록 밖 값 거부, 더 위험한 쪽)
+
+
 def judge(text: str, ctx: dict) -> dict:
-    """판정 결과: grade, intent, confidence, source(rule|llm|fallback|default), leaks, reask, ms."""
+    """판정 결과: grade, intent, confidence, source(rule|backup|llm|fallback|default), leaks, reask, ms.
+
+    순서: 규칙 → (SIM_BACKUP_FIRST=1이면 예비 판정) → 임대 GPU LLM → (아니면 여기서 예비 판정) → SIM_FALLBACK → 기본값."""
     started = time.perf_counter()
     verdict = rule_judge(text, ctx)
     source = "rule"
     if verdict is None:
         verdict, source = None, "default"
-        attempts = []
+        attempts = []  # (이름, 묻는 함수, 느린 경로인지)
+        backup_first = backup_use.first()
+        if backup_first:
+            attempts.append(("backup", lambda: _ask_backup(text, ctx), False))
         if os.getenv("SIM_LLM_BASE_URL", "").strip():
-            attempts.append(("llm", lambda: _ask_gpu(text, ctx)))
+            attempts.append(("llm", lambda: _ask_gpu(text, ctx), True))
+        if not backup_first:
+            attempts.append(("backup", lambda: _ask_backup(text, ctx), False))
         fallback = os.getenv("SIM_FALLBACK", "none").strip().lower()
         if fallback in ("openai", "anthropic"):
-            attempts.append(("fallback", lambda: _ask_fallback(fallback, text, ctx)))
-        for name, ask in attempts:
-            if time.perf_counter() - started > _budget() - _timeout():
+            attempts.append(("fallback", lambda: _ask_fallback(fallback, text, ctx), True))
+        for name, ask, slow in attempts:
+            if slow and time.perf_counter() - started > _budget() - _timeout():
                 log.warning("sim 판정 %s 건너뜀: 시간 상한", name)
                 continue
             try:

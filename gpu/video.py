@@ -5,11 +5,15 @@ Models (all Apache-2.0 / MIT, not gated):
   alibaba-pai/Wan2.1-Fun-V1.1-1.3B-InP          (Apache-2.0)  base DiT, VAE, umT5 text encoder, CLIP
   TencentGameMate/chinese-wav2vec2-base          (MIT)         audio encoder used by the Flash weights
 Code: github.com/antgroup/echomimic_v3 (Apache-2.0) at a pinned commit; we drive its src/ modules the same
-way as its infer_flash.py / run_flash.sh, but render long audio in consecutive chunks (each chunk starts from
-the reference image, audio features are computed once over the whole clip).
+way as its infer_flash.py / run_flash.sh, with these changes (round 2, 2026-11-01, checked on frames + gpu/lipsync_check.py):
+  - TeaCache off, audio CFG 5.0 (official 3.0 + TeaCache gave little mouth movement; see render() docstring)
+  - long audio in ~100-frame chunks; each chunk starts from the previous chunk's last frame ("continue"),
+    CLIP identity stays on the original face; audio features computed once over the whole clip
+  - face/voice/script/prompt presets: gpu/deepfake_presets.py
 
 Prefill:  modal run gpu/video.py::download        (weights -> Volume, CPU only)
 Run:      modal run gpu/video.py --image runs/face_0.png --audio runs/family_call.wav [--out runs/video_family.mp4]
+          [--preset son_accident] [--size 768] [--variants "steps:acfg:teacache,..."] [--start 6 --dur 4.84]
 
 Not deployed. Separate app from codysafe-llm / codysafe-voice. Scale to zero, no warm containers.
 Only synthetic inputs (generated face, TTS voice) go in.
@@ -69,27 +73,35 @@ def download():
     hf_cache.commit()
 
 
-def _chunks(total: int, max_len: int) -> list[tuple[int, int]]:
-    """Split `total` frames into consecutive chunks of length 4k+1 (Wan VAE), each <= max_len."""
+def _chunks(total: int, max_len: int, overlap: int = 0) -> list[tuple[int, int]]:
+    """Consecutive chunks (start, length) of length 4k+1 (Wan VAE), each <= max_len, sharing `overlap` frames."""
     import math
 
-    n = max(1, math.ceil(total / max_len))
+    step = max_len - overlap
+    n = max(1, math.ceil((total - overlap) / step))
+    want = (math.ceil((total - overlap) / n) + overlap + 2) // 4 * 4 + 1  # balanced, rounded up to 4k+1
     out, start = [], 0
-    for i in range(n):
-        left = total - start
-        want = left if i == n - 1 else min(max_len, math.ceil(left / (n - i)))
-        length = (want - 1) // 4 * 4 + 1
-        if length < 5:
+    while start < total:
+        length = (min(want, total - start) - 1) // 4 * 4 + 1
+        if length < 5 or (out and length - overlap < 4):
             break
         out.append((start, length))
-        start += length
+        if start + length >= total:
+            break
+        start += length - overlap
     return out
 
 
 @app.function(image=image, gpu=GPU, volumes=VOLUMES, timeout=40 * MINUTES, min_containers=0, max_containers=1,
               cpu=4.0, memory=32768)
-def render(image_png: bytes, audio_wav: bytes, prompt: str, size: int = 512, steps: int = 8,
-           chunk: int = 113, seed: int = 43) -> bytes:
+def render(image_png: bytes, audio_wav: bytes, prompt: str, size: int = 512, variants: list[dict] | None = None,
+           chunk: int = 113, seed: int = 43, start: float = 0.0, dur: float = 0.0) -> list[bytes]:
+    """One mp4 per variant. variant keys: steps (8), acfg (audio CFG, 3.0), teacache (False), join ("continue").
+
+    Round-2 finding: with audio CFG the pipeline calls the transformer twice per step, but TeaCache counts
+    calls as steps, so with the official flash settings (8 steps, skip 5) it reuses cached residuals across
+    the conditional/unconditional calls. Default is therefore teacache off.
+    """
     import math
     import os
     import subprocess
@@ -115,6 +127,7 @@ def render(image_png: bytes, audio_wav: bytes, prompt: str, size: int = 512, ste
     from src.wan_image_encoder import CLIPModel
     from src.wan_text_encoder import WanT5EncoderModel
     from src.wan_transformer3d_audio_2512 import WanTransformerAudioMask3DModel as WanTransformer
+    from src.wan_vae import AutoencoderKLWan
     from src.wav2vec2 import Wav2Vec2Model
 
     t_all = time.time()
@@ -123,7 +136,10 @@ def render(image_png: bytes, audio_wav: bytes, prompt: str, size: int = 512, ste
     os.makedirs(work, exist_ok=True)
     img_path, wav_path = f"{work}/ref.png", f"{work}/in.wav"
     open(img_path, "wb").write(image_png)
-    open(wav_path, "wb").write(audio_wav)
+    open(f"{work}/orig.wav", "wb").write(audio_wav)
+    trim = (["-ss", str(start)] if start else []) + (["-t", str(dur)] if dur else [])
+    subprocess.run(["ffmpeg", "-nostdin", "-y", "-loglevel", "error", *trim, "-i", f"{work}/orig.wav", wav_path],
+                   check=True)
     dtype, device, fps = torch.bfloat16, "cuda", 25
 
     # ---- models (as in infer_flash.py) ----
@@ -141,7 +157,6 @@ def render(image_png: bytes, audio_wav: bytes, prompt: str, size: int = 512, ste
     m, u = transformer.load_state_dict(sd, strict=False)
     print(f"echomimic weights: missing {len(m)}, unexpected {len(u)}")
     del sd
-    from src.wan_vae import AutoencoderKLWan
     vae = AutoencoderKLWan.from_pretrained(os.path.join(wan, cfg["vae_kwargs"].get("vae_subpath", "vae")),
                                            additional_kwargs=OmegaConf.to_container(cfg["vae_kwargs"])).to(dtype)
     tokenizer = AutoTokenizer.from_pretrained(
@@ -159,9 +174,7 @@ def render(image_png: bytes, audio_wav: bytes, prompt: str, size: int = 512, ste
                                       text_encoder=text_encoder, scheduler=scheduler, clip_image_encoder=clip)
     pipe.to(device=device)
     coeff = get_teacache_coefficients(wan)
-    if coeff is not None:
-        pipe.transformer.enable_teacache(coeff, steps, 0.1, num_skip_start_steps=5, offload=False)
-    print(f"models loaded in {time.time() - t0:.1f}s, teacache={'on' if coeff else 'off'}")
+    print(f"models loaded in {time.time() - t0:.1f}s")
 
     # ---- audio features once over the whole clip ----
     import pyloudnorm as pyln
@@ -180,51 +193,90 @@ def render(image_png: bytes, audio_wav: bytes, prompt: str, size: int = 512, ste
     w0, h0 = ref.size
     r = math.sqrt(w0 * h0 / size / size)
     sh, sw = (int(h0 / r // 16 * 16), int(w0 / r // 16 * 16)) if r > 1 else (h0 // 16 * 16, w0 // 16 * 16)
-    gen = torch.Generator(device=device).manual_seed(seed)
     neg = ("Gesture is bad. Gesture is unclear. Strange and twisted hands. Bad hands. Bad fingers. Unclear and "
            "blurry hands. Unclear gestures, broken hands, fused fingers. 手指融合，")
-    frames = []
-    plan = _chunks(total, chunk)
-    print(f"audio {len(wav16) / sr:.2f}s -> {total} frames, {sh}x{sw}, chunks {plan}")
-    t_r = time.time()
-    for ci, (start, length) in enumerate(plan):
-        t1 = time.time()
-        idx = torch.arange(start, start + length).unsqueeze(1) + (torch.arange(5) - 2).unsqueeze(0)
-        idx = idx.clamp(0, emb.shape[0] - 1)
-        a = emb[idx].unsqueeze(0)  # [1, F, 5, 12, 768]
-        vid, vmask, clip_img = get_image_to_video_latent2(ref, None, video_length=length, sample_size=[sh, sw])
-        with torch.no_grad():
-            sample = pipe(prompt, num_frames=length, negative_prompt=neg, audio_embeds=a, audio_scale=1.0,
-                          ip_mask=None, use_un_ip_mask=False, height=sh, width=sw, generator=gen,
-                          neg_scale=1.0, neg_steps=0, use_dynamic_cfg=False, use_dynamic_acfg=False,
-                          guidance_scale=6.0, audio_guidance_scale=3.0, num_inference_steps=steps,
-                          video=vid, mask_video=vmask, clip_image=clip_img, cfg_skip_ratio=0.0, shift=5.0).videos
-        x = sample[0, :, :length].permute(1, 2, 3, 0).float().clamp(0, 1).mul(255).byte().cpu().numpy()
-        frames.extend(list(x))
-        print(f"chunk {ci + 1}/{len(plan)} ({length} frames) in {time.time() - t1:.1f}s", flush=True)
-    print(f"render {len(frames)} frames in {time.time() - t_r:.1f}s on {torch.cuda.get_device_name(0)}")
-
-    frames = [frames[0]] + [color_transfer(f, frames[0]) for f in frames[1:]]  # as save_videos_grid does
-    raw = f"{work}/raw.mp4"
-    imageio.mimwrite(raw, frames, fps=fps, codec="libx264", quality=8, macro_block_size=16)
-    out = f"{work}/out.mp4"
-    fs = max(28, sh // 12)
-    draw = (f"drawtext=fontfile={FONT}:text='{LABEL}':fontcolor=white:fontsize={fs}:box=1:boxcolor=red@0.85:"
-            f"boxborderw={fs // 3}:x=w-tw-{fs // 2}:y={fs // 2}")
-    subprocess.run(["ffmpeg", "-nostdin", "-y", "-loglevel", "error", "-i", raw, "-i", wav_path, "-vf", draw,
-                    "-map", "0:v", "-map", "1:a", "-c:v", "libx264", "-pix_fmt", "yuv420p", "-crf", "18",
-                    "-c:a", "aac", "-b:a", "128k", "-shortest", out], check=True)
+    print(f"audio {len(wav16) / sr:.2f}s -> {total} frames, {sh}x{sw}")
+    _, _, clip_ref = get_image_to_video_latent2(ref, None, video_length=5, sample_size=[sh, sw])
+    results = []
+    for vi, var in enumerate(variants or [{}]):
+        steps, acfg, tc = int(var.get("steps", 8)), float(var.get("acfg", 3.0)), bool(var.get("teacache", False))
+        # join: "continue" = next chunk starts from the previous chunk's last frame (1 shared frame, CLIP identity
+        # stays on the original face); "xfade" = every chunk starts from the face, 8-frame crossfade;
+        # "restart" = round-1 behaviour (hard cut every chunk).
+        join = var.get("join", "continue")
+        overlap = {"continue": 1, "xfade": 8}.get(join, 0)
+        plan = _chunks(total, chunk, overlap)
+        print(f"variant {vi}: join={join} chunks {plan}")
+        if tc and coeff is not None:
+            pipe.transformer.enable_teacache(coeff, steps, 0.1, num_skip_start_steps=5, offload=False)
+        else:
+            pipe.transformer.disable_teacache()
+        gen = torch.Generator(device=device).manual_seed(seed)
+        frames, t_r = [], time.time()
+        for ci, (st, length) in enumerate(plan):
+            t1 = time.time()
+            idx = (torch.arange(st, st + length).unsqueeze(1) + (torch.arange(5) - 2).unsqueeze(0))
+            a = emb[idx.clamp(0, emb.shape[0] - 1)].unsqueeze(0)  # [1, F, 5, 12, 768]
+            start_img = Image.fromarray(frames[-1]) if (join == "continue" and frames) else ref
+            vid, vmask, _ = get_image_to_video_latent2(start_img, None, video_length=length, sample_size=[sh, sw])
+            clip_img = clip_ref
+            with torch.no_grad():
+                sample = pipe(prompt, num_frames=length, negative_prompt=neg, audio_embeds=a, audio_scale=1.0,
+                              ip_mask=None, use_un_ip_mask=False, height=sh, width=sw, generator=gen,
+                              neg_scale=1.0, neg_steps=0, use_dynamic_cfg=False, use_dynamic_acfg=False,
+                              guidance_scale=6.0, audio_guidance_scale=acfg, num_inference_steps=steps,
+                              video=vid, mask_video=vmask, clip_image=clip_img, cfg_skip_ratio=0.0,
+                              shift=5.0).videos
+            x = sample[0, :, :length].permute(1, 2, 3, 0).float().clamp(0, 1).mul(255).byte().cpu().numpy()
+            x = list(x)
+            if frames and overlap:
+                if join == "xfade":
+                    for k in range(overlap):
+                        wgt = (k + 1) / (overlap + 1)
+                        frames[-overlap + k] = (frames[-overlap + k].astype(np.float32) * (1 - wgt)
+                                                + x[k].astype(np.float32) * wgt).round().astype(np.uint8)
+                x = x[overlap:]
+            frames.extend(x)
+            print(f"variant {vi} {var}: chunk {ci + 1}/{len(plan)} ({length} frames) in {time.time() - t1:.1f}s",
+                  flush=True)
+        print(f"variant {vi}: render {len(frames)} frames in {time.time() - t_r:.1f}s "
+              f"on {torch.cuda.get_device_name(0)}")
+        frames = [frames[0]] + [color_transfer(f, frames[0]) for f in frames[1:]]  # as save_videos_grid does
+        raw, out = f"{work}/raw{vi}.mp4", f"{work}/out{vi}.mp4"
+        imageio.mimwrite(raw, frames, fps=fps, codec="libx264", quality=8, macro_block_size=16)
+        fs = max(28, sh // 12)
+        draw = (f"drawtext=fontfile={FONT}:text='{LABEL}':fontcolor=white:fontsize={fs}:box=1:"
+                f"boxcolor=red@0.85:boxborderw={fs // 3}:x=w-tw-{fs // 2}:y={fs // 2}")
+        subprocess.run(["ffmpeg", "-nostdin", "-y", "-loglevel", "error", "-i", raw, "-i", wav_path, "-vf", draw,
+                        "-map", "0:v", "-map", "1:a", "-c:v", "libx264", "-pix_fmt", "yuv420p", "-crf", "18",
+                        "-c:a", "aac", "-b:a", "128k", "-shortest", out], check=True)
+        results.append(open(out, "rb").read())
     print(f"total {time.time() - t_all:.1f}s")
-    return open(out, "rb").read()
+    return results
 
 
 @app.local_entrypoint()
-def main(image: str, audio: str, out: str = "runs/video_family.mp4", size: int = 512, steps: int = 8,
-         chunk: int = 113, seed: int = 43,
-         prompt: str = "A young Korean man is talking anxiously to the camera on a phone video call."):
+def main(image: str, audio: str, out: str = "runs/video_family.mp4", size: int = 512, chunk: int = 113,
+         seed: int = 43, prompt: str = "", preset: str = "", variants: str = "8:5:0:continue",
+         start: float = 0.0, dur: float = 0.0):
+    """--variants "steps:acfg:teacache[:join],..." e.g. "8:3:1:restart,8:5:0:continue" (several -> out_v0.mp4 ...)."""
+    import sys
     from pathlib import Path
 
-    data = render.remote(Path(image).read_bytes(), Path(audio).read_bytes(), prompt, size, steps, chunk, seed)
+    if preset:
+        sys.path.insert(0, str(Path(__file__).resolve().parent))
+        from deepfake_presets import PRESETS
+        prompt = prompt or PRESETS[preset]["video_prompt"]
+    prompt = prompt or "A young Korean man is talking anxiously to the camera on a phone video call."
+    vs = []
+    for v in variants.split(","):
+        f = v.split(":")
+        vs.append({"steps": int(f[0]), "acfg": float(f[1]), "teacache": f[2] == "1",
+                   "join": f[3] if len(f) > 3 else "continue"})
+    res = render.remote(Path(image).read_bytes(), Path(audio).read_bytes(), prompt, size, vs, chunk, seed,
+                        start, dur)
     Path(out).parent.mkdir(parents=True, exist_ok=True)
-    Path(out).write_bytes(data)
-    print("saved", out, len(data), "bytes")
+    for i, data in enumerate(res):
+        p = Path(out) if len(res) == 1 else Path(out).with_name(f"{Path(out).stem}_v{i}{Path(out).suffix}")
+        p.write_bytes(data)
+        print("saved", p, len(data), "bytes", vs[i])

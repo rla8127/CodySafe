@@ -15,7 +15,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from guard.app import app
-from guard.sim import engine, judge, validate
+from guard.sim import backup_use, engine, judge, validate
 from guard.sim.schema import preset_profile
 
 BROKEN_LLM = "http://127.0.0.1:9/v1"  # 일부러 틀린 주소(아무도 듣지 않는 포트)
@@ -23,10 +23,35 @@ BROKEN_LLM = "http://127.0.0.1:9/v1"  # 일부러 틀린 주소(아무도 듣지
 
 @pytest.fixture(autouse=True)
 def no_llm(monkeypatch):
-    """기본은 LLM 없이 규칙만. 유료 API를 부르지 않는다."""
+    """기본은 LLM 없이 규칙만. 유료 API를 부르지 않는다. 예비 자료(O-2 backup)도 기본은 없는 것으로 본다."""
     for key in ("SIM_LLM_BASE_URL", "SIM_LLM_API_KEY", "SIM_LLM_MODEL", "SIM_FALLBACK", "SIM_TTS_URL", "SIM_STT_URL",
-                "SIM_TTS_API_KEY", "SIM_STT_API_KEY"):
+                "SIM_TTS_API_KEY", "SIM_STT_API_KEY", "SIM_BACKUP_FIRST"):
         monkeypatch.delenv(key, raising=False)
+    monkeypatch.setattr(backup_use, "module", lambda: None)
+
+
+def fake_backup(monkeypatch, tmp_path, lines=None, verdicts=None, videos=()):
+    """O-2의 guard.sim.backup과 같은 모양의 가짜(파일만 읽음): tts·judge·video·BACKUP."""
+    import types
+
+    root = tmp_path / "backup"
+    (root / "tts").mkdir(parents=True)
+    (root / "video").mkdir()
+    lines = lines or {}
+    for i, _ in enumerate(lines):
+        (root / "tts" / f"line{i}.mp3").write_bytes(b"ID3")
+    if verdicts is not None:
+        (root / "judge.json").write_text("{}", encoding="utf-8")
+    for name in videos:
+        (root / "video" / f"{name}.mp4").write_bytes(b"\x00\x00\x00\x18ftypmp42")
+    mod = types.SimpleNamespace(
+        BACKUP=root,
+        tts=lambda text, tone=None, voice=None: (lines[(text, tone)], "audio/mpeg") if (text, tone) in lines else None,
+        judge=lambda scenario_id, node_id, text: dict((verdicts or {})[text]) if text in (verdicts or {}) else None,
+        video=lambda name: (root / "video" / f"{name}.mp4") if (root / "video" / f"{name}.mp4").is_file() else None,
+    )
+    monkeypatch.setattr(backup_use, "module", lambda: mod)
+    return mod
 
 
 def graph_data(name="agency_call"):
@@ -722,3 +747,131 @@ def test_tts_cache_key_changes_with_server_model_and_voice(monkeypatch):
     for key, value in (("SIM_TTS_URL", "http://gpu2.example/tts"), ("SIM_TTS_MODEL", "tts-2"), ("SIM_TTS_VOICE", "v2")):
         monkeypatch.setenv(key, value)
         assert sim_api._tts_path("여보세요", "official") != first
+
+
+# ---------- 예비 자료(11-01 호연 결정: 발표·작동 영상은 GPU로 미리 만든 자료로, O-2 backup 모듈 자리에 가짜를 넣어 연결만 본다) ----------
+def test_backup_voice_comes_first_or_after_gpu_failure(monkeypatch, tmp_path):
+    from guard import sim_api
+
+    fake_backup(monkeypatch, tmp_path, lines={("여보세요", "official"): b"MP3-backup"})
+    calls = []
+
+    def gpu_down(text, tone=None):
+        calls.append(text)
+        raise RuntimeError("gpu down")
+
+    monkeypatch.setattr(sim_api, "call_tts", gpu_down)
+    monkeypatch.setattr(sim_api, "TTS_CACHE", tmp_path / "cache")
+    assert sim_api.cached_tts("여보세요", "official") == (b"MP3-backup", "audio/mpeg")  # GPU 주소 없음 → 예비 음성
+    with pytest.raises(sim_api.TtsUnavailable):
+        sim_api.cached_tts("없는 대사", "official")
+    monkeypatch.setenv("SIM_TTS_URL", "http://gpu.example/tts")
+    assert sim_api.cached_tts("여보세요", "official") == (b"MP3-backup", "audio/mpeg") and calls == ["여보세요"]  # GPU 실패 → 예비
+    monkeypatch.setenv("SIM_BACKUP_FIRST", "1")
+    assert sim_api.cached_tts("여보세요", "official") == (b"MP3-backup", "audio/mpeg") and calls == ["여보세요"]  # 예비 먼저, GPU 안 부름
+    with pytest.raises(RuntimeError):  # 예비에 없으면 GPU, 그것도 실패하면 화면이 브라우저 음성으로
+        sim_api.cached_tts("없는 대사", "official")
+    calls.clear()
+    sim_api.warm_gpu()
+    sim_api.prerender(preset_profile("mother_74_alone").model_dump())
+    assert calls == []  # 예비 먼저일 때는 GPU를 깨우거나 미리 만들지 않는다(크레딧)
+
+
+def test_tts_endpoint_serves_backup_mp3_and_404_only_for_missing_lines(client, monkeypatch, tmp_path):
+    fake_backup(monkeypatch, tmp_path, lines={("여보세요", "official"): b"MP3"})
+    h = device(client, "예비")
+    r = client.post("/v1/sim/tts", headers=h, json={"text": "여보세요", "tone": "official"})
+    assert r.status_code == 200 and r.headers["content-type"] == "audio/mpeg" and r.headers["x-sim-voice"] == "backup"
+    r = client.post("/v1/sim/tts", headers=h, json={"text": "없는 대사", "tone": "official"})
+    assert r.status_code == 404 and r.json()["fallback"] == "browser"  # 이 대사만 브라우저 음성(화면은 GPU 음성을 끄지 않음)
+    caps = client.get("/v1/sim/caps").json()
+    assert caps["tts"] is True and caps["llm"] == "rule" and caps["backup"] == {"first": False, "tts": True, "judge": False, "video": []}
+    assert client.get("/v1/sim/scenarios", headers=h).json()["backup"]["tts"] is True
+
+
+def test_judge_uses_backup_before_or_after_the_gpu_llm(monkeypatch, tmp_path):
+    from guard.sim import judge as J
+
+    text, other = "오늘 날씨가 참 좋네요", "어제 시장에 다녀왔어요"
+    fake_backup(monkeypatch, tmp_path, verdicts={text: {"grade": "정답", "intent": "망설임", "confidence": 0.9}})
+    graph = engine.get_graph("agency_call")
+    ctx = engine._judge_context(graph, engine.start(graph, preset_profile("mother_74_alone"), seed=0))
+    assert ctx["scenario_id"] == "agency_call" and ctx["node_id"] == "n1_intro"
+    assert J.rule_judge(text, ctx) is None and J.rule_judge(other, ctx) is None
+    v = J.judge(text, ctx)  # LLM 없음 → 예비 판정. 등급·의도가 다르면 더 위험한 쪽(LLM 답과 같은 검사)
+    assert (v["source"], v["grade"], v["intent"], v["reask"]) == ("backup", "중답", "망설임", False)
+    asked = []
+
+    def cold_gpu(t, c):
+        asked.append(t)
+        raise TimeoutError("cold start")
+
+    monkeypatch.setattr(J, "_ask_gpu", cold_gpu)
+    monkeypatch.setenv("SIM_LLM_BASE_URL", "http://gpu.example/v1")
+    assert J.judge(text, ctx)["source"] == "backup" and asked == [text]  # 기본: LLM 실패 뒤 예비
+    monkeypatch.setenv("SIM_BACKUP_FIRST", "1")
+    assert J.judge(text, ctx)["source"] == "backup" and asked == [text]  # 예비 먼저: LLM을 부르지 않음
+    v = J.judge(other, ctx)  # 예비에 없는 답 → LLM(실패) → 기본값
+    assert v["source"] == "default" and v["reask"] is True and asked[-1] == other
+
+
+def test_sessions_start_with_seed_zero_when_voice_comes_from_backup(client, monkeypatch):
+    from guard import db
+
+    h = device(client, "씨앗")
+
+    def seed_of_new_session():
+        sid = client.post("/v1/sim/sessions", headers=h, json={"scenario_id": "family_messenger"}).json()["session_id"]
+        with db.connect() as conn:
+            return json.loads(conn.execute("SELECT state_json FROM sim_sessions WHERE id = ?", (sid,)).fetchone()[0])["seed"]
+
+    assert seed_of_new_session() == 0  # GPU 음성 없음 → 예비 음성과 같은 대사(인증번호 숫자)
+    monkeypatch.setenv("SIM_TTS_URL", "http://gpu.example/tts")
+    assert seed_of_new_session() != 0  # GPU 음성 → 세션마다 다른 인증번호
+    monkeypatch.setenv("SIM_BACKUP_FIRST", "1")
+    assert seed_of_new_session() == 0
+
+
+def test_family_scene_shows_the_child_video_and_the_route_serves_only_backup_files(client, monkeypatch, tmp_path):
+    graph = engine.get_graph("family_messenger")
+
+    def scene_at(node_id, preset, pressure=None):
+        state = engine.start(graph, preset_profile(preset), seed=0)
+        state["node"] = node_id
+        return engine.scene(graph, state, pressure=pressure)
+
+    son, daughter = scene_at("n2_auth", "mother_74_alone")["video"], scene_at("n2_auth", "father_68_retired")["video"]
+    assert son["src"] == "/v1/sim/video/son_accident" and "큰아들" in son["caption"]
+    assert daughter["src"] == "/v1/sim/video/daughter_deposit"
+    assert scene_at("n2_auth", "mother_74_alone", pressure="더 미는 말")["video"] is None
+    assert scene_at("n1_newnum", "mother_74_alone")["video"] is None
+    assert client.get("/v1/sim/video/son_accident").status_code == 404  # 예비 자료가 없으면 화면이 말풍선을 지운다
+    fake_backup(monkeypatch, tmp_path, videos=("son_accident",))
+    r = client.get("/v1/sim/video/son_accident")  # <video src>는 인증 머리를 못 보내므로 기기 인증 없이 연다
+    assert r.status_code == 200 and r.headers["content-type"] == "video/mp4"
+    for bad in ("daughter_deposit", "Son_accident", "son.accident"):
+        assert client.get(f"/v1/sim/video/{bad}").status_code == 404
+    bad_graph = graph_data("family_messenger")
+    bad_graph["nodes"]["n2_auth"]["video"]["caption"] = "영상 https://real-bank.com/x"
+    assert any("video" in p for p in validate.validate(bad_graph))
+
+
+def test_chat_shows_the_video_message_before_the_lines(tmp_path):
+    import re
+    import shutil
+    import subprocess
+
+    node = shutil.which("node")
+    if not node:
+        pytest.skip("node 없음")
+    src = (engine.GRAPH_DIR.parents[2] / "web" / "sim2.js").read_text(encoding="utf-8")
+    fn = re.search(r"function s2Items\(.*?\n}\n", src, re.S).group(0)
+    script = tmp_path / "items.js"
+    script.write_text(fn + """
+const items = s2Items({ lines: ['급하게 결제할 게 있어'], media: { kind: 'sms', text: '[Web발신] 인증번호' },
+  video: { src: '/v1/sim/video/son_accident', caption: '영상 메시지' } });
+console.log(JSON.stringify(items.map((m) => m.kind)));
+""", encoding="utf-8")
+    result = subprocess.run([node, str(script)], capture_output=True, text=True, timeout=20)
+    assert result.returncode == 0, result.stderr
+    assert json.loads(result.stdout) == ["video", "", "sms"]

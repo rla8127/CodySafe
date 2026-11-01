@@ -140,6 +140,14 @@ def _choices(graph: Graph, state: dict, node_id: str) -> list[dict]:
     return items
 
 
+def _video(node, values: dict) -> dict | None:
+    """합성 얼굴 영상 메시지(예비 자료). 자녀 호칭에 '딸'이 있으면 딸 영상, 아니면 아들 영상. 파일이 없으면 화면이 지운다."""
+    if node.video is None:
+        return None
+    name = node.video.daughter if "딸" in values.get("child_title", "") else node.video.son
+    return {"src": f"/v1/sim/video/{name}", "caption": render(node.video.caption, values)}
+
+
 def scene(graph: Graph, state: dict, pressure: str | None = None) -> dict:
     """화면에 보낼 지금 장면. 등급과 해설은 끝나기 전에는 보내지 않는다."""
     node_id = state["node"]
@@ -152,6 +160,7 @@ def scene(graph: Graph, state: dict, pressure: str | None = None) -> dict:
         "pressure": pressure is not None,
         "tone": node.tone if pressure is None else node.pressure_tone,
         "media": {"kind": node.media.kind, "text": render(node.media.text, values)} if node.media and pressure is None else None,
+        "video": _video(node, values) if pressure is None else None,
         "choices": _choices(graph, state, node_id),
         "turn": len(state["turns"]) + 1,
         "max_turns": MAX_TURNS,
@@ -162,6 +171,8 @@ def _judge_context(graph: Graph, state: dict) -> dict:
     node = graph.nodes[state["node"]]
     values = state["values"]
     return {
+        "scenario_id": graph.id,  # 예비 판정(judge.json)을 찾는 열쇠. LLM 프롬프트에는 들어가지 않는다
+        "node_id": state["node"],
         "scenario": graph.title,
         "scam_type": graph.scam_type,
         "stage": node.stage,

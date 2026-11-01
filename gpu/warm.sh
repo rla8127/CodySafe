@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # CodySafe GPU warm-up for rehearsal/demo.
-#   gpu/warm.sh up     -> keep 1 container warm in each app (codysafe-llm, codysafe-voice[, codysafe-video])
+#   gpu/warm.sh up     -> keep 1 container warm in codysafe-llm and codysafe-voice
 #   gpu/warm.sh down   -> back to 0 (scale to zero after the 5-minute idle window)
 #   gpu/warm.sh status -> list running containers
 #
@@ -22,14 +22,19 @@ import sys
 import modal
 
 n = int(sys.argv[1])
-targets = [("codysafe-llm", "serve", None), ("codysafe-voice", None, "Voice"), ("codysafe-video", None, "Video")]
-for app, fn, cls in targets:
+targets = [("codysafe-llm", "serve", None), ("codysafe-voice", None, "Voice")]  # video/face are one-off runs, never kept warm
+failed = []
+for app, fn, cls in targets:  # try every app even if one fails, so "down" never leaves a paid container behind
     try:
         obj = modal.Function.from_name(app, fn) if fn else modal.Cls.from_name(app, cls)()
         obj.update_autoscaler(min_containers=n)
         print(f"{app}: min_containers={n}")
     except modal.exception.NotFoundError:
         print(f"{app}: not deployed, skipped")
+    except Exception as exc:
+        failed.append(app)
+        print(f"{app}: FAILED ({type(exc).__name__}) - check https://modal.com/apps/hoykim125/main", file=sys.stderr)
+sys.exit(1 if failed else 0)
 EOF
 if [ "$N" = 1 ]; then
   echo "Containers are starting (cold start: see eval/gpu_latency.md). Run '$0 down' after the demo."

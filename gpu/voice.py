@@ -64,7 +64,8 @@ VOICES = {
                      "slightly high and soft voice, speaking casual Seoul Korean on a phone call.",
 }
 SEEDS = {"caller_male": 1101, "caller_female": 2202, "family": 3303, "family_female": 4404}  # fixed seed per voice -> steadier timbre
-TONES = {  # O-1 TONE_GUIDE keys -> English style words for the instruct (pace stays natural unless noted)
+TONES = {  # O-1 TONE_GUIDE keys -> style words. NOTE (v5, 09:1x): the Base reader ignores these; tone = pace (RATE) only.
+    # Kept so the request format stays the same and VoiceDesign can be used again if needed.
     "calm": "calm and clear, but at a normal conversational pace",
     "official": "stiff, formal and bureaucratic, slightly low pitch, brisk",
     # urgent/threat: pace comes from the instruct itself (tested 08:5x: 6.8 syl/s without stretching)
@@ -194,7 +195,9 @@ class Voice:
         from fastapi import Depends, FastAPI, File, Form, HTTPException, Request, UploadFile
         from fastapi.responses import Response
 
-        token = os.environ["GPU_TOKEN"]
+        token = os.environ["GPU_TOKEN"].strip()
+        if len(token) < 32:
+            raise RuntimeError("GPU_TOKEN missing or too short")  # never accept an empty Bearer
         api = FastAPI(title="codysafe-voice", docs_url=None, redoc_url=None, openapi_url=None)
 
         def auth(request: Request):
@@ -245,6 +248,8 @@ class Voice:
                 body = await request.json()
             except Exception:
                 raise HTTPException(status_code=400, detail="JSON body required")
+            if not isinstance(body, dict):
+                raise HTTPException(status_code=400, detail="JSON object required")
             text = str(body.get("text") or body.get("input") or "").strip()
             if not text:
                 raise HTTPException(status_code=400, detail="text required")
@@ -254,7 +259,7 @@ class Voice:
             if fmt != "wav":
                 raise HTTPException(status_code=400, detail="only wav")
             voice = body.get("voice")
-            voice = voice if voice in VOICES else "caller_male"
+            voice = voice if isinstance(voice, str) and voice in VOICES else "caller_male"
             emotion = str(body.get("emotion") or "")
             style = TONES.get(emotion) or str(body.get("instruct") or "")[:200]
             import anyio
