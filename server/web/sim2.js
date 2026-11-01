@@ -476,10 +476,11 @@ async function s2Answer(payload, shown) {
   else { $('#c2Ans').hidden = true; s2Status('상대가 듣는 중…'); }
   try {
     const r = await api('POST', `/v1/sim/sessions/${s2sid()}/turn`, payload);
-    if (hadVideo) s2RevealFake();
+    const reveal = hadVideo && S2.revealedFor !== s2sid(); // 세션마다 한 번만(다시 묻기 뒤 또 답해도 한 번)
+    if (reveal) { S2.revealedFor = s2sid(); s2RevealFake(); }
     if (r.status !== 'active') {
       s2StopAudio();
-      later(() => s2ClosingPage(r.terminal, r.closing), 600);
+      later(() => s2ClosingPage(r.terminal, r.closing), reveal ? 3500 : 600); // 안내를 읽을 시간
     } else if (isCall) {
       s2CallScene(r.scene, r.judge.reask);
     } else {
