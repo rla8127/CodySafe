@@ -37,8 +37,12 @@ def main() -> int:
             os.environ.pop(key, None)
     else:
         from guard import config  # noqa: F401  server/.env의 SIM_* 값을 읽어 둔다(값은 출력하지 않음)
-    from guard.sim import engine, judge
+    from guard.sim import backup_use, engine, judge
     from guard.sim.schema import preset_profile
+
+    if args.mode == "rules":
+        # 예비 판정(judge.json)에는 보류셋 답을 GPU LLM이 미리 판정한 값이 들어 있다. '규칙만'에서는 섞지 않는다.
+        backup_use.module = lambda: None
 
     path = Path(args.holdout)
     if not path.exists():
