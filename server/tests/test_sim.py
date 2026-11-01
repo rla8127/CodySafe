@@ -843,11 +843,11 @@ def test_family_scene_shows_the_child_video_and_the_route_serves_only_backup_fil
         state["node"] = node_id
         return engine.scene(graph, state, pressure=pressure)
 
-    son, daughter = scene_at("n2_auth", "mother_74_alone")["video"], scene_at("n2_auth", "father_68_retired")["video"]
+    son, daughter = scene_at("n1_newnum", "mother_74_alone")["video"], scene_at("n1_newnum", "father_68_retired")["video"]
     assert son["src"] == "/v1/sim/video/son_accident" and "큰아들" in son["caption"]
     assert daughter["src"] == "/v1/sim/video/daughter_deposit"
-    assert scene_at("n2_auth", "mother_74_alone", pressure="더 미는 말")["video"] is None
-    assert scene_at("n1_newnum", "mother_74_alone")["video"] is None
+    assert scene_at("n1_newnum", "mother_74_alone", pressure="더 미는 말")["video"] is None  # 첫 장면에서 바로 보임(어떤 답을 골라도)
+    assert scene_at("n2_auth", "mother_74_alone")["video"] is None
     assert client.get("/v1/sim/video/son_accident").status_code == 404  # 예비 자료가 없으면 화면이 말풍선을 지운다
     fake_backup(monkeypatch, tmp_path, videos=("son_accident",))
     r = client.get("/v1/sim/video/son_accident")  # <video src>는 인증 머리를 못 보내므로 기기 인증 없이 연다
@@ -855,7 +855,7 @@ def test_family_scene_shows_the_child_video_and_the_route_serves_only_backup_fil
     for bad in ("daughter_deposit", "Son_accident", "son.accident"):
         assert client.get(f"/v1/sim/video/{bad}").status_code == 404
     bad_graph = graph_data("family_messenger")
-    bad_graph["nodes"]["n2_auth"]["video"]["caption"] = "영상 https://real-bank.com/x"
+    bad_graph["nodes"]["n1_newnum"]["video"]["caption"] = "영상 https://real-bank.com/x"
     assert any("video" in p for p in validate.validate(bad_graph))
 
 

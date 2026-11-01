@@ -1,7 +1,7 @@
 {
   "id": "family_messenger",
-  "title": "\"나 폰 액정 깨졌어\" 가족 사칭 메시지",
-  "summary": "자녀를 사칭해 새 번호로 연락하고 인증번호·신분증·상품권을 요구하는 메신저 대화",
+  "title": "\"나 폰 액정 깨졌어\" 가족 사칭 메시지 · 딥페이크 영상",
+  "summary": "자녀를 사칭해 새 번호로 연락하고, AI로 만든 자녀 얼굴 영상(딥페이크)까지 보내며 인증번호·신분증·상품권을 요구하는 메신저 대화",
   "scam_type": "가족지인사칭",
   "channel": "chat",
   "impersonated": "자녀",
@@ -53,6 +53,11 @@
       "media": {
         "kind": "sms",
         "text": "보낸 사람: 010-0000-3417 (저장되지 않은 번호)"
+      },
+      "video": {
+        "son": "son_accident",
+        "daughter": "daughter_deposit",
+        "caption": "영상 메시지: {child_title} 얼굴로 보이는 짧은 영상 (AI로 만든 가상 얼굴, 실제 사람 아님)"
       },
       "red_flags": [
         "처음 보는 번호로 가족이라며 연락함"
@@ -138,12 +143,7 @@
       ],
       "debrief": "인증번호를 대신 알려 주면 내 명의로 결제나 대출이 일어날 수 있어요. 가족끼리 정한 암구호로 확인하세요.",
       "tone": "urgent",
-      "pressure_tone": "sob",
-      "video": {
-        "son": "son_accident",
-        "daughter": "daughter_deposit",
-        "caption": "영상 메시지: {child_title} 얼굴로 보이는 짧은 영상 (AI로 만든 가상 얼굴, 실제 사람 아님)"
-      }
+      "pressure_tone": "sob"
     },
     "n3_secret": {
       "stage": "공포·긴급",
