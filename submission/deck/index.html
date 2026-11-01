@@ -66,7 +66,7 @@ section[style*="padding-top:28px"] td{padding:4px 14px;font-size:21px;line-heigh
 <h1>실시간 탐지와 경쟁하지 않고, 그 다음 단계를 맡습니다</h1>
 <div class="flow">
 <div class="node">통화 녹음 폴더<small>안드로이드 앱 연동</small></div><div class="arr">→</div>
-<div class="node">사용자별 S3<small>presigned URL</small></div><div class="arr">→</div>
+<div class="node">사용자별 S3<small>임시 업로드 링크</small></div><div class="arr">→</div>
 <div class="node">STT<small>자체 Whisper, 장애 시 OpenAI</small></div><div class="arr">→</div>
 <div class="node hot">사례 검색 + LLM 판정<small>구조화 출력</small></div><div class="arr">→</div>
 <div class="node hot">녹취 대조<small>직접 구현</small></div><div class="arr">→</div>
@@ -153,13 +153,13 @@ def _keep_grounded(result, transcript):
 <tr><td><b>웹</b></td><td>HTML, CSS, JavaScript (프레임워크 없음)</td></tr>
 <tr><td><b>앱</b></td><td>Kotlin, WebView, WorkManager, 접근성 서비스 (minSdk 26, targetSdk 34)</td></tr>
 <tr><td><b>AI</b></td><td>Claude, faster-whisper(대체: OpenAI Whisper), Elasticsearch 8.17 + bge-m3</td></tr>
-<tr><td><b>인프라</b></td><td>AWS EC2 3대: 서비스 t4g.large, STT c7i-flex.large, 검색 t4g.medium. S3 (presigned URL), Terraform·Docker(검색 서버), GitHub Actions</td></tr>
+<tr><td><b>인프라</b></td><td>AWS EC2 3대: 서비스 t4g.large, STT c7i-flex.large, 검색 t4g.medium. S3, Terraform·Docker(검색 서버), GitHub Actions</td></tr>
 <tr><td><b>관측</b></td><td>Langfuse Cloud: 시간·토큰·판정 라벨만 전송, 통화 내용은 보내지 않음</td></tr>
 <tr><td><b>검증</b></td><td>pytest 71개, 실제 음성 파일, 실제 폰 녹화</td></tr>
 </table></div>
 <div class="card"><h3>구현상 판단</h3>
 <p><b>화면을 WebView로 공유</b><br>화면을 고쳐도 APK를 다시 빌드하지 않습니다. 네이티브는 폴더 접근, 동기화, 차단만 맡습니다.</p>
-<p><b>기기에 AWS 키를 두지 않음</b><br>presigned URL로 사용자별 경로에 직접 올립니다.</p>
+<p><b>기기에 AWS 키를 두지 않음</b><br>서버가 발급한 임시 링크로 사용자별 경로에 직접 올립니다.</p>
 <p><b>음성은 자체 서버에서 먼저</b><br>외부 전송과 의존을 줄이려 STT를 직접 띄웠습니다. GPU 사용 제약으로 CPU에서 서빙하고, 부하·장애 때만 OpenAI로 넘깁니다.</p></div>
 </div>
 <div class="foot"><span>대체 경로를 탄 음성은 외부로 전송됩니다. Langfuse: us.cloud.langfuse.com/project/cmvwspomu005fad0e5vr8sgrq/traces</span><span>6</span></div></section>
