@@ -496,7 +496,7 @@ let signal = null;
     out = json.loads(result.stdout)
     assert out["slow"] == [False, True, True, True]  # 늦으면 이번 대사만 브라우저 음성, GPU 음성은 계속 씀
     assert out["broken"] == [False, False]  # 502면 이번 훈련은 브라우저 음성으로
-    assert out["labels"] == ["브라우저 음성(ko-KR) · GPU 음성 준비 중", "브라우저 음성(ko-KR)"]
+    assert out["labels"] == ["브라우저 음성(ko-KR) · 합성 음성 준비 중", "브라우저 음성(ko-KR)"]
 
 
 # ---------- GAF 검토(11-01) 필수 수정 회귀 시험 ----------

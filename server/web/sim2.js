@@ -235,7 +235,9 @@ function s2RenderStart() {
   if (it.channel !== 'call') box.append(s2el('div', 'tiny muted s2-note', '전화 훈련은 전화 대본(기관 사칭)에서 할 수 있어요.'));
   box.append(s2el('div', 'tiny muted s2-note', S2.caps.llm === 'gpu'
     ? '직접 쓴 답은 규칙으로 먼저 보고, 애매하면 AI가 판정해요.'
-    : '직접 쓴 답은 정해진 규칙으로 판정해요. 애매하면 선택지로 다시 물어요.'));
+    : S2.caps.backup && S2.caps.backup.judge
+      ? '직접 쓴 답은 규칙으로 먼저 보고, 없으면 미리 만든 판정(AI가 미리 판정해 둔 답)을 써요. 그래도 애매하면 선택지로 다시 물어요.'
+      : '직접 쓴 답은 정해진 규칙으로 판정해요. 애매하면 선택지로 다시 물어요.'));
   icons();
 }
 
@@ -514,7 +516,8 @@ SCREENS.sim2call = gated(() => `<div class="callscreen s2-call">
 INIT.sim2call = async (sid) => {
   if (!signedIn() || !sid) return;
   if ((await s2Resume(sid, 'call')) !== 'active') return;
-  $('#c2Voice').textContent = !S2.caps.tts ? '브라우저 음성(ko-KR)' : S2.caps.backup && S2.caps.backup.first ? '미리 만든 GPU 음성 · 전화 음질' : '임대 GPU 음성 · 전화 음질';
+  // 실행 중에는 GPU를 부르지 않는다(11-01 호연 결정): 대사는 GPU로 미리 만든 음성, 없으면 브라우저 음성.
+  $('#c2Voice').textContent = !S2.caps.tts ? '브라우저 음성(ko-KR)' : S2.caps.backup && S2.caps.backup.tts ? '미리 만든 음성 · 전화 음질' : '실시간 합성 음성 · 전화 음질';
   vibrate([300, 200, 300]);
   const started = S2.scene && S2.scene.turn > 1;
   if (started) return s2Pickup();
@@ -725,7 +728,7 @@ function s2StopRec(submit) {
   if (S2.recog) { try { submit ? S2.recog.stop() : S2.recog.abort(); } catch (e) { } if (!submit) S2.recog = null; }
 }
 
-// 대사 읽기: 임대 GPU TTS(전화 음질 300–3400Hz) → 안 되면 브라우저 speechSynthesis(ko-KR).
+// 대사 읽기: 서버 음성(미리 만든 음성, 설정하면 GPU 실시간 합성. 전화 음질 300–3400Hz) → 안 되면 브라우저 speechSynthesis(ko-KR).
 async function s2Speak(text, token, tone) {
   if (S2.caps.tts && await s2PlayTts(text, token, tone)) return;
   await s2SpeakBrowser(text, token, tone);
@@ -754,7 +757,7 @@ async function s2PlayTts(text, token, tone) {
     const buf = await res.arrayBuffer();
     clearTimeout(timer);
     if (token !== S2.speakToken) return true;
-    label(res.headers.get('X-Sim-Voice') === 'backup' ? '미리 만든 GPU 음성 · 전화 음질' : '임대 GPU 음성 · 전화 음질');
+    label(res.headers.get('X-Sim-Voice') === 'backup' ? '미리 만든 음성 · 전화 음질' : '실시간 합성 음성 · 전화 음질');
     const ctx = S2.audioCtx || (S2.audioCtx = new (window.AudioContext || window.webkitAudioContext)());
     if (ctx.state === 'suspended') await ctx.resume();
     const audio = await ctx.decodeAudioData(buf);
@@ -771,7 +774,7 @@ async function s2PlayTts(text, token, tone) {
     await new Promise((resolve) => { src.onended = resolve; src.start(); });
     return true;
   } catch (e) {
-    if (e && e.name === 'AbortError') label('브라우저 음성(ko-KR) · GPU 음성 준비 중');
+    if (e && e.name === 'AbortError') label('브라우저 음성(ko-KR) · 합성 음성 준비 중');
     return false;
   } finally {
     clearTimeout(timer);
