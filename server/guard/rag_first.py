@@ -68,7 +68,10 @@ def _documents(hits: list[dict]) -> str:
 
 
 def _score(result: dict) -> float:
-    suspicion = [max(0.0, min(1.0, float(s["score"]))) for s in result.get("suspicion") or []]
+    raw = [float(s["score"]) for s in result.get("suspicion") or []]
+    # 작은 모델이 0–1 대신 0–100으로 답하는 일이 있어(11-01 Kanana 실측), 1을 넘는 값이 있으면 100으로 나눕니다.
+    scale = 100.0 if any(v > 1 for v in raw) else 1.0
+    suspicion = [max(0.0, min(1.0, v / scale)) for v in raw]
     if suspicion:
         return max(suspicion)
     # rule 모드는 수법별 키워드 묶음 중 가장 많이 맞은 묶음의 값이 곧 confidence입니다.
@@ -104,6 +107,9 @@ def band(score: int | None) -> str:
 
 def result_band(result: dict) -> str:
     if result["label"] == "uncertain" or (result["label"] == VOICE_PHISHING and not result["evidence"]):
+        return "unclear"
+    # 판정은 정상인데 점수가 주의 이상이면 모델 답이 서로 어긋난 것이라 '판단 어려움'으로 둡니다(자동 조치 없음).
+    if result["label"] == "normal" and (result.get("score") or 0) >= config.BAND_CAUTION:
         return "unclear"
     return band(result.get("score"))
 

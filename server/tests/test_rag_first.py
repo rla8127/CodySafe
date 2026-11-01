@@ -190,3 +190,14 @@ def test_web_loads_extra_script(client):
     assert "innerHTML" not in js and "insertAdjacentHTML" not in js
     for url in ("https://www.payinfo.or.kr", "https://pd.fss.or.kr", "https://www.msafer.or.kr", "https://www.fsc.go.kr/no010101/84607", "tel:112", "tel:1394"):
         assert url in js, url
+
+
+def test_suspicion_on_0_100_scale_is_normalised():
+    r = {"label": "voice_phishing", "confidence": 0.9, "evidence": ["x"], "suspicion": [{"scam_type": "loan_refinance", "score": 85}, {"scam_type": "bank_security", "score": 0}]}
+    assert rag_first._score(r) == 0.85
+
+
+def test_normal_label_with_high_score_is_unclear():
+    r = {"label": "normal", "confidence": 0.9, "evidence": [], "score": 100}
+    assert rag_first.result_band(r) == "unclear" and rag_first.auto_actions(r) == (False, False)
+    assert rag_first.result_band({**r, "score": 39}) == "log"
