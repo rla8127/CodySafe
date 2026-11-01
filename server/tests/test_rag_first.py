@@ -195,6 +195,24 @@ def test_web_loads_extra_script(client):
 def test_suspicion_on_0_100_scale_is_normalised():
     r = {"label": "voice_phishing", "confidence": 0.9, "evidence": ["x"], "suspicion": [{"scam_type": "loan_refinance", "score": 85}, {"scam_type": "bank_security", "score": 0}]}
     assert rag_first._score(r) == 0.85
+    # 0–1 소수로 답하면 그대로, [1, 0]처럼 애매하면 1점(낮은 쪽)으로 읽습니다.
+    assert rag_first._score({**r, "suspicion": [{"scam_type": "loan_refinance", "score": 0.8}]}) == 0.8
+    assert rag_first._score({**r, "suspicion": [{"scam_type": "loan_refinance", "score": 1}, {"scam_type": "bank_security", "score": 0}]}) == 0.01
+
+
+def test_save_after_delete_does_not_recreate(client):
+    rag_first.save("no-such-recording", {"band": "lock"})
+    with db.connect() as conn:
+        assert conn.execute("SELECT 1 FROM detect_extra WHERE recording_id = 'no-such-recording'").fetchone() is None
+
+
+def test_sample_extra_never_claims_alert_or_lock(client, on):
+    from guard import app as app_module, samples
+    app_module._sample_results.clear()
+    sid = next(s["id"] for s in samples.SAMPLES if s["expected"] == "voice_phishing")
+    x = client.post(f"/v1/samples/{sid}/analyze", headers=device(client, "예시")).json()["detect"]
+    assert x["sample"] and not x["family_alert"] and not x["lock"]
+    app_module._sample_results.clear()
 
 
 def test_normal_label_with_high_score_is_unclear():

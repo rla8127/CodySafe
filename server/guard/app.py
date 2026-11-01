@@ -373,7 +373,8 @@ def _analyze_sample(sample_id: str) -> dict:
                     "expected": sample["expected"],
                 }
                 if rag_first.enabled():
-                    _sample_results[sample_id]["detect"] = rag_first.extra(result, _sample_results[sample_id]["matches"])
+                    # 예시 통화는 알림·잠금을 하지 않으므로 화면에도 한 것처럼 보이지 않게 합니다.
+                    _sample_results[sample_id]["detect"] = {**rag_first.extra(result, _sample_results[sample_id]["matches"]), "family_alert": False, "lock": False, "sample": True}
         return _sample_results[sample_id]
 
 
