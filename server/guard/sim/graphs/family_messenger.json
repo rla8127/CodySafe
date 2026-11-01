@@ -104,7 +104,8 @@
         "text": "[Web발신] 인증번호 [{otp}] 타인에게 절대 알려 주지 마세요."
       },
       "red_flags": [
-        "통화는 피하고 인증번호를 요구함"
+        "통화는 피하고 인증번호를 요구함",
+        "얼굴이 나오는 영상도 AI로 만들 수 있음(영상만 보고 믿지 않기)"
       ],
       "choices": [
         {
@@ -137,7 +138,12 @@
       ],
       "debrief": "인증번호를 대신 알려 주면 내 명의로 결제나 대출이 일어날 수 있어요. 가족끼리 정한 암구호로 확인하세요.",
       "tone": "urgent",
-      "pressure_tone": "sob"
+      "pressure_tone": "sob",
+      "video": {
+        "son": "son_accident",
+        "daughter": "daughter_deposit",
+        "caption": "영상 메시지: {child_title} 얼굴로 보이는 짧은 영상 (AI로 만든 가상 얼굴, 실제 사람 아님)"
+      }
     },
     "n3_secret": {
       "stage": "공포·긴급",
