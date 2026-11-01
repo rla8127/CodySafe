@@ -230,8 +230,11 @@ def test_rule_judge(text, grade, intent):
 
 
 def test_mixed_answer_is_left_to_llm_then_default_mid_with_reask():
-    verdict = judge.judge("아들한테 물어보고 보내 줄게요", ctx_for())
+    verdict = judge.judge("아들한테 전화해 볼게요. 돈은 보낼게요", ctx_for())
     assert verdict == {**verdict, "grade": "중답", "source": "default", "reask": True}
+    # '가족에게 먼저 묻고 보내겠다'는 조건부 동의는 11-01부터 규칙이 중답(망설임)으로 정한다(시연 답 32번, 호연 라벨).
+    verdict = judge.judge("아들한테 물어보고 보내 줄게요", ctx_for())
+    assert (verdict["grade"], verdict["intent"], verdict["source"]) == ("중답", "망설임", "rule")
 
 
 def test_llm_is_used_only_when_rules_cannot_decide(monkeypatch):
@@ -875,3 +878,27 @@ console.log(JSON.stringify(items.map((m) => m.kind)));
     result = subprocess.run([node, str(script)], capture_output=True, text=True, timeout=20)
     assert result.returncode == 0, result.stderr
     assert json.loads(result.stdout) == ["video", "", "sms"]
+
+
+# 11-01 시연 답(O-2 eval/demo_answers.csv) 가운데 호연이 라벨을 정했는데 규칙이 먼저 다르게 정하던 3줄(11·16·32번)과,
+# 같은 꼴이지만 안전한 답. 보류셋(judge_holdout.csv)은 보지 않고 고쳤다.
+@pytest.mark.parametrize("scenario,node,text,expected", [
+    ("agency_call", "n3_otp", "잠깐만요 문자 보고 불러 드릴게요.", ("오답", "정보제공")),  # 11번
+    ("agency_call", "n4_transfer", "앱은 어떻게 까는 거예요? 알려 주세요.", ("오답", "앱설치동의")),  # 16번
+    ("family_messenger", "n3_secret", "아빠한테 먼저 물어보고 보낼게.", ("중답", "망설임")),  # 32번(가족에게 먼저 묻는 조건부 동의)
+    ("delivery_sms", "n4_card_info", "네 불러 드리겠습니다", ("오답", "정보제공")),
+    ("agency_call", "n3_otp", "경찰 불러 드릴게요", ("정답", "신고")),
+    ("family_messenger", "n2_auth", "큰아들 불러 줄게", ("정답", "가족확인")),
+    ("agency_call", "n3_otp", "안 불러 드릴게요", ("정답", "거절")),
+    ("agency_call", "n4_transfer", "앱 설치하라는 건 사기죠? 어떻게 신고해요?", ("정답", "신고")),
+    ("family_messenger", "n3_secret", "아빠한테 먼저 물어보고 신고할게", ("정답", "신고")),
+    ("agency_call", "n1_intro", "불러 드릴게요", None),  # 정보를 요구하지 않는 장면에서는 정하지 않음
+])
+def test_demo_answers_labeled_by_hoyeon_and_their_safe_neighbors(scenario, node, text, expected):
+    graph = engine.get_graph(scenario)
+    state = engine.start(graph, preset_profile("mother_74_alone"), seed=0)
+    state["node"] = node
+    verdict = judge.rule_judge(text, engine._judge_context(graph, state))
+    assert ((verdict["grade"], verdict["intent"]) if verdict else None) == expected
+    if text.startswith("잠깐만요"):
+        assert verdict["leaks"] == ["인증번호"]  # 장면이 요구한 정보를 내주는 것으로 센다(정보 지킴 점수)
