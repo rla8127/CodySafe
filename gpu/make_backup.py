@@ -35,6 +35,7 @@ def main():
     ap.add_argument("--tts", action="store_true")
     ap.add_argument("--judge", action="store_true")
     ap.add_argument("--answers", action="append", default=[])
+    ap.add_argument("--profiles", help="JSON list of extra profiles (common banks, regions, family terms) for TTS")
     a = ap.parse_args()
     sys.path.insert(0, a.sim)
     from guard import config  # noqa: F401  (loads server/.env into the environment)
@@ -56,8 +57,11 @@ def main():
     if a.tts:
         (OUT / "tts").mkdir(exist_ok=True)
         items, made, t0 = {}, 0, time.time()
-        for preset_id, preset in PRESETS.items():
-            prof = SimProfile(**preset["profile"])
+        profiles = [(pid, p["profile"]) for pid, p in PRESETS.items()]
+        if a.profiles:
+            profiles += [(f"extra{i}", p) for i, p in enumerate(json.loads(Path(a.profiles).read_text()))]
+        for preset_id, prof_dict in profiles:
+            prof = SimProfile(**prof_dict)
             for graph in graphs.values():
                 values = engine.start(graph, prof, seed=0)["values"]
                 for node_id, node in graph.nodes.items():
@@ -87,6 +91,7 @@ def main():
             print(f"tts {made}/{len(items)} {it['scenario']}/{it['node']} {it['tone']}", flush=True)
         manifest["tts"] = {"made_at": time.strftime("%Y-%m-%d %H:%M %Z"), "voice": voice, "count": len(items),
                            "format": "mp3 64 kbps mono", "seed": 0, "presets": list(PRESETS),
+                           "extra_profiles": len(profiles) - len(PRESETS),
                            "model": "Qwen/Qwen3-TTS-12Hz-1.7B-Base (voice designed by Qwen3-TTS-12Hz-1.7B-VoiceDesign)",
                            "gpu": "Modal NVIDIA L40S", "items": items, "seconds": round(time.time() - t0)}
         _atomic_write(manifest_path, json.dumps(manifest, ensure_ascii=False, indent=1))
