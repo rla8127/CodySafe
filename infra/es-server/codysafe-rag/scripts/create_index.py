@@ -18,6 +18,9 @@ body = {
         "source_tier": {"type": "keyword"}, "source_name": {"type": "keyword"}, "source_url": {"type": "keyword"},
         "content_hash": {"type": "keyword"}, "data_period": {"type": "keyword"},
         "published_at": {"type": "date"}, "collected_at": {"type": "date"},
+        "stage": {"type": "keyword"}, "tactics": {"type": "keyword"}, "requested_actions": {"type": "keyword"},
+        "target_age_band": {"type": "keyword"}, "license": {"type": "keyword"}, "case_id": {"type": "keyword"},
+        "source_ref": {"type": "keyword"}, "synthetic": {"type": "boolean"}, "sample_lines": ko(),
         "embedding": {"type": "dense_vector", "dims": 1024, "index": True, "similarity": "cosine"}}},
 }
 if es.indices.exists(index=INDEX):

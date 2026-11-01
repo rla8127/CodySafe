@@ -1,0 +1,348 @@
+{
+  "id": "gen_agency_call_19be2d6a",
+  "title": "최근 사례로 만든 검찰 수사관이라는 전화",
+  "scam_type": "기관사칭",
+  "channel": "call",
+  "impersonated": "검찰 수사관",
+  "difficulty": "어려움",
+  "synthetic": true,
+  "source_refs": [
+    {
+      "title": "검사 사칭 명의도용·대포통장 연루 수사 전화",
+      "url": "https://www.fsc.go.kr/no010101/86250",
+      "published_at": "2026-02-10",
+      "publisher": "",
+      "note": "출처 등급 official, 이용 조건 미확인. n1_intro(대포통장·집단 고소)·n2_fear(보안사건 구속수사·가족에게 비밀)·n4_transfer(자산 확인) 대사에 바꿔 씀"
+    },
+    {
+      "title": "검사 사칭 약식수사 명목 모텔 셀프감금",
+      "url": "https://www.fsc.go.kr/no010101/86250",
+      "published_at": "2026-02-10",
+      "publisher": "",
+      "note": "출처 등급 official, 이용 조건 미확인. n2_fear(혼자 모텔 입실) 대사에 바꿔 씀"
+    },
+    {
+      "title": "주민센터 번호 변작 후 신용정보원 사칭 번호로 회신 유도",
+      "url": "https://www.boho.or.kr/kr/bbs/view.do?bbsId=B0000133&menuNo=205020&nttId=72158",
+      "published_at": "2026-08-11",
+      "publisher": "",
+      "note": "출처 등급 official, 이용 조건 미확인. n3_otp 대사: 명의도용 차단 접수 명목으로 인증번호를 부르게 하는 수법을 검찰 사칭 틀에 맞춰 바꿔 씀"
+    },
+    {
+      "title": "이커머스 유출 악용 피해보상 스미싱과 검경·우체국 사칭",
+      "url": "https://www.boho.or.kr/kr/bbs/view.do?bbsId=B0000133&menuNo=205020&nttId=71925",
+      "published_at": "2025-12-19",
+      "publisher": "",
+      "note": "출처 등급 official, 이용 조건 미확인. n4_transfer(점검 앱 설치 지시) 대사에 바꿔 씀"
+    },
+    {
+      "title": "보이스피싱 피해예방 10계명",
+      "url": "https://www.fsc.go.kr/no010101/86250",
+      "published_at": "2026-02-10",
+      "publisher": "금융위원회",
+      "note": "❶ 명의도용·수사 전화는 일단 끊기, ❷ 모텔 투숙 요구는 100% 사기, ❻ 앱 설치 지시는 거절. 대사는 이 수칙과 팀의 기존 체험 시나리오(server/web/sim.js)를 바탕으로 새로 쓴 가상 대화"
+    }
+  ],
+  "persona": {
+    "role": "검찰 수사관 사칭",
+    "name": "수사관 김민수",
+    "tone": "딱딱하고 위압적"
+  },
+  "slots": [
+    "user_title",
+    "region_office",
+    "bank",
+    "child_title"
+  ],
+  "start": "n1_intro",
+  "nodes": {
+    "n1_intro": {
+      "stage": "접근",
+      "tactics": [
+        "권위"
+      ],
+      "goal": "수사기관이라고 믿게 하기",
+      "lines": [
+        "{region_office} 수사관 김민수입니다. {user_title} 명의로 {bank} 계좌가 만들어져 자금세탁 사건의 대포통장으로 쓰였습니다.",
+        "피해자 50명이 집단 고소장을 접수한 사건이라 지금 정식 수사 중입니다. 전화 끊지 마시고 협조하세요."
+      ],
+      "red_flags": [
+        "수사기관이라며 먼저 전화를 걸어 옴",
+        "내 명의 계좌가 범죄에 쓰였다고 겁을 줌"
+      ],
+      "choices": [
+        {
+          "id": "a",
+          "grade": "정답",
+          "intent": "공식번호확인",
+          "text": "전화를 끊고 대검찰청 1301에 직접 전화해 확인한다",
+          "next": "t_safe",
+          "act": "do",
+          "leaks": []
+        },
+        {
+          "id": "b",
+          "grade": "중답",
+          "intent": "되묻기",
+          "text": "무슨 사건인데요? 저는 그런 적 없는데요.",
+          "next": "n2_fear",
+          "act": "say",
+          "leaks": []
+        },
+        {
+          "id": "c",
+          "grade": "오답",
+          "intent": "따르기",
+          "text": "어머, 큰일이네요. 제가 뭘 하면 되나요?",
+          "next": "n2_fear",
+          "act": "say",
+          "leaks": []
+        }
+      ],
+      "pressure": [
+        "사건 번호까지 나온 정식 수사입니다. 지금 협조하지 않으시면 피의자로 바뀝니다."
+      ],
+      "tone": "official",
+      "pressure_tone": "threat",
+      "debrief": "수사기관은 전화로 수사를 알리며 협조를 요구하지 않아요. 명의도용·수사 전화는 일단 끊고, 직접 찾은 번호(대검찰청 1301)로 확인하세요. (금융위 10계명 ❶)",
+      "media": null
+    },
+    "n2_fear": {
+      "stage": "공포·긴급",
+      "tactics": [
+        "공포",
+        "비밀유지",
+        "고립"
+      ],
+      "goal": "겁을 주고 가족과 떼어 놓기",
+      "lines": [
+        "이건 특급 보안사건이라 구속 수사와 비공개 수사가 원칙입니다. 은행이랑 경찰까지 얽혀 있어서 {child_title}에게도 절대 말씀하시면 안 됩니다.",
+        "다른 사람 목소리가 섞이면 안 되니까 근처 저렴한 모텔에 혼자 입실해서 조사 끝날 때까지 대기하세요."
+      ],
+      "red_flags": [
+        "구속을 들먹이며 겁을 줌",
+        "가족에게 말하지 말라고 함",
+        "혼자 숙소로 가라고 함"
+      ],
+      "choices": [
+        {
+          "id": "a",
+          "grade": "정답",
+          "intent": "가족확인",
+          "text": "{child_title}에게 바로 전화해 이 일을 알린다",
+          "next": "t_safe",
+          "act": "do",
+          "leaks": []
+        },
+        {
+          "id": "b",
+          "grade": "중답",
+          "intent": "되묻기",
+          "text": "정말 구속이에요? 그럼 공문부터 보내 주세요.",
+          "next": "n3_otp",
+          "act": "say",
+          "leaks": []
+        },
+        {
+          "id": "c",
+          "grade": "오답",
+          "intent": "따르기",
+          "text": "알겠어요. 아무한테도 말 안 하고 숙소로 갈게요.",
+          "next": "n3_otp",
+          "act": "say",
+          "leaks": []
+        }
+      ],
+      "pressure": [
+        "공문은 보안상 보내 드릴 수 없습니다. 지금 끊으시면 바로 체포영장이 나갑니다."
+      ],
+      "tone": "threat",
+      "pressure_tone": "threat",
+      "debrief": "가족에게 비밀로 하라거나 혼자 숙소에 머물라는 요구는 주변의 도움을 끊으려는 수법이에요. 모텔 투숙 요구는 100% 사기예요. (금융위 10계명 ❷)",
+      "media": null
+    },
+    "n3_otp": {
+      "stage": "요구",
+      "tactics": [
+        "권위",
+        "긴급"
+      ],
+      "goal": "인증번호 받아 내기",
+      "lines": [
+        "{user_title} 명의 계좌를 범죄 계좌에서 분리 접수하려면 본인 확인부터 해야 합니다.",
+        "방금 휴대폰으로 받으신 인증번호 6자리를 불러 주세요. 전화는 끊지 마시고요."
+      ],
+      "red_flags": [
+        "전화로 인증번호를 불러 달라고 함"
+      ],
+      "choices": [
+        {
+          "id": "a",
+          "grade": "정답",
+          "intent": "거절",
+          "text": "인증번호는 누구에게도 안 알려 줘요. 끊겠습니다.",
+          "next": "t_safe",
+          "act": "say",
+          "leaks": []
+        },
+        {
+          "id": "b",
+          "grade": "중답",
+          "intent": "되묻기",
+          "text": "인증번호는 왜 필요한 거예요?",
+          "next": "n4_transfer",
+          "act": "say",
+          "leaks": []
+        },
+        {
+          "id": "c",
+          "grade": "오답",
+          "intent": "정보제공",
+          "text": "네, 불러 드릴게요. {otp}",
+          "next": "n4_transfer",
+          "act": "say",
+          "leaks": [
+            "인증번호"
+          ]
+        }
+      ],
+      "pressure": [
+        "본인 확인만 하는 겁니다. 인증번호를 안 주시면 계좌가 바로 정지됩니다."
+      ],
+      "tone": "urgent",
+      "pressure_tone": "threat",
+      "debrief": "인증번호는 내 돈을 옮길 때 쓰는 열쇠예요. 수사기관도 은행도 전화로 인증번호를 묻지 않아요.",
+      "media": {
+        "kind": "sms",
+        "text": "[Web발신] 본인확인 인증번호 [{otp}] 타인에게 절대 알려 주지 마세요."
+      }
+    },
+    "n4_transfer": {
+      "stage": "요구",
+      "tactics": [
+        "권위",
+        "긴급",
+        "보상"
+      ],
+      "goal": "'안전 계좌'로 돈을 옮기게 하기",
+      "lines": [
+        "지금부터 {user_title} 자산이 범죄 자금인지 하나씩 확인하겠습니다. {bank} 계좌 돈은 금감원 안전 계좌로 옮겨 두시면 조사 뒤 돌려드립니다.",
+        "추가 피해를 막으려면 먼저 지금 보내 드리는 점검 앱부터 설치하세요."
+      ],
+      "red_flags": [
+        "'안전 계좌'로 돈을 옮기라고 함",
+        "보안 앱 설치를 요구함"
+      ],
+      "choices": [
+        {
+          "id": "a",
+          "grade": "정답",
+          "intent": "신고",
+          "text": "거절하고 전화를 끊은 뒤 112에 신고한다",
+          "next": "t_safe",
+          "act": "do",
+          "leaks": []
+        },
+        {
+          "id": "b",
+          "grade": "중답",
+          "intent": "망설임",
+          "text": "지금은 은행 갈 시간이 없는데요…",
+          "next": "t_quit",
+          "act": "say",
+          "leaks": []
+        },
+        {
+          "id": "c",
+          "grade": "오답",
+          "intent": "송금동의",
+          "text": "알겠어요, 말씀하신 계좌로 지금 보낼게요.",
+          "next": "t_loss_money",
+          "act": "say",
+          "leaks": []
+        }
+      ],
+      "pressure": [
+        "오늘 안 옮기시면 계좌가 동결돼 돈을 못 찾습니다. 은행 직원이 물으면 가족에게 보낸다고만 하세요."
+      ],
+      "tone": "official",
+      "pressure_tone": "urgent",
+      "debrief": "'안전 계좌'는 없어요. 수사기관과 금융감독원은 돈을 옮기라고 하지 않고, 앱 설치를 지시하지도 않아요. (금융위 10계명 ❻)",
+      "media": {
+        "kind": "link",
+        "text": "https://secure-case.example/app"
+      }
+    }
+  },
+  "terminals": {
+    "t_safe": {
+      "type": "safe",
+      "loss": null,
+      "message": "잘하셨어요. 전화를 끊고 직접 찾은 번호로 확인하면 이 수법은 더 나아가지 못해요.",
+      "by": "user"
+    },
+    "t_quit": {
+      "type": "safe",
+      "loss": null,
+      "message": "머뭇거리는 사이 상대가 먼저 전화를 끊었어요. 피해는 없었지만, 다음에는 먼저 끊고 확인하세요.",
+      "by": "scammer"
+    },
+    "t_loss_money": {
+      "type": "loss",
+      "loss": "송금",
+      "message": "'안전 계좌'는 사기범의 계좌였어요. 바로 112와 은행에 전화해 지급정지를 요청해야 해요.",
+      "by": "user"
+    },
+    "t_loss_app": {
+      "type": "loss",
+      "loss": "앱설치",
+      "message": "설치한 앱이 전화와 문자를 가로챌 수 있어요. 휴대폰을 비행기 모드로 바꾸고 다른 전화로 112와 은행에 알려야 해요.",
+      "by": "user"
+    }
+  },
+  "bait": {
+    "otp": "583920"
+  },
+  "closing": {
+    "question": "전화를 끊은 뒤 무엇을 하시겠어요? 여러 개 고를 수 있어요.",
+    "options": [
+      {
+        "id": "k1",
+        "text": "대검찰청 1301이나 {bank} 대표번호처럼 직접 찾은 번호로 사실인지 확인한다",
+        "points": 10,
+        "kind": "공식번호확인",
+        "why": "걸려 온 번호가 아니라 직접 찾은 번호로 확인해야 해요."
+      },
+      {
+        "id": "k2",
+        "text": "{child_title}에게 알리고 함께 확인한다",
+        "points": 10,
+        "kind": "가족확인",
+        "why": "혼자 판단하지 않는 것이 가장 큰 예방이에요."
+      },
+      {
+        "id": "k3",
+        "text": "112에 신고하고, 돈이 나갔다면 은행에 지급정지를 요청한다",
+        "points": 5,
+        "kind": "신고",
+        "why": "빨리 신고할수록 피해를 줄일 수 있어요."
+      },
+      {
+        "id": "k4",
+        "text": "걸려 온 번호로 다시 전화해 정말 수사관인지 물어본다",
+        "points": 0,
+        "kind": "기타",
+        "why": "걸려 온 번호로 다시 걸면 사기범에게 연결돼요."
+      },
+      {
+        "id": "k5",
+        "text": "별일 없었으니 잊고 넘어간다",
+        "points": 0,
+        "kind": "기타",
+        "why": "같은 사람이 다른 수법으로 다시 연락할 수 있어요."
+      }
+    ]
+  },
+  "aliases": [],
+  "summary": "공식 사례 4건의 대사를 장면 4곳에 넣은 생성 대본(혼자 사시는 70대 어머니 기준)"
+}

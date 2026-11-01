@@ -1,0 +1,38 @@
+scenario_id,node_id,answer,label
+agency_call,n1_intro,검찰이 전화로 이런 거 안 한다던데요. 끊고 1301에 직접 물어볼게요.,
+agency_call,n1_intro,무슨 사건이요? 저는 그런 계좌 만든 적 없어요.,
+agency_call,n1_intro,어머 큰일이네. 제가 뭘 어떻게 해야 돼요?,오답
+agency_call,n1_intro,누구시라고요? 잘 안 들리는데 다시 말해 보세요.,
+agency_call,n2_fear,우리 아들한테 먼저 전화해 볼게요.,정답
+agency_call,n2_fear,구속이라니요? 그럼 서류부터 우편으로 보내 주세요.,
+agency_call,n2_fear,알겠어요. 아무한테도 말 안 하고 시키는 대로 할게요.,
+agency_call,n2_fear,모텔은 왜 가야 돼요? 집에 있으면 안 돼요?,
+agency_call,n3_otp,인증번호는 아무한테도 안 알려 줘요. 끊을게요.,
+agency_call,n3_otp,인증번호는 왜 필요한데요?,
+agency_call,n3_otp,잠깐만요 문자 보고 불러 드릴게요.,오답
+agency_call,n3_otp,은행에 직접 가서 물어볼게요.,
+agency_call,n4_transfer,안 보내요. 끊고 112에 신고할 거예요.,
+agency_call,n4_transfer,지금은 은행 갈 시간이 없는데요.,
+agency_call,n4_transfer,알겠어요. 말씀하신 계좌로 지금 보낼게요.,
+agency_call,n4_transfer,앱은 어떻게 까는 거예요? 알려 주세요.,오답
+delivery_sms,n1_parcel,링크는 안 누르고 택배 앱에서 직접 볼게요.,정답
+delivery_sms,n1_parcel,택배 시킨 게 없는데 뭐지?,
+delivery_sms,n1_parcel,주소 다시 입력하면 되는 거죠? 눌러 볼게요.,
+delivery_sms,n2_card,카드사 대표번호로 직접 전화해 볼게요.,정답
+delivery_sms,n2_card,문자에 있는 번호로 전화하면 되겠네.,
+delivery_sms,n3_apk,앱은 안 깔아요. 스팸 신고할게요.,
+delivery_sms,n3_apk,시키는 대로 설정 바꾸고 설치할게요.,
+delivery_sms,n4_card_info,카드 번호는 말 못 해요. 끊고 카드사에 확인할게요.,
+delivery_sms,n4_card_info,카드 번호 불러 드릴게요.,
+family_messenger,n1_newnum,원래 번호로 전화해 볼게.,
+family_messenger,n1_newnum,진짜 우리 아들 맞니? 어디서 수리 맡겼는데?,
+family_messenger,n1_newnum,어머 괜찮아? 번호 저장해 둘게.,
+family_messenger,n2_auth,우리 집 암구호부터 말해 봐.,
+family_messenger,n2_auth,인증번호는 뭐 하려고?,
+family_messenger,n2_auth,알았어 인증번호 불러 줄게.,
+family_messenger,n3_secret,아빠한테 먼저 물어보고 보낼게.,중답
+family_messenger,n3_secret,신분증까지는 좀 그런데 꼭 필요해?,
+family_messenger,n3_secret,알았어 신분증 사진 보낼게.,
+family_messenger,n4_gift,이상하다. 그만하고 112에 신고할게.,
+family_messenger,n4_gift,지금은 바빠서 이따가 볼게.,
+family_messenger,n4_gift,알았어 상품권 사서 번호 보내 줄게.,

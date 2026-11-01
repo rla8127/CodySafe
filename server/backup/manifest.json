@@ -1,0 +1,1000 @@
+{
+ "tts": {
+  "made_at": "2026-11-01 11:03 KST",
+  "voice": "caller_male",
+  "count": 119,
+  "format": "mp3 64 kbps mono",
+  "seed": 0,
+  "presets": [
+   "mother_74_alone",
+   "father_68_retired",
+   "grandma_82"
+  ],
+  "extra_profiles": 53,
+  "model": "Qwen/Qwen3-TTS-12Hz-1.7B-Base (voice designed by Qwen3-TTS-12Hz-1.7B-VoiceDesign)",
+  "gpu": "Modal NVIDIA L40S",
+  "items": {
+   "009f97a79cf227d1331f0ac3c844a640": {
+    "text": "여보세요, 어르신. 대구지검 첨단범죄수사팀 수사관 김민수입니다.",
+    "tone": "official",
+    "voice": "caller_male",
+    "scenario": "agency_call",
+    "node": "n1_intro",
+    "preset": "extra38"
+   },
+   "832132fcd361df19875db9539a56a95e": {
+    "text": "어르신 명의로 된 농협 계좌가 금융범죄에 쓰여 연락드렸습니다. 지금 통화 괜찮으시죠?",
+    "tone": "official",
+    "voice": "caller_male",
+    "scenario": "agency_call",
+    "node": "n1_intro",
+    "preset": "extra52"
+   },
+   "5f4e1047a213039fa8317557f62173fd": {
+    "text": "사건 번호까지 나온 정식 수사입니다. 지금 협조하지 않으시면 피의자로 바뀝니다.",
+    "tone": "threat",
+    "voice": "caller_male",
+    "scenario": "agency_call",
+    "node": "n1_intro",
+    "preset": "extra52"
+   },
+   "dee34a7fe4aeb98a507f08f5364f5981": {
+    "text": "보안 사건이라 구속 수사와 비공개 수사가 원칙입니다.",
+    "tone": "threat",
+    "voice": "caller_male",
+    "scenario": "agency_call",
+    "node": "n2_fear",
+    "preset": "extra52"
+   },
+   "fd673780bd4d89e280564093b750e2d8": {
+    "text": "큰아들에게도, 다른 가족에게도 절대 말씀하시면 안 됩니다. 조사가 끝날 때까지 근처 모텔 같은 숙소로 혼자 가 계세요.",
+    "tone": "threat",
+    "voice": "caller_male",
+    "scenario": "agency_call",
+    "node": "n2_fear",
+    "preset": "extra52"
+   },
+   "54595ad4579b1ee4f8ac1fab364ae111": {
+    "text": "공문은 보안상 보내 드릴 수 없습니다. 지금 끊으시면 바로 체포영장이 나갑니다.",
+    "tone": "threat",
+    "voice": "caller_male",
+    "scenario": "agency_call",
+    "node": "n2_fear",
+    "preset": "extra52"
+   },
+   "628316531e0819a7399970b760c029e1": {
+    "text": "어르신 본인이 맞는지 확인하겠습니다.",
+    "tone": "urgent",
+    "voice": "caller_male",
+    "scenario": "agency_call",
+    "node": "n3_otp",
+    "preset": "extra52"
+   },
+   "999b381d90fc1d5074ad956fabae0d61": {
+    "text": "방금 휴대폰으로 간 인증번호 6자리를 불러 주세요.",
+    "tone": "urgent",
+    "voice": "caller_male",
+    "scenario": "agency_call",
+    "node": "n3_otp",
+    "preset": "extra52"
+   },
+   "9fafef37e2b8033b45bb1fe30f9a3257": {
+    "text": "본인 확인만 하는 겁니다. 인증번호를 안 주시면 계좌가 바로 정지됩니다.",
+    "tone": "threat",
+    "voice": "caller_male",
+    "scenario": "agency_call",
+    "node": "n3_otp",
+    "preset": "extra52"
+   },
+   "b69e1467ba1ee12da73bb2cb12cffcca": {
+    "text": "어르신 명의 농협 계좌의 돈이 범죄 자금과 섞여 있습니다.",
+    "tone": "official",
+    "voice": "caller_male",
+    "scenario": "agency_call",
+    "node": "n4_transfer",
+    "preset": "extra52"
+   },
+   "819fb8193b0f4a4c9e00b56ae35ba132": {
+    "text": "금융감독원 안전 계좌로 옮겨 두시면 조사 뒤 바로 돌려드립니다. 그 전에 보안 앱부터 설치하세요.",
+    "tone": "official",
+    "voice": "caller_male",
+    "scenario": "agency_call",
+    "node": "n4_transfer",
+    "preset": "extra52"
+   },
+   "340dfd5577b86d9944e55d300a73f15c": {
+    "text": "오늘 안 옮기시면 계좌가 동결돼 돈을 못 찾습니다. 은행 직원이 물으면 가족에게 보낸다고만 하세요.",
+    "tone": "urgent",
+    "voice": "caller_male",
+    "scenario": "agency_call",
+    "node": "n4_transfer",
+    "preset": "extra52"
+   },
+   "12320c18fbaf3a6764015eb4cc873283": {
+    "text": "[Web발신] 고객님 택배가 주소 불일치로 보류되었습니다.",
+    "tone": "official",
+    "voice": "caller_male",
+    "scenario": "delivery_sms",
+    "node": "n1_parcel",
+    "preset": "extra52"
+   },
+   "a10f5147664b40f1a40cf575a4a99158": {
+    "text": "아래에서 주소를 확인해 주세요.",
+    "tone": "official",
+    "voice": "caller_male",
+    "scenario": "delivery_sms",
+    "node": "n1_parcel",
+    "preset": "extra52"
+   },
+   "3848ddc2d0ebc37370fe40e37de46e51": {
+    "text": "[Web발신] 오늘 안에 확인하지 않으면 반송 처리됩니다.",
+    "tone": "urgent",
+    "voice": "caller_male",
+    "scenario": "delivery_sms",
+    "node": "n1_parcel",
+    "preset": "extra52"
+   },
+   "6883338da0a850921417b54b18b6f7aa": {
+    "text": "[Web발신] 농협 카드 발급이 완료되어 오늘 배송 예정입니다.",
+    "tone": "official",
+    "voice": "caller_male",
+    "scenario": "delivery_sms",
+    "node": "n2_card",
+    "preset": "extra52"
+   },
+   "ef9e5895fe15950164b1aafd18ddf4b5": {
+    "text": "본인이 신청하지 않았다면 카드 배송 상담 010-0000-5821로 연락 주세요.",
+    "tone": "official",
+    "voice": "caller_male",
+    "scenario": "delivery_sms",
+    "node": "n2_card",
+    "preset": "extra52"
+   },
+   "5b0a29026b12a4679bac842557bf4ecd": {
+    "text": "[Web발신] 명의도용이 의심됩니다. 지금 바로 상담 번호로 연락하셔야 합니다.",
+    "tone": "urgent",
+    "voice": "caller_male",
+    "scenario": "delivery_sms",
+    "node": "n2_card",
+    "preset": "extra52"
+   },
+   "7145d3096f053098f39084e7df68923c": {
+    "text": "명의도용을 막으려면 '명의보호' 앱을 설치해 주세요.",
+    "tone": "friendly",
+    "voice": "caller_male",
+    "scenario": "delivery_sms",
+    "node": "n3_apk",
+    "preset": "extra52"
+   },
+   "ade1f235ad0933b9884149e86dd34dc3": {
+    "text": "설치할 때 '출처를 알 수 없는 앱' 허용을 눌러 주시면 됩니다.",
+    "tone": "friendly",
+    "voice": "caller_male",
+    "scenario": "delivery_sms",
+    "node": "n3_apk",
+    "preset": "extra52"
+   },
+   "056144c2cbc9c1d5b73d813b25705c47": {
+    "text": "어려우시면 제가 하나씩 알려 드릴게요. 금방 끝납니다.",
+    "tone": "urgent",
+    "voice": "caller_male",
+    "scenario": "delivery_sms",
+    "node": "n3_apk",
+    "preset": "extra52"
+   },
+   "95a065182aca42a426de5aaf239b1651": {
+    "text": "앱이 어려우시면 본인 확인만 하겠습니다.",
+    "tone": "urgent",
+    "voice": "caller_male",
+    "scenario": "delivery_sms",
+    "node": "n4_card_info",
+    "preset": "extra52"
+   },
+   "6793d3cac7dd6a252f40184750932690": {
+    "text": "카드 번호와 비밀번호 앞 두 자리를 불러 주세요.",
+    "tone": "urgent",
+    "voice": "caller_male",
+    "scenario": "delivery_sms",
+    "node": "n4_card_info",
+    "preset": "extra52"
+   },
+   "d0ac950faf58ee7b5e5f19fc8c42cd2f": {
+    "text": "확인이 안 되면 카드가 정지되고 명의도용 피해를 보실 수 있습니다.",
+    "tone": "threat",
+    "voice": "caller_male",
+    "scenario": "delivery_sms",
+    "node": "n4_card_info",
+    "preset": "extra52"
+   },
+   "ff8c5c75fba80d3d2d1a37455cc42f2d": {
+    "text": "나 폰 액정 깨져서 수리 맡겼어ㅠㅠ",
+    "tone": "tremble",
+    "voice": "caller_male",
+    "scenario": "family_messenger",
+    "node": "n1_newnum",
+    "preset": "extra52"
+   },
+   "46c4f0883197735d9ffe6da62d9c11c7": {
+    "text": "이거 임시 번호야. 저장해 줘!",
+    "tone": "tremble",
+    "voice": "caller_male",
+    "scenario": "family_messenger",
+    "node": "n1_newnum",
+    "preset": "extra52"
+   },
+   "8de1fe2aeaddf46f3e79cb9ce7abb2d7": {
+    "text": "나 맞다니까ㅠ 수리점이라 통화가 안 돼. 문자로만 얘기하자.",
+    "tone": "urgent",
+    "voice": "caller_male",
+    "scenario": "family_messenger",
+    "node": "n1_newnum",
+    "preset": "extra52"
+   },
+   "be3e5f35ecf91bd61f2ab286c0e92c72": {
+    "text": "급하게 결제할 게 있는데 내 폰으로는 본인인증이 안 돼ㅠ",
+    "tone": "urgent",
+    "voice": "caller_male",
+    "scenario": "family_messenger",
+    "node": "n2_auth",
+    "preset": "extra52"
+   },
+   "0e558701bfb392d3cdf330e821606c9c": {
+    "text": "그쪽 폰으로 인증번호 하나 갈 거야. 그것만 알려 줘",
+    "tone": "urgent",
+    "voice": "caller_male",
+    "scenario": "family_messenger",
+    "node": "n2_auth",
+    "preset": "extra52"
+   },
+   "00c2c90344332d24add9000f5cb25ca4": {
+    "text": "지금 설명할 시간이 없어ㅠ 결제 끝나면 다 말해 줄게.",
+    "tone": "sob",
+    "voice": "caller_male",
+    "scenario": "family_messenger",
+    "node": "n2_auth",
+    "preset": "extra52"
+   },
+   "e19e0b01a512cea85abf6d2cca85357b": {
+    "text": "보험 처리하게 신분증 사진이랑 통장 비밀번호도 보내 줘",
+    "tone": "sob",
+    "voice": "caller_male",
+    "scenario": "family_messenger",
+    "node": "n3_secret",
+    "preset": "extra52"
+   },
+   "3b3f78aaa082050dc5f86e3ba6db46ed": {
+    "text": "작은아들한테는 말하지 마. 괜히 걱정하잖아ㅠ",
+    "tone": "sob",
+    "voice": "caller_male",
+    "scenario": "family_messenger",
+    "node": "n3_secret",
+    "preset": "extra43"
+   },
+   "44cee13015569f21712e0453ac64126f": {
+    "text": "나 못 믿는 거야? 진짜 서운하다ㅠㅠ 빨리 좀 해 줘.",
+    "tone": "sob",
+    "voice": "caller_male",
+    "scenario": "family_messenger",
+    "node": "n3_secret",
+    "preset": "extra52"
+   },
+   "b0b743154a12b0b56d0e5b4c97e6623f": {
+    "text": "그럼 상품권 50만 원어치만 사서 번호 보내 줘",
+    "tone": "urgent",
+    "voice": "caller_male",
+    "scenario": "family_messenger",
+    "node": "n4_gift",
+    "preset": "extra52"
+   },
+   "a755ebcf87f5a87fbc4da58d703636bc": {
+    "text": "아니면 이 앱 깔아 주면 내가 알아서 할게!",
+    "tone": "urgent",
+    "voice": "caller_male",
+    "scenario": "family_messenger",
+    "node": "n4_gift",
+    "preset": "extra52"
+   },
+   "b77814a1072d57e9aada4c1b637c266d": {
+    "text": "진짜 급하다니까ㅠ 10분 안에 안 하면 큰일 나.",
+    "tone": "urgent",
+    "voice": "caller_male",
+    "scenario": "family_messenger",
+    "node": "n4_gift",
+    "preset": "extra52"
+   },
+   "7bab02f3c96a7c856bd8d5c1356c7221": {
+    "text": "여보세요, 선생님. 서울중앙지검 첨단범죄수사팀 수사관 김민수입니다.",
+    "tone": "official",
+    "voice": "caller_male",
+    "scenario": "agency_call",
+    "node": "n1_intro",
+    "preset": "extra11"
+   },
+   "da9d909a9c462ae43ae0a63ed8944fe9": {
+    "text": "선생님 명의로 된 국민은행 계좌가 금융범죄에 쓰여 연락드렸습니다. 지금 통화 괜찮으시죠?",
+    "tone": "official",
+    "voice": "caller_male",
+    "scenario": "agency_call",
+    "node": "n1_intro",
+    "preset": "extra1"
+   },
+   "d2bb8942080e1e4e8fb0966422e28b61": {
+    "text": "딸에게도, 다른 가족에게도 절대 말씀하시면 안 됩니다. 조사가 끝날 때까지 근처 모텔 같은 숙소로 혼자 가 계세요.",
+    "tone": "threat",
+    "voice": "caller_male",
+    "scenario": "agency_call",
+    "node": "n2_fear",
+    "preset": "extra49"
+   },
+   "abfeb7d0d2fddd58cca97461e077103f": {
+    "text": "선생님 본인이 맞는지 확인하겠습니다.",
+    "tone": "urgent",
+    "voice": "caller_male",
+    "scenario": "agency_call",
+    "node": "n3_otp",
+    "preset": "extra11"
+   },
+   "de4c14be9a43512c57320d6458b60f35": {
+    "text": "선생님 명의 국민은행 계좌의 돈이 범죄 자금과 섞여 있습니다.",
+    "tone": "official",
+    "voice": "caller_male",
+    "scenario": "agency_call",
+    "node": "n4_transfer",
+    "preset": "extra1"
+   },
+   "9ff85dfbd5c6752a7ea9f8261ad679e4": {
+    "text": "[Web발신] 국민은행 카드 발급이 완료되어 오늘 배송 예정입니다.",
+    "tone": "official",
+    "voice": "caller_male",
+    "scenario": "delivery_sms",
+    "node": "n2_card",
+    "preset": "extra13"
+   },
+   "33971e41a19d35c5d4874dceb0d26707": {
+    "text": "다른 가족한테는 말하지 마. 괜히 걱정하잖아ㅠ",
+    "tone": "sob",
+    "voice": "caller_male",
+    "scenario": "family_messenger",
+    "node": "n3_secret",
+    "preset": "extra51"
+   },
+   "ad7c7c0e114edaa6610ea8c679ebadbd": {
+    "text": "여보세요, 어르신. 광주지검 첨단범죄수사팀 수사관 김민수입니다.",
+    "tone": "official",
+    "voice": "caller_male",
+    "scenario": "agency_call",
+    "node": "n1_intro",
+    "preset": "extra37"
+   },
+   "944a54e2257c747f7d2b7a98d4f81c9f": {
+    "text": "어르신 명의로 된 우체국 계좌가 금융범죄에 쓰여 연락드렸습니다. 지금 통화 괜찮으시죠?",
+    "tone": "official",
+    "voice": "caller_male",
+    "scenario": "agency_call",
+    "node": "n1_intro",
+    "preset": "extra18"
+   },
+   "b7c2e5b514e4b8251e41b787eb688e83": {
+    "text": "손주에게도, 다른 가족에게도 절대 말씀하시면 안 됩니다. 조사가 끝날 때까지 근처 모텔 같은 숙소로 혼자 가 계세요.",
+    "tone": "threat",
+    "voice": "caller_male",
+    "scenario": "agency_call",
+    "node": "n2_fear",
+    "preset": "extra47"
+   },
+   "e2dc6ab0aa81f49f1446255b00eb5ebd": {
+    "text": "어르신 명의 우체국 계좌의 돈이 범죄 자금과 섞여 있습니다.",
+    "tone": "official",
+    "voice": "caller_male",
+    "scenario": "agency_call",
+    "node": "n4_transfer",
+    "preset": "extra18"
+   },
+   "4ab75c51afff40567842a6d18d7499f0": {
+    "text": "[Web발신] 우체국 카드 발급이 완료되어 오늘 배송 예정입니다.",
+    "tone": "official",
+    "voice": "caller_male",
+    "scenario": "delivery_sms",
+    "node": "n2_card",
+    "preset": "extra18"
+   },
+   "b844df0d6bb0312cd6dbf64e8fa6b799": {
+    "text": "며느리한테는 말하지 마. 괜히 걱정하잖아ㅠ",
+    "tone": "sob",
+    "voice": "caller_male",
+    "scenario": "family_messenger",
+    "node": "n3_secret",
+    "preset": "extra52"
+   },
+   "dc248338e52fa44f27dd531dce875035": {
+    "text": "선생님 명의로 된 농협 계좌가 금융범죄에 쓰여 연락드렸습니다. 지금 통화 괜찮으시죠?",
+    "tone": "official",
+    "voice": "caller_male",
+    "scenario": "agency_call",
+    "node": "n1_intro",
+    "preset": "extra0"
+   },
+   "53322639204745713a293c485a305060": {
+    "text": "아들에게도, 다른 가족에게도 절대 말씀하시면 안 됩니다. 조사가 끝날 때까지 근처 모텔 같은 숙소로 혼자 가 계세요.",
+    "tone": "threat",
+    "voice": "caller_male",
+    "scenario": "agency_call",
+    "node": "n2_fear",
+    "preset": "extra48"
+   },
+   "ff2c1ef82336d46354ed6aa588320426": {
+    "text": "선생님 명의 농협 계좌의 돈이 범죄 자금과 섞여 있습니다.",
+    "tone": "official",
+    "voice": "caller_male",
+    "scenario": "agency_call",
+    "node": "n4_transfer",
+    "preset": "extra0"
+   },
+   "0ec6716411ff8b3515d7023e4a2fdccf": {
+    "text": "선생님 명의로 된 신한은행 계좌가 금융범죄에 쓰여 연락드렸습니다. 지금 통화 괜찮으시죠?",
+    "tone": "official",
+    "voice": "caller_male",
+    "scenario": "agency_call",
+    "node": "n1_intro",
+    "preset": "extra2"
+   },
+   "7b0fc62916bcde371a501fb64d3c0eda": {
+    "text": "선생님 명의 신한은행 계좌의 돈이 범죄 자금과 섞여 있습니다.",
+    "tone": "official",
+    "voice": "caller_male",
+    "scenario": "agency_call",
+    "node": "n4_transfer",
+    "preset": "extra2"
+   },
+   "674e7e9e8bf575b6b0bdee0832b43bc8": {
+    "text": "[Web발신] 신한은행 카드 발급이 완료되어 오늘 배송 예정입니다.",
+    "tone": "official",
+    "voice": "caller_male",
+    "scenario": "delivery_sms",
+    "node": "n2_card",
+    "preset": "extra14"
+   },
+   "aa9065a8c3b01e5ecb9308ab51a07878": {
+    "text": "선생님 명의로 된 우리은행 계좌가 금융범죄에 쓰여 연락드렸습니다. 지금 통화 괜찮으시죠?",
+    "tone": "official",
+    "voice": "caller_male",
+    "scenario": "agency_call",
+    "node": "n1_intro",
+    "preset": "extra3"
+   },
+   "cd95eec4f55ab7e88b6659b5c1575364": {
+    "text": "선생님 명의 우리은행 계좌의 돈이 범죄 자금과 섞여 있습니다.",
+    "tone": "official",
+    "voice": "caller_male",
+    "scenario": "agency_call",
+    "node": "n4_transfer",
+    "preset": "extra3"
+   },
+   "670499bd0a722706f7e4db8c737b7c1d": {
+    "text": "[Web발신] 우리은행 카드 발급이 완료되어 오늘 배송 예정입니다.",
+    "tone": "official",
+    "voice": "caller_male",
+    "scenario": "delivery_sms",
+    "node": "n2_card",
+    "preset": "extra15"
+   },
+   "e8f6d09246e78d736c351655657e1ff5": {
+    "text": "선생님 명의로 된 하나은행 계좌가 금융범죄에 쓰여 연락드렸습니다. 지금 통화 괜찮으시죠?",
+    "tone": "official",
+    "voice": "caller_male",
+    "scenario": "agency_call",
+    "node": "n1_intro",
+    "preset": "extra4"
+   },
+   "280cb86778c0c84275595756559a6754": {
+    "text": "선생님 명의 하나은행 계좌의 돈이 범죄 자금과 섞여 있습니다.",
+    "tone": "official",
+    "voice": "caller_male",
+    "scenario": "agency_call",
+    "node": "n4_transfer",
+    "preset": "extra4"
+   },
+   "4a9a7a71c020064d4caaf166240566d1": {
+    "text": "[Web발신] 하나은행 카드 발급이 완료되어 오늘 배송 예정입니다.",
+    "tone": "official",
+    "voice": "caller_male",
+    "scenario": "delivery_sms",
+    "node": "n2_card",
+    "preset": "extra16"
+   },
+   "33de709edf2bf99aea1b056bd21b190f": {
+    "text": "선생님 명의로 된 기업은행 계좌가 금융범죄에 쓰여 연락드렸습니다. 지금 통화 괜찮으시죠?",
+    "tone": "official",
+    "voice": "caller_male",
+    "scenario": "agency_call",
+    "node": "n1_intro",
+    "preset": "extra5"
+   },
+   "962a931d77220cf953c12c80b7e7d311": {
+    "text": "선생님 명의 기업은행 계좌의 돈이 범죄 자금과 섞여 있습니다.",
+    "tone": "official",
+    "voice": "caller_male",
+    "scenario": "agency_call",
+    "node": "n4_transfer",
+    "preset": "extra5"
+   },
+   "e59cec7483fd1b03c0c3dd9b551fb056": {
+    "text": "[Web발신] 기업은행 카드 발급이 완료되어 오늘 배송 예정입니다.",
+    "tone": "official",
+    "voice": "caller_male",
+    "scenario": "delivery_sms",
+    "node": "n2_card",
+    "preset": "extra17"
+   },
+   "5ec975931a13da9588553967c5bd4ea5": {
+    "text": "선생님 명의로 된 우체국 계좌가 금융범죄에 쓰여 연락드렸습니다. 지금 통화 괜찮으시죠?",
+    "tone": "official",
+    "voice": "caller_male",
+    "scenario": "agency_call",
+    "node": "n1_intro",
+    "preset": "extra6"
+   },
+   "f50a1238263fba2c78dc5b0abc0ea8ae": {
+    "text": "선생님 명의 우체국 계좌의 돈이 범죄 자금과 섞여 있습니다.",
+    "tone": "official",
+    "voice": "caller_male",
+    "scenario": "agency_call",
+    "node": "n4_transfer",
+    "preset": "extra6"
+   },
+   "855bdd070f6230c6b0651f2a11f7a97c": {
+    "text": "선생님 명의로 된 새마을금고 계좌가 금융범죄에 쓰여 연락드렸습니다. 지금 통화 괜찮으시죠?",
+    "tone": "official",
+    "voice": "caller_male",
+    "scenario": "agency_call",
+    "node": "n1_intro",
+    "preset": "extra7"
+   },
+   "6c525950ac6116a6941e5084acd75b4a": {
+    "text": "선생님 명의 새마을금고 계좌의 돈이 범죄 자금과 섞여 있습니다.",
+    "tone": "official",
+    "voice": "caller_male",
+    "scenario": "agency_call",
+    "node": "n4_transfer",
+    "preset": "extra7"
+   },
+   "7dc8a309a5801b49fd833c23cc2fcbf5": {
+    "text": "[Web발신] 새마을금고 카드 발급이 완료되어 오늘 배송 예정입니다.",
+    "tone": "official",
+    "voice": "caller_male",
+    "scenario": "delivery_sms",
+    "node": "n2_card",
+    "preset": "extra19"
+   },
+   "539ea82cb8deb6dfa386c77463518b42": {
+    "text": "선생님 명의로 된 카카오뱅크 계좌가 금융범죄에 쓰여 연락드렸습니다. 지금 통화 괜찮으시죠?",
+    "tone": "official",
+    "voice": "caller_male",
+    "scenario": "agency_call",
+    "node": "n1_intro",
+    "preset": "extra8"
+   },
+   "f78903edd4f1dadf5b9914d56e17d00d": {
+    "text": "선생님 명의 카카오뱅크 계좌의 돈이 범죄 자금과 섞여 있습니다.",
+    "tone": "official",
+    "voice": "caller_male",
+    "scenario": "agency_call",
+    "node": "n4_transfer",
+    "preset": "extra8"
+   },
+   "826498d4b5479637b9c94d5bc5acc1d9": {
+    "text": "[Web발신] 카카오뱅크 카드 발급이 완료되어 오늘 배송 예정입니다.",
+    "tone": "official",
+    "voice": "caller_male",
+    "scenario": "delivery_sms",
+    "node": "n2_card",
+    "preset": "extra20"
+   },
+   "fc8ba16938ae81528652c74f1fa7cc7d": {
+    "text": "선생님 명의로 된 농협은행 계좌가 금융범죄에 쓰여 연락드렸습니다. 지금 통화 괜찮으시죠?",
+    "tone": "official",
+    "voice": "caller_male",
+    "scenario": "agency_call",
+    "node": "n1_intro",
+    "preset": "extra9"
+   },
+   "f8c0f5c21dbca19cf5edca4ec474d01e": {
+    "text": "선생님 명의 농협은행 계좌의 돈이 범죄 자금과 섞여 있습니다.",
+    "tone": "official",
+    "voice": "caller_male",
+    "scenario": "agency_call",
+    "node": "n4_transfer",
+    "preset": "extra9"
+   },
+   "45d5b8fecfdb75521b050fadfa2524db": {
+    "text": "[Web발신] 농협은행 카드 발급이 완료되어 오늘 배송 예정입니다.",
+    "tone": "official",
+    "voice": "caller_male",
+    "scenario": "delivery_sms",
+    "node": "n2_card",
+    "preset": "extra21"
+   },
+   "f0af78791b573d9f16c29c51d87be154": {
+    "text": "선생님 명의로 된 신협 계좌가 금융범죄에 쓰여 연락드렸습니다. 지금 통화 괜찮으시죠?",
+    "tone": "official",
+    "voice": "caller_male",
+    "scenario": "agency_call",
+    "node": "n1_intro",
+    "preset": "extra10"
+   },
+   "3b8bb278a22a170c94c24e55b243091c": {
+    "text": "선생님 명의 신협 계좌의 돈이 범죄 자금과 섞여 있습니다.",
+    "tone": "official",
+    "voice": "caller_male",
+    "scenario": "agency_call",
+    "node": "n4_transfer",
+    "preset": "extra10"
+   },
+   "1ebfb3307b8bdd4294cb4852c252535b": {
+    "text": "[Web발신] 신협 카드 발급이 완료되어 오늘 배송 예정입니다.",
+    "tone": "official",
+    "voice": "caller_male",
+    "scenario": "delivery_sms",
+    "node": "n2_card",
+    "preset": "extra22"
+   },
+   "eeaa8aa3faa1b1c81ca3ff4b3dc299cc": {
+    "text": "선생님 명의로 된 SC제일은행 계좌가 금융범죄에 쓰여 연락드렸습니다. 지금 통화 괜찮으시죠?",
+    "tone": "official",
+    "voice": "caller_male",
+    "scenario": "agency_call",
+    "node": "n1_intro",
+    "preset": "extra11"
+   },
+   "8af73a1f21eeef77aa403ef11dcad744": {
+    "text": "선생님 명의 SC제일은행 계좌의 돈이 범죄 자금과 섞여 있습니다.",
+    "tone": "official",
+    "voice": "caller_male",
+    "scenario": "agency_call",
+    "node": "n4_transfer",
+    "preset": "extra11"
+   },
+   "5ff31b11abe554e351e3cc340e633a6f": {
+    "text": "[Web발신] SC제일은행 카드 발급이 완료되어 오늘 배송 예정입니다.",
+    "tone": "official",
+    "voice": "caller_male",
+    "scenario": "delivery_sms",
+    "node": "n2_card",
+    "preset": "extra23"
+   },
+   "5ff3978323179427a6f055208d6ab4b1": {
+    "text": "여보세요, 어르신. 서울중앙지검 첨단범죄수사팀 수사관 김민수입니다.",
+    "tone": "official",
+    "voice": "caller_male",
+    "scenario": "agency_call",
+    "node": "n1_intro",
+    "preset": "extra52"
+   },
+   "284b8a5be47701354f790ee8a7b6ad63": {
+    "text": "어르신 명의로 된 국민은행 계좌가 금융범죄에 쓰여 연락드렸습니다. 지금 통화 괜찮으시죠?",
+    "tone": "official",
+    "voice": "caller_male",
+    "scenario": "agency_call",
+    "node": "n1_intro",
+    "preset": "extra13"
+   },
+   "b8bf8c5a37c406c8a97a1cef482ec91d": {
+    "text": "어르신 명의 국민은행 계좌의 돈이 범죄 자금과 섞여 있습니다.",
+    "tone": "official",
+    "voice": "caller_male",
+    "scenario": "agency_call",
+    "node": "n4_transfer",
+    "preset": "extra13"
+   },
+   "9a5fbd21e3a2d2e6c13d497e1dd35049": {
+    "text": "어르신 명의로 된 신한은행 계좌가 금융범죄에 쓰여 연락드렸습니다. 지금 통화 괜찮으시죠?",
+    "tone": "official",
+    "voice": "caller_male",
+    "scenario": "agency_call",
+    "node": "n1_intro",
+    "preset": "extra14"
+   },
+   "7312d303c4d744b4557a86139948ae3e": {
+    "text": "어르신 명의 신한은행 계좌의 돈이 범죄 자금과 섞여 있습니다.",
+    "tone": "official",
+    "voice": "caller_male",
+    "scenario": "agency_call",
+    "node": "n4_transfer",
+    "preset": "extra14"
+   },
+   "d2a25c41f5926926f0fc68bb0e481142": {
+    "text": "어르신 명의로 된 우리은행 계좌가 금융범죄에 쓰여 연락드렸습니다. 지금 통화 괜찮으시죠?",
+    "tone": "official",
+    "voice": "caller_male",
+    "scenario": "agency_call",
+    "node": "n1_intro",
+    "preset": "extra15"
+   },
+   "fb65a7153408eaa449aed84bb5cba197": {
+    "text": "어르신 명의 우리은행 계좌의 돈이 범죄 자금과 섞여 있습니다.",
+    "tone": "official",
+    "voice": "caller_male",
+    "scenario": "agency_call",
+    "node": "n4_transfer",
+    "preset": "extra15"
+   },
+   "f3d85cfb8833472ba687032ed13a343b": {
+    "text": "어르신 명의로 된 하나은행 계좌가 금융범죄에 쓰여 연락드렸습니다. 지금 통화 괜찮으시죠?",
+    "tone": "official",
+    "voice": "caller_male",
+    "scenario": "agency_call",
+    "node": "n1_intro",
+    "preset": "extra16"
+   },
+   "17e64c4e73dd4b72ef1d6c1e02d85173": {
+    "text": "어르신 명의 하나은행 계좌의 돈이 범죄 자금과 섞여 있습니다.",
+    "tone": "official",
+    "voice": "caller_male",
+    "scenario": "agency_call",
+    "node": "n4_transfer",
+    "preset": "extra16"
+   },
+   "5f0d38a4e24eccff43b361a22b11907a": {
+    "text": "어르신 명의로 된 기업은행 계좌가 금융범죄에 쓰여 연락드렸습니다. 지금 통화 괜찮으시죠?",
+    "tone": "official",
+    "voice": "caller_male",
+    "scenario": "agency_call",
+    "node": "n1_intro",
+    "preset": "extra17"
+   },
+   "6874325b447e2ec86e66eebefdef9f49": {
+    "text": "어르신 명의 기업은행 계좌의 돈이 범죄 자금과 섞여 있습니다.",
+    "tone": "official",
+    "voice": "caller_male",
+    "scenario": "agency_call",
+    "node": "n4_transfer",
+    "preset": "extra17"
+   },
+   "908b1645d0281a3419ff6d87b4b90146": {
+    "text": "어르신 명의로 된 새마을금고 계좌가 금융범죄에 쓰여 연락드렸습니다. 지금 통화 괜찮으시죠?",
+    "tone": "official",
+    "voice": "caller_male",
+    "scenario": "agency_call",
+    "node": "n1_intro",
+    "preset": "extra19"
+   },
+   "9e5e67201cbde499e2ea311fe13babd0": {
+    "text": "어르신 명의 새마을금고 계좌의 돈이 범죄 자금과 섞여 있습니다.",
+    "tone": "official",
+    "voice": "caller_male",
+    "scenario": "agency_call",
+    "node": "n4_transfer",
+    "preset": "extra19"
+   },
+   "321589f9db4a7b3846f7da27df12e7c6": {
+    "text": "어르신 명의로 된 카카오뱅크 계좌가 금융범죄에 쓰여 연락드렸습니다. 지금 통화 괜찮으시죠?",
+    "tone": "official",
+    "voice": "caller_male",
+    "scenario": "agency_call",
+    "node": "n1_intro",
+    "preset": "extra20"
+   },
+   "e5684e8f3dc058b0bed666961be74429": {
+    "text": "어르신 명의 카카오뱅크 계좌의 돈이 범죄 자금과 섞여 있습니다.",
+    "tone": "official",
+    "voice": "caller_male",
+    "scenario": "agency_call",
+    "node": "n4_transfer",
+    "preset": "extra20"
+   },
+   "828a3cfc59e0178e650ae1e5e1c765e7": {
+    "text": "어르신 명의로 된 농협은행 계좌가 금융범죄에 쓰여 연락드렸습니다. 지금 통화 괜찮으시죠?",
+    "tone": "official",
+    "voice": "caller_male",
+    "scenario": "agency_call",
+    "node": "n1_intro",
+    "preset": "extra21"
+   },
+   "5cc6da0a7c5b65d9683d02abdfaf2c0e": {
+    "text": "어르신 명의 농협은행 계좌의 돈이 범죄 자금과 섞여 있습니다.",
+    "tone": "official",
+    "voice": "caller_male",
+    "scenario": "agency_call",
+    "node": "n4_transfer",
+    "preset": "extra21"
+   },
+   "cbd43b21d49ca2e0cafe56efbf3038ce": {
+    "text": "어르신 명의로 된 신협 계좌가 금융범죄에 쓰여 연락드렸습니다. 지금 통화 괜찮으시죠?",
+    "tone": "official",
+    "voice": "caller_male",
+    "scenario": "agency_call",
+    "node": "n1_intro",
+    "preset": "extra22"
+   },
+   "192e3e5c1b5a1321995018b01adb651d": {
+    "text": "어르신 명의 신협 계좌의 돈이 범죄 자금과 섞여 있습니다.",
+    "tone": "official",
+    "voice": "caller_male",
+    "scenario": "agency_call",
+    "node": "n4_transfer",
+    "preset": "extra22"
+   },
+   "a28ea679ee1aad5777b9fbf3d3917171": {
+    "text": "어르신 명의로 된 SC제일은행 계좌가 금융범죄에 쓰여 연락드렸습니다. 지금 통화 괜찮으시죠?",
+    "tone": "official",
+    "voice": "caller_male",
+    "scenario": "agency_call",
+    "node": "n1_intro",
+    "preset": "extra23"
+   },
+   "51ab145a1d4c3723982a6f9f9f25d051": {
+    "text": "어르신 명의 SC제일은행 계좌의 돈이 범죄 자금과 섞여 있습니다.",
+    "tone": "official",
+    "voice": "caller_male",
+    "scenario": "agency_call",
+    "node": "n4_transfer",
+    "preset": "extra23"
+   },
+   "739a768ac24fbac7808f8b84b1c3810c": {
+    "text": "여보세요, 어르신. 부산지검 첨단범죄수사팀 수사관 김민수입니다.",
+    "tone": "official",
+    "voice": "caller_male",
+    "scenario": "agency_call",
+    "node": "n1_intro",
+    "preset": "extra25"
+   },
+   "44a765752428252a8d4a3bb14cac5b96": {
+    "text": "여보세요, 어르신. 인천지검 첨단범죄수사팀 수사관 김민수입니다.",
+    "tone": "official",
+    "voice": "caller_male",
+    "scenario": "agency_call",
+    "node": "n1_intro",
+    "preset": "extra27"
+   },
+   "d0a0da44f376b03b017d4975acb69a81": {
+    "text": "여보세요, 어르신. 대전지검 첨단범죄수사팀 수사관 김민수입니다.",
+    "tone": "official",
+    "voice": "caller_male",
+    "scenario": "agency_call",
+    "node": "n1_intro",
+    "preset": "extra35"
+   },
+   "81663e44ff0c37f47ff6fd723c0f9d8a": {
+    "text": "여보세요, 어르신. 울산지검 첨단범죄수사팀 수사관 김민수입니다.",
+    "tone": "official",
+    "voice": "caller_male",
+    "scenario": "agency_call",
+    "node": "n1_intro",
+    "preset": "extra30"
+   },
+   "104249d32f9d43afa996dd7191e54f2d": {
+    "text": "여보세요, 어르신. 수원지검 첨단범죄수사팀 수사관 김민수입니다.",
+    "tone": "official",
+    "voice": "caller_male",
+    "scenario": "agency_call",
+    "node": "n1_intro",
+    "preset": "extra32"
+   },
+   "c1f61444eb5a817a0454923bdca317cd": {
+    "text": "여보세요, 어르신. 춘천지검 첨단범죄수사팀 수사관 김민수입니다.",
+    "tone": "official",
+    "voice": "caller_male",
+    "scenario": "agency_call",
+    "node": "n1_intro",
+    "preset": "extra33"
+   },
+   "e4ca374e1c102395c4a66086adaa5c2f": {
+    "text": "여보세요, 어르신. 청주지검 첨단범죄수사팀 수사관 김민수입니다.",
+    "tone": "official",
+    "voice": "caller_male",
+    "scenario": "agency_call",
+    "node": "n1_intro",
+    "preset": "extra34"
+   },
+   "d1551b9bb382c257aa23254d7ef99649": {
+    "text": "여보세요, 어르신. 전주지검 첨단범죄수사팀 수사관 김민수입니다.",
+    "tone": "official",
+    "voice": "caller_male",
+    "scenario": "agency_call",
+    "node": "n1_intro",
+    "preset": "extra36"
+   },
+   "3ca666b97831c53a401c101a8ce57994": {
+    "text": "여보세요, 어르신. 창원지검 첨단범죄수사팀 수사관 김민수입니다.",
+    "tone": "official",
+    "voice": "caller_male",
+    "scenario": "agency_call",
+    "node": "n1_intro",
+    "preset": "extra39"
+   },
+   "cbdb4defd2594d9eb44507e94fc4d129": {
+    "text": "여보세요, 어르신. 제주지검 첨단범죄수사팀 수사관 김민수입니다.",
+    "tone": "official",
+    "voice": "caller_male",
+    "scenario": "agency_call",
+    "node": "n1_intro",
+    "preset": "extra40"
+   },
+   "b9dbea6e746064bb0b6ddba33db12553": {
+    "text": "딸한테는 말하지 마. 괜히 걱정하잖아ㅠ",
+    "tone": "sob",
+    "voice": "caller_male",
+    "scenario": "family_messenger",
+    "node": "n3_secret",
+    "preset": "extra44"
+   },
+   "6bbb3921abad16ce3f5f757d4ffa4175": {
+    "text": "아들한테는 말하지 마. 괜히 걱정하잖아ㅠ",
+    "tone": "sob",
+    "voice": "caller_male",
+    "scenario": "family_messenger",
+    "node": "n3_secret",
+    "preset": "extra45"
+   },
+   "6087a565da530c6f477e77bc75232ef8": {
+    "text": "큰딸에게도, 다른 가족에게도 절대 말씀하시면 안 됩니다. 조사가 끝날 때까지 근처 모텔 같은 숙소로 혼자 가 계세요.",
+    "tone": "threat",
+    "voice": "caller_male",
+    "scenario": "agency_call",
+    "node": "n2_fear",
+    "preset": "extra46"
+   },
+   "27688732b132a39d9dbc3a97b3305fd8": {
+    "text": "작은딸한테는 말하지 마. 괜히 걱정하잖아ㅠ",
+    "tone": "sob",
+    "voice": "caller_male",
+    "scenario": "family_messenger",
+    "node": "n3_secret",
+    "preset": "extra46"
+   },
+   "7e37185a683bd7feee9ae5a3f77e4601": {
+    "text": "사위한테는 말하지 마. 괜히 걱정하잖아ㅠ",
+    "tone": "sob",
+    "voice": "caller_male",
+    "scenario": "family_messenger",
+    "node": "n3_secret",
+    "preset": "extra49"
+   },
+   "e7054e1d4f1269d3535504f9a67975b2": {
+    "text": "막내아들에게도, 다른 가족에게도 절대 말씀하시면 안 됩니다. 조사가 끝날 때까지 근처 모텔 같은 숙소로 혼자 가 계세요.",
+    "tone": "threat",
+    "voice": "caller_male",
+    "scenario": "agency_call",
+    "node": "n2_fear",
+    "preset": "extra50"
+   },
+   "04f7cdfe3504d31a6eadcfcb286a383f": {
+    "text": "막내딸에게도, 다른 가족에게도 절대 말씀하시면 안 됩니다. 조사가 끝날 때까지 근처 모텔 같은 숙소로 혼자 가 계세요.",
+    "tone": "threat",
+    "voice": "caller_male",
+    "scenario": "agency_call",
+    "node": "n2_fear",
+    "preset": "extra51"
+   }
+  },
+  "seconds": 476
+ },
+ "judge": {
+  "made_at": "2026-11-01 10:32 KST",
+  "count": 138,
+  "model": "kakaocorp/kanana-1.5-8b-instruct-2505 fp8 (vLLM)",
+  "gpu": "Modal NVIDIA L40S",
+  "new_this_run": 0,
+  "agree_with_label_this_run": "0/0",
+  "sources": [
+   "graph choice texts × 3 presets → the graph's own grade/intent (48, source=graph-choice)",
+   "eval/demo_answers.csv (37) and eval/judge_holdout.csv (60) → GPU LLM (90 unique, source=gpu-llm)"
+  ],
+  "agree_with_label": {
+   "judge_holdout_llm_only": "48/60",
+   "graph_choices_llm_only_before_replacing": "35/36"
+  }
+ },
+ "video": {
+  "files": [
+   "video/son_accident.mp4",
+   "video/daughter_deposit.mp4"
+  ],
+  "size": "768x768, 27.7 s / 28.5 s, 'AI 생성' label",
+  "models": "Z-Image-Turbo face + EchoMimicV3 flash-pro, Qwen3-TTS voice (family/family_female, rate 5.0)",
+  "gpu": "Modal NVIDIA L40S",
+  "faces": "synthetic, not real people",
+  "code": "gpu/face.py, gpu/video.py, gpu/deepfake_presets.py",
+  "committed": false
+ }
+}

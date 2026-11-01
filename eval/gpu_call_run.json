@@ -1,0 +1,175 @@
+{
+ "tts": [
+  {
+   "scene": 1,
+   "node": "n1_intro",
+   "tone": "official",
+   "chars": 35,
+   "status": 200,
+   "wall_ms": 7053,
+   "server_ms": "7049",
+   "type": "audio/wav",
+   "audio_s": 4.66,
+   "file": "tts_1_0_official.wav"
+  },
+  {
+   "scene": 1,
+   "node": "n1_intro",
+   "tone": "official",
+   "chars": 47,
+   "status": 200,
+   "wall_ms": 8612,
+   "server_ms": "8606",
+   "type": "audio/wav",
+   "audio_s": 6.05,
+   "file": "tts_1_1_official.wav"
+  },
+  {
+   "scene": 2,
+   "node": "n1_intro",
+   "tone": "threat",
+   "chars": 44,
+   "status": 200,
+   "wall_ms": 15608,
+   "server_ms": "15603",
+   "type": "audio/wav",
+   "audio_s": 5.17,
+   "file": "tts_2_0_threat.wav"
+  },
+  {
+   "scene": 3,
+   "node": "n2_fear",
+   "tone": "threat",
+   "chars": 29,
+   "status": 200,
+   "wall_ms": 13007,
+   "server_ms": "12998",
+   "type": "audio/wav",
+   "audio_s": 3.44,
+   "file": "tts_3_0_threat.wav"
+  },
+  {
+   "scene": 3,
+   "node": "n2_fear",
+   "tone": "threat",
+   "chars": 66,
+   "status": 200,
+   "wall_ms": 14118,
+   "server_ms": "14108",
+   "type": "audio/wav",
+   "audio_s": 7.35,
+   "file": "tts_3_1_threat.wav"
+  }
+ ],
+ "stt": [
+  {
+   "n": 1,
+   "said": "아이고, 갑자기 그런 말씀을 하시니 너무 당황스럽네요.",
+   "audio_s": 4.19,
+   "status": 200,
+   "wall_ms": 7205,
+   "heard": "아이고, 갑자기 그런 말씀을 하시니 너무 당황스럽네요.",
+   "server_ms": 7200
+  },
+  {
+   "n": 2,
+   "said": "그 검찰청이 어디라고요? 사건 번호가 뭔데요?",
+   "audio_s": 3.5,
+   "status": 200,
+   "wall_ms": 10888,
+   "heard": "그 검찰청이 어디라고요? 사건 번호가 뭔데요?",
+   "server_ms": 10882
+  },
+  {
+   "n": 3,
+   "said": "일단 전화 끊고 검찰청 대표번호로 제가 직접 확인해 볼게요.",
+   "audio_s": 4.61,
+   "status": 200,
+   "wall_ms": 1840,
+   "heard": "일단 전화 끊고 검찰청 대표 번호로 제가 직접 확인해 볼게요.",
+   "server_ms": 1834
+  }
+ ],
+ "turns": [
+  {
+   "n": 1,
+   "status": 200,
+   "wall_ms": 2179,
+   "keys": [
+    "judge",
+    "scene",
+    "status"
+   ]
+  },
+  {
+   "n": 2,
+   "status": 200,
+   "wall_ms": 12,
+   "keys": [
+    "judge",
+    "scene",
+    "status"
+   ]
+  },
+  {
+   "n": 3,
+   "status": 200,
+   "wall_ms": 13,
+   "keys": [
+    "closing",
+    "judge",
+    "status",
+    "terminal"
+   ]
+  }
+ ],
+ "started": "08:53:15",
+ "caps": {
+  "llm": "gpu",
+  "tts": true,
+  "stt": true
+ },
+ "session_id": "c25d7dd15ee54d0991e1ea85af44d827",
+ "after_turns": {
+  "status": "closing",
+  "terminal": {
+   "id": "t_safe",
+   "type": "safe",
+   "loss": null,
+   "by": "user",
+   "message": "잘하셨어요. 전화를 끊고 직접 찾은 번호로 확인하면 이 수법은 더 나아가지 못해요."
+  }
+ },
+ "closing": {
+  "status": 200,
+  "options": [
+   "k1",
+   "k2",
+   "k3"
+  ]
+ },
+ "result": {
+  "status": "done",
+  "score": {
+   "total": 75,
+   "band": "보통",
+   "breakdown": {
+    "알아차림": 15,
+    "정보지킴": 30,
+    "확인행동": 25,
+    "대응속도": 5
+   },
+   "max": {
+    "알아차림": 30,
+    "정보지킴": 30,
+    "확인행동": 25,
+    "대응속도": 15
+   },
+   "scenes_visited": 2,
+   "first_safe_scene": 2,
+   "leaks": []
+  },
+  "terminal": "safe"
+ },
+ "finished": "08:54:39"
+}

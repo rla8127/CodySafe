@@ -1,0 +1,287 @@
+"""CodySafe voice on Modal: STT (faster-whisper large-v3-turbo) + TTS (Qwen3-TTS 1.7B VoiceDesign).
+
+One app, one GPU container, FastAPI with Bearer auth (same token as the LLM, Secret `codysafe-gpu`).
+
+Deploy:   modal deploy gpu/voice.py
+Prefill:  modal run gpu/voice.py::download
+
+POST /stt   multipart `file` (wav/webm/m4a/mp3), optional `language` (default ko), `model` ignored
+            -> {"text": str, "duration_s": float, "elapsed_s": float}
+POST /tts   JSON {"text"|"input": str, "voice": caller_male|caller_female|family (else caller_male),
+                  "format"|"response_format": "wav", "emotion"?: str, "instruct"?: str}
+            -> audio/wav bytes
+GET  /health -> {"ok": true, "model": str}   (no auth)
+GET  /gpu    -> GPU memory numbers (auth), for eval/gpu_latency.md
+
+Voices are designed from text descriptions (VoiceDesign). No real person's voice is cloned.
+STT model matches the team's korean-stt server (openai/whisper-large-v3-turbo, CTranslate2 conversion
+dropbox-dash/faster-whisper-large-v3-turbo) so detection and training see the same recognizer.
+"""
+import modal
+
+APP_NAME = "codysafe-voice"
+STT_REPO = "dropbox-dash/faster-whisper-large-v3-turbo"
+TTS_REPO = "Qwen/Qwen3-TTS-12Hz-1.7B-VoiceDesign"   # designs each voice once from a text description
+CLONE_REPO = "Qwen/Qwen3-TTS-12Hz-1.7B-Base"         # speaks every line in that designed voice (same identity)
+REF_DIR = "/root/.cache/huggingface/codysafe_voice_refs"  # designed reference clips, kept on the Volume
+REF_TEXT = "안녕하세요. 지금부터 몇 가지 확인할 내용이 있어서 연락드렸습니다. 잠시만 시간 괜찮으실까요?"
+GPU = "L40S"
+MINUTES = 60
+
+image = (
+    modal.Image.from_registry("nvidia/cuda:12.8.1-cudnn-runtime-ubuntu22.04", add_python="3.12")
+    .entrypoint([])
+    .apt_install("sox", "libsox-fmt-all", "ffmpeg")
+    .uv_pip_install(
+        "torch==2.8.0", "torchaudio==2.8.0",
+        index_url="https://download.pytorch.org/whl/cu128",
+    )
+    .uv_pip_install(
+        "qwen-tts==0.1.1", "faster-whisper==1.2.1", "soundfile", "numpy<2.3",
+        "fastapi[standard]", "python-multipart", "huggingface_hub[hf_xet]",
+    )
+    .env({"HF_XET_HIGH_PERFORMANCE": "1"})
+)
+
+hf_cache = modal.Volume.from_name("codysafe-hf-cache", create_if_missing=True)
+VOLUMES = {"/root/.cache/huggingface": hf_cache}
+app = modal.App(APP_NAME)
+
+# Pace is not reliable through the instruct alone (08:3x test), so _synth trims silence and time-stretches
+# (pitch kept, ffmpeg atempo) to a target syllables-per-second per tone.
+# Stretching more than ~1.15x sounds like fast playback (호연 08:5x), so urgent/threat stay near natural.
+MAX_STRETCH = {"urgent": 1.15, "threat": 1.15}
+RATE = {"": 6.2, "calm": 5.6, "official": 5.8, "urgent": 7.2, "threat": 6.4, "tremble": 6.6, "sob": 5.2,
+        "friendly": 6.4}
+VOICES = {
+    "caller_male": "A Korean man in his early 40s with a low, steady, businesslike voice, "
+                   "speaking standard Seoul Korean on a phone call. ",
+    "caller_female": "A Korean woman in her early 30s with a clear, polite, composed call-center voice, "
+                     "speaking standard Seoul Korean on a phone call. ",
+    "family": "A Korean man in his late 20s, the listener's son, with a natural, familiar, warm voice, "
+              "speaking casual Seoul Korean on a phone call. ",
+    "family_female": "A Korean woman in her early 20s, the listener's daughter, with a natural, familiar, "
+                     "slightly high and soft voice, speaking casual Seoul Korean on a phone call.",
+}
+SEEDS = {"caller_male": 1101, "caller_female": 2202, "family": 3303, "family_female": 4404}  # fixed seed per voice -> steadier timbre
+TONES = {  # O-1 TONE_GUIDE keys -> style words. NOTE (v5, 09:1x): the Base reader ignores these; tone = pace (RATE) only.
+    # Kept so the request format stays the same and VoiceDesign can be used again if needed.
+    "calm": "calm and clear, but at a normal conversational pace",
+    "official": "stiff, formal and bureaucratic, slightly low pitch, brisk",
+    # urgent/threat: pace comes from the instruct itself (tested 08:5x: 6.8 syl/s without stretching)
+    "urgent": ("a fast-talking, impatient investigator who scolds and rushes the listener, sharp and forceful "
+               "tone, rapid speech. 화난 듯 다그치며 빠르게 몰아붙이듯"),
+    "threat": ("an intimidating, stern man who scolds the listener in a low, forceful voice, clipped and fast. "
+               "위압적으로 다그치듯 단호하게"),
+    "tremble": "anxious and trembling, short of breath, hurried",
+    "sob": "tearful, sobbing, the ends of sentences shaking",
+    "friendly": "friendly, warm and bright, lively pace",
+}
+MAX_TEXT = 400
+MAX_AUDIO = 15 * 1024 * 1024
+
+
+@app.function(image=image, volumes=VOLUMES, timeout=30 * MINUTES)
+def download():
+    from huggingface_hub import snapshot_download
+
+    for repo in (STT_REPO, TTS_REPO, CLONE_REPO):
+        print("cached", repo, "->", snapshot_download(repo))
+    hf_cache.commit()
+
+
+@app.cls(
+    image=image,
+    gpu=GPU,
+    cpu=4.0,                   # TTS decoding loop is CPU-bound per step; Modal default CPU is small
+    memory=16384,
+    volumes=VOLUMES,
+    secrets=[modal.Secret.from_name("codysafe-gpu")],
+    min_containers=0,
+    max_containers=1,
+    scaledown_window=5 * MINUTES,
+    timeout=10 * MINUTES,
+    startup_timeout=10 * MINUTES,
+)
+@modal.concurrent(max_inputs=8)
+class Voice:
+    @modal.enter()
+    def load(self):
+        import os
+        import threading
+
+        import soundfile as sf
+        import torch
+        from faster_whisper import WhisperModel
+        from qwen_tts import Qwen3TTSModel
+
+        self.lock = threading.Lock()
+        self.stt = WhisperModel(STT_REPO, device="cuda", compute_type="float16")
+        self.tts = Qwen3TTSModel.from_pretrained(TTS_REPO, device_map="cuda:0", dtype=torch.bfloat16,
+                                                 attn_implementation="sdpa")
+        self.clone = Qwen3TTSModel.from_pretrained(CLONE_REPO, device_map="cuda:0", dtype=torch.bfloat16,
+                                                   attn_implementation="sdpa")
+        langs = self.tts.get_supported_languages() or []
+        self.lang = next((x for x in langs if str(x).lower() in ("korean", "ko")), "Korean")
+        # One designed reference clip per voice (synthetic, no real person), stored on the Volume so the
+        # identity stays the same across container restarts. Every line is then spoken by the Base model
+        # in that voice (11-01 09:1x: designing per line changed the speaker between lines).
+        os.makedirs(REF_DIR, exist_ok=True)
+        self.prompts, made = {}, False
+        for voice in VOICES:
+            path = f"{REF_DIR}/{voice}.wav"
+            if not os.path.exists(path):
+                torch.manual_seed(SEEDS[voice])
+                wavs, sr = self.tts.generate_voice_design(text=REF_TEXT, instruct=VOICES[voice], language=self.lang)
+                sf.write(path, wavs[0], sr, subtype="PCM_16")
+                made = True
+            ref, ref_sr = sf.read(path, dtype="float32")
+            self.prompts[voice] = self.clone.create_voice_clone_prompt(
+                ref_audio=(ref, ref_sr), ref_text=REF_TEXT, x_vector_only_mode=False)
+        if made:
+            hf_cache.commit()
+        # warm the kernels once so the first real request is not the slow one
+        self._synth("안녕하세요.", "caller_male", "")
+
+    def _synth(self, text: str, voice: str, style: str, emotion: str = "", rate: float = 0.0):
+        import io
+        import re
+        import subprocess
+
+        import numpy as np
+        import soundfile as sf
+        import torch
+
+        # Identity first: the Base model has no style instruct, so tone is carried by pace (RATE) only.
+        with self.lock:
+            torch.manual_seed(SEEDS[voice])
+            wavs, sr = self.clone.generate_voice_clone(text=text, language=self.lang,
+                                                       voice_clone_prompt=self.prompts[voice])
+        wav = np.asarray(wavs[0], dtype=np.float32)
+        loud = np.flatnonzero(np.abs(wav) > 0.01)
+        if loud.size:  # trim leading/trailing silence, keep 0.08 s
+            pad = int(0.08 * sr)
+            wav = wav[max(0, loud[0] - pad):loud[-1] + pad]
+        syllables = len(re.findall(r"[가-힣0-9]", text)) + len(re.findall(r"[A-Za-z]", text)) / 2
+        dur = len(wav) / sr
+        speed = 1.0
+        if syllables and dur:
+            if rate:  # caller asked for an exact pace (e.g. video lines): allow slowing down too
+                speed = min(1.3, max(0.8, rate * dur / syllables))
+            else:
+                speed = min(MAX_STRETCH.get(emotion, 1.6), max(1.0, RATE.get(emotion, RATE[""]) * dur / syllables))
+        if abs(speed - 1.0) > 0.02:  # raw float in/out so the WAV header written below has the right length
+            out = subprocess.run(["ffmpeg", "-nostdin", "-loglevel", "error", "-f", "f32le", "-ar", str(sr),
+                                  "-ac", "1", "-i", "-", "-filter:a", f"atempo={speed:.3f}", "-f", "f32le", "-"],
+                                 input=wav.tobytes(), capture_output=True)
+            if out.returncode == 0 and out.stdout:
+                wav = np.frombuffer(out.stdout, dtype=np.float32)
+            else:
+                speed = 1.0
+        buf = io.BytesIO()
+        sf.write(buf, wav, sr, format="WAV", subtype="PCM_16")
+        return buf.getvalue(), speed
+
+    @modal.asgi_app()
+    def web(self):
+        import os
+        import secrets
+        import subprocess
+        import tempfile
+        import time
+
+        import numpy as np
+        import torch
+        from fastapi import Depends, FastAPI, File, Form, HTTPException, Request, UploadFile
+        from fastapi.responses import Response
+
+        token = os.environ["GPU_TOKEN"].strip()
+        if len(token) < 32:
+            raise RuntimeError("GPU_TOKEN missing or too short")  # never accept an empty Bearer
+        api = FastAPI(title="codysafe-voice", docs_url=None, redoc_url=None, openapi_url=None)
+
+        def auth(request: Request):
+            got = request.headers.get("authorization", "")
+            if not (got.startswith("Bearer ") and secrets.compare_digest(got[7:].strip(), token)):
+                raise HTTPException(status_code=401, detail="unauthorized")
+
+        @api.get("/health")
+        def health():
+            return {"ok": True, "model": f"stt={STT_REPO}; tts={CLONE_REPO} (voices designed by {TTS_REPO})"}
+
+        @api.post("/stt", dependencies=[Depends(auth)])
+        def stt(file: UploadFile = File(...), language: str = Form("ko"), model: str = Form("")):
+            data = file.file.read(MAX_AUDIO + 1)
+            if not data:
+                print(f"stt reject: empty file name={file.filename!r} type={file.content_type!r}")
+                raise HTTPException(status_code=400, detail="empty file")
+            if len(data) > MAX_AUDIO:
+                raise HTTPException(status_code=413, detail="file too large")
+            suffix = os.path.splitext(file.filename or "")[1] or ".wav"
+            t0 = time.perf_counter()
+            with tempfile.NamedTemporaryFile(suffix=suffix) as f:
+                f.write(data)
+                f.flush()
+                # decode with ffmpeg ourselves (faster-whisper's PyAV path breaks on new av versions)
+                dec = None
+                for fmt in ([], ["-f", "webm"], ["-f", "mp4"], ["-f", "ogg"]):
+                    dec = subprocess.run(["ffmpeg", "-nostdin", "-loglevel", "error", *fmt, "-i", f.name,
+                                          "-f", "f32le", "-ac", "1", "-ar", "16000", "-"], capture_output=True)
+                    if dec.returncode == 0 and dec.stdout:
+                        break
+            if dec.returncode != 0 or not dec.stdout:
+                print(f"stt reject: decode failed bytes={len(data)} name={file.filename!r} "
+                      f"type={file.content_type!r} head={data[:12].hex()} err={dec.stderr[-300:]!r}")
+                raise HTTPException(status_code=400, detail="cannot decode audio")
+            audio = np.frombuffer(dec.stdout, dtype=np.float32)
+            with self.lock:
+                segments, info = self.stt.transcribe(
+                    audio, language=(language or "ko")[:2], beam_size=5, vad_filter=True,
+                    condition_on_previous_text=False)
+                text = " ".join(s.text.strip() for s in segments).strip()
+            return {"text": text, "duration_s": round(len(audio) / 16000, 3),
+                    "elapsed_s": round(time.perf_counter() - t0, 3)}
+
+        @api.post("/tts", dependencies=[Depends(auth)])
+        async def tts(request: Request):
+            try:
+                body = await request.json()
+            except Exception:
+                raise HTTPException(status_code=400, detail="JSON body required")
+            if not isinstance(body, dict):
+                raise HTTPException(status_code=400, detail="JSON object required")
+            text = str(body.get("text") or body.get("input") or "").strip()
+            if not text:
+                raise HTTPException(status_code=400, detail="text required")
+            if len(text) > MAX_TEXT:
+                raise HTTPException(status_code=413, detail=f"text longer than {MAX_TEXT}")
+            fmt = str(body.get("format") or body.get("response_format") or "wav").lower()
+            if fmt != "wav":
+                raise HTTPException(status_code=400, detail="only wav")
+            voice = body.get("voice")
+            voice = voice if isinstance(voice, str) and voice in VOICES else "caller_male"
+            emotion = str(body.get("emotion") or "")
+            style = TONES.get(emotion) or str(body.get("instruct") or "")[:200]
+            import anyio
+
+            t0 = time.perf_counter()
+            try:
+                rate = float(body.get("rate") or 0)  # optional target syllables per second (3–9)
+            except (TypeError, ValueError):
+                rate = 0.0
+            rate = rate if 3.0 <= rate <= 9.0 else 0.0
+            audio, speed = await anyio.to_thread.run_sync(self._synth, text, voice, style, emotion, rate)
+            return Response(content=audio, media_type="audio/wav",
+                            headers={"X-Elapsed-S": f"{time.perf_counter() - t0:.3f}", "X-Voice": voice,
+                                     "X-Speed": f"{speed:.2f}"})
+
+        @api.get("/gpu", dependencies=[Depends(auth)])
+        def gpu():
+            smi = subprocess.run(
+                ["nvidia-smi", "--query-gpu=name,memory.used,memory.total", "--format=csv,noheader"],
+                capture_output=True, text=True).stdout.strip()
+            return {"nvidia_smi": smi,
+                    "torch_max_allocated_mib": round(torch.cuda.max_memory_allocated() / 2**20),
+                    "torch_max_reserved_mib": round(torch.cuda.max_memory_reserved() / 2**20)}
+
+        return api
